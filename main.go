@@ -152,6 +152,23 @@ func (s *state) project(time float64) *state {
 
 //endregion
 
+//region Util
+/**
+Print a fatal error and die.
+*/
+func printError(v interface{}) {
+	log.Fatal("Planner error:", v)
+}
+
+/**
+Log a message to stderr.
+*/
+func printLog(v interface{}) {
+	log.Println("Planner message:", v)
+}
+
+//endregion
+
 type plan struct {
 	states []state
 }
