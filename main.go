@@ -4,13 +4,9 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"strconv"
-	"strings"
-	"time"
 )
 
 //region Constants
-const maxSpeed = 2.5
 
 //endregion
 
@@ -41,7 +37,8 @@ func (c *cell) isBlocked() bool {
 Grid struct for holding distances to static obstacles (shore)
 */
 type grid struct {
-	cells [][]cell
+	cells         [][]cell
+	width, height int
 }
 
 /**
@@ -56,7 +53,21 @@ func newGrid(width int, height int) grid {
 		}
 		*cells = append(*cells, *col)
 	}
-	return grid{cells: *cells}
+	return grid{cells: *cells, width: width, height: height}
+}
+
+/**
+Get the cell at x, y.
+*/
+func (g *grid) get(x int, y int) *cell {
+	return &(g.cells[x][y])
+}
+
+/**
+Block the cell at x, y. For initialization only (probably).
+*/
+func (g *grid) block(x int, y int) {
+	g.get(x, y).distanceToShore = 0
 }
 
 //endregion
@@ -109,13 +120,7 @@ Parse a state from a string in the format: x y heading speed time
 */
 func parseState(line string) *state {
 	var x, y, heading, speed, t float64
-	split := strings.Split(line, " ")
-	x, _ = strconv.ParseFloat(split[0], 64)
-	y, _ = strconv.ParseFloat(split[1], 64)
-	heading, _ = strconv.ParseFloat(split[2], 64)
-	speed, _ = strconv.ParseFloat(split[3], 64)
-	t, _ = strconv.ParseFloat(split[4], 64)
-
+	fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
 	return &state{x, y, heading, speed, t}
 }
 
@@ -134,6 +139,10 @@ func (s *state) collides(other *state) bool {
 	return (math.Abs(s.time-other.time) < 1) &&
 		(math.Abs(s.x-other.x) < 1) &&
 		(math.Abs(s.y-other.y) < 1)
+}
+
+func (s *state) String() string {
+	return fmt.Sprintf("%f %f %f %f %f", s.x, s.y, s.heading, s.speed, s.time)
 }
 
 /**
@@ -173,43 +182,68 @@ type plan struct {
 	states []state
 }
 
-type path struct {
-	states []state
+func (p *plan) String() string {
+	s := fmt.Sprintf("plan %d", len(p.states))
+	for _, state := range p.states {
+		s += "\n" + state.String()
+	}
+	return s
+}
+
+type path []state
+
+/**
+Remove the given state from the path. Modifies the original path.
+*/
+func (p *path) remove(s state) {
+	b := (*p)[0:]
+	for _, x := range *p {
+		if s == x {
+			b = append(b, x)
+		}
+	}
 }
 
 func buildGrid() *grid {
-	log.Println("Reading map dimensions")
-	var maxX, maxY, minX, minY int
-	_, err := fmt.Scanf("%d %d %d %d", &maxX, &maxY, &minX, &minY)
-	if err != nil {
-		log.Fatal(err)
+	printLog("Reading map dimensions")
+	var width, height int
+	fmt.Scanf("map %d %d", &width, &height)
+	printLog("Building grid")
+	grid := newGrid(width, height)
+	for y := 0; y < height; y++ {
+		var line string
+		fmt.Scanln(&line)
+		for x, c := range line {
+			if c == '#' {
+				grid.block(x, y)
+			}
+		}
 	}
-	grid := newGrid(maxX, maxY)
-	//for y := 0; y < maxY; y++ {
-	//	var line string
-	//	_, err = fmt.Scanln(&line)
-	//if(len(line) != maxX) { log.Fatal("Error: wrong map dimension") }
-	//for x := 0; x < maxX; x++ {
-	//	fmt.Println(line[x])
-	//}
-	//for x, c := range line {
-	//	fmt.Println(x, c)
-	//}
-	//}
 	return &grid
 }
 
 func readPath() *path {
-	return new(path)
+	p := new(path)
+	var pathLength int
+	printLog("Reading path to cover")
+	fmt.Scanf("path to cover %d", &pathLength)
+	var x, y float64
+	for l := 0; l < pathLength; l++ {
+		fmt.Scanf("%f %f", &x, &y)
+		*p = append(*p, state{x: x, y: y})
+	}
+	return p
 }
 
-func makePlan(start *state) *plan {
+func makePlan(grid *grid, start *state, path *path) *plan {
+	printLog("Starting to plan")
 	var plan = new(plan)
 
 	// go north 50m over 20 seconds
 	s := state{x: start.x, y: start.y + 50, heading: 0, speed: 2.5, time: start.time + 20}
 	plan.states = append(plan.states, s)
 
+	printLog("Done planning")
 	return plan
 }
 
@@ -223,10 +257,52 @@ func updateObstacles(o *obstacles, n int) {
 	}
 }
 
-func main() {
-	var startTime = float64(time.Now().UnixNano()) / 10e9
-	fmt.Println("Planner starting at", startTime)
-	//var grid = buildGrid()
-	//var path = readPath()
+var maxSpeed, maxTurningRadius float64
 
+func main() {
+
+	//var startTime = float64(time.Now().UnixNano()) / 10e9
+	//printLog(fmt.Sprintf("Planner starting at %f", startTime))
+
+	var line string
+	fmt.Scanf("%s", &line) // "start"
+
+	fmt.Scanf("max speed %f", &maxSpeed)
+	fmt.Scanf("max turning radius %f", &maxTurningRadius)
+
+	var grid = buildGrid()
+
+	var path = readPath()
+
+	fmt.Println("ready")
+	printLog("ready to plan")
+
+	//printLog(fmt.Sprint(grid, path)) // to make Go stop complaining about unused variables
+
+	// planning loop
+	for {
+		fmt.Scanf("%s", &line)
+		if line != "plan" {
+			break
+		}
+
+		printLog("Reading newly covered path")
+		var covered int
+		fmt.Scanf("newly covered %d", &covered)
+		var x, y int
+		for i := 0; i < covered; i++ {
+			fmt.Scanf("%d %d", &x, &y)
+			path.remove(state{x: float64(x), y: float64(y)})
+		}
+		fmt.Scanf("start state %s", &line)
+		start := parseState(line)
+
+		var nObstacles int
+		o := new(obstacles)
+		fmt.Scanf("dynamic obs %d", nObstacles)
+		updateObstacles(o, nObstacles)
+
+		plan := makePlan(grid, start, path)
+		fmt.Println(plan.String())
+	}
 }
