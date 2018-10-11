@@ -505,37 +505,34 @@ func main() {
 	fmt.Println("ready")
 
 	// planning loop
-	// TODO -- fix termination conditions to actually work (loops forever)
-	for {
-		printLog("ready to plan")
-		line = getLine()
-		if line == "done" {
-			fmt.Println(line)
-			break
-		} else if line != "plan\n" {
+	printLog("ready to plan")
+	for line = getLine(); line != "done\n"; line = getLine() {
+
+		if line != "plan\n" {
 			continue
-		} else {
-
-			printLog("Reading newly covered path")
-			var covered int
-			fmt.Sscanf(getLine(), "newly covered %d", &covered)
-			var x, y int
-			for i := 0; i < covered; i++ {
-				fmt.Sscanf(getLine(), "%d %d", &x, &y)
-				path.remove(state{x: float64(x), y: float64(y)})
-			}
-			line = getLine()
-			line = strings.TrimPrefix(line, "start state ")
-			start := parseState(line)
-
-			var nObstacles int
-			o := new(obstacles)
-			fmt.Sscanf(getLine(), "dynamic obs %d", nObstacles)
-			updateObstacles(o, nObstacles)
-
-			plan := makePlan(grid, start, *path)
-			fmt.Println(plan.String())
 		}
+
+		printLog("Reading newly covered path")
+		var covered int
+		fmt.Sscanf(getLine(), "newly covered %d", &covered)
+		var x, y int
+		for i := 0; i < covered; i++ {
+			fmt.Sscanf(getLine(), "%d %d", &x, &y)
+			path.remove(state{x: float64(x), y: float64(y)})
+		}
+		line = getLine()
+		line = strings.TrimPrefix(line, "start state ")
+		start := parseState(line)
+
+		var nObstacles int
+		o := new(obstacles)
+		fmt.Sscanf(getLine(), "dynamic obs %d", nObstacles)
+		updateObstacles(o, nObstacles)
+
+		plan := makePlan(grid, start, *path)
+		fmt.Println(plan.String())
+
+		printLog("ready to plan")
 	}
 }
 
