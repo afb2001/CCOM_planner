@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 //region Constants
@@ -17,6 +18,32 @@ const (
 	goalBias     float64 = 0.1
 	maxSpeedBias float64 = 0.5
 )
+
+//endregion
+
+//region Util
+/**
+Print a fatal error and die.
+*/
+func printError(v interface{}) {
+	log.Fatal("Planner error:", v)
+}
+
+/**
+Log a message to stderr.
+*/
+func printLog(v interface{}) {
+	log.Println("Planner message:", v)
+}
+
+/**
+Read a line.
+I feel like I'm fighting the input stuff here...
+*/
+func getLine() string {
+	l, _ := reader.ReadString('\n')
+	return l
+}
 
 //endregion
 
@@ -87,27 +114,6 @@ func (g *grid) isBlocked(x float64, y float64) bool {
 	return g.get(int(x), int(y)).isBlocked()
 }
 
-/**
-Read the map from stdin and build the corresponding grid.
-*/
-func buildGrid() *grid {
-	printLog("Reading map dimensions")
-	var width, height int
-	fmt.Sscanf(getLine(), "map %d %d", &width, &height)
-	printLog("Building grid")
-	grid := newGrid(width, height)
-	for y := 0; y < height; y++ {
-		var line string
-		line = getLine()
-		for x, c := range line {
-			if c == '#' {
-				grid.block(x, y)
-			}
-		}
-	}
-	return &grid
-}
-
 //endregion
 
 //region Obstacles
@@ -142,20 +148,6 @@ func (o *obstacles) collisionExists(state *state) float64 {
 	return 0
 }
 
-/**
-Update the given obstacle collection to account for n
-updated obstacles coming from stdin.
-*/
-func updateObstacles(o *obstacles, n int) {
-	for i := 0; i < n; i++ {
-		var id int
-		var line string
-		fmt.Scanf("%d %s", &id, &line)
-		state := parseState(line)
-		o.update(id, state)
-	}
-}
-
 //endregion
 
 //region State
@@ -165,17 +157,6 @@ Represents a singular state in the world.
 */
 type state struct {
 	x, y, heading, speed, time float64
-}
-
-/**
-Parse a state from a string in the format: x y heading speed time.
-Turns heading into angle.
-*/
-func parseState(line string) *state {
-	//fmt.Println("parsing line", line)
-	var x, y, heading, speed, t float64
-	fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
-	return &state{x, y, (heading * -1) + math.Pi/2, speed, t}
 }
 
 /**
@@ -250,35 +231,27 @@ func (s *state) push(heading float64, distance float64) {
 
 //endregion
 
-//region Util
-/**
-Print a fatal error and die.
-*/
-func printError(v interface{}) {
-	log.Fatal("Planner error:", v)
-}
+//region Path
+
+type path []state
 
 /**
-Log a message to stderr.
+Remove the given state from the path. Modifies the original path.
 */
-func printLog(v interface{}) {
-	log.Println("Planner message:", v)
-}
-
-/**
-Read a line.
-I feel like I'm fighting the input stuff here...
-*/
-func getLine() string {
-	l, _ := reader.ReadString('\n')
-	return l
+func (p *path) remove(s state) {
+	b := (*p)[0:]
+	for _, x := range *p {
+		if s == x {
+			b = append(b, x)
+		}
+	}
 }
 
 //endregion
 
 //region Plan
 type plan struct {
-	states []state
+	states []*state
 }
 
 func (p *plan) String() string {
@@ -295,7 +268,7 @@ Default do-nothing plan.
 func defaultPlan(start *state) *plan {
 	plan := new(plan)
 	s := state{x: start.x, y: start.y, heading: start.heading, speed: start.speed, time: start.time + 1.0}
-	plan.states = append(plan.states, s)
+	plan.states = append(plan.states, &s)
 	return plan
 }
 
@@ -377,17 +350,16 @@ func getClosest(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64) {
 }
 
 func rrt(g *grid, start *state, goal *state) *plan {
-	//startTime := float64(time.Now().UnixNano()) / 10e9
+	startTime := float64(time.Now().UnixNano()) / 10e9
 	printLog(fmt.Sprintf("Start state is %s", start.String()))
 	p := new(plan)
 	root := &rrtNode{state: start}
 	nodes := []*rrtNode{root}
 	var n *rrtNode
 	// RRT loop
-	// TODO -- add some termination condition other than reaching goal
-	for {
+	for startTime+timeToPlan > float64(time.Now().UnixNano())/10e9 {
 		n = randomNode(g, goal)
-		printLog(fmt.Sprintf("Sampled state %s", n.state.String()))
+		//printLog(fmt.Sprintf("Sampled state %s", n.state.String()))
 		closest, distance := getClosest(nodes, n)
 		angle := n.state.headingTo(closest.state)
 
@@ -415,8 +387,13 @@ func rrt(g *grid, start *state, goal *state) *plan {
 			break
 		}
 	}
-	for c := n; c.state != start; c = c.parent {
-		p.states = append(p.states, *c.state)
+	// if we run out of time return a do-nothing plan (for now)
+	if !(startTime+timeToPlan > float64(time.Now().UnixNano())/10e9) {
+		return defaultPlan(start)
+	}
+
+	for cur := n; cur.state != start; cur = cur.parent {
+		p.states = append(p.states, cur.state)
 	}
 
 	// reverse the plan order
@@ -424,16 +401,54 @@ func rrt(g *grid, start *state, goal *state) *plan {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+
+	// hack to put times on the states at 1s intervals
+	for i, j := range s {
+		j.time = float64(i + 1)
+	}
+
 	p.states = s
 
 	return p
-
 }
 
 //endregion
 
-//region Path
-type path []state
+//region Parse
+
+// Anything that does parsing goes here
+
+/**
+Read the map from stdin and build the corresponding grid.
+*/
+func buildGrid() *grid {
+	printLog("Reading map dimensions")
+	var width, height int
+	fmt.Sscanf(getLine(), "map %d %d", &width, &height)
+	printLog("Building grid")
+	grid := newGrid(width, height)
+	for y := 0; y < height; y++ {
+		var line string
+		line = getLine()
+		for x, c := range line {
+			if c == '#' {
+				grid.block(x, y)
+			}
+		}
+	}
+	return &grid
+}
+
+/**
+Parse a state from a string in the format: x y heading speed time.
+Turns heading into angle.
+*/
+func parseState(line string) *state {
+	//fmt.Println("parsing line", line)
+	var x, y, heading, speed, t float64
+	fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
+	return &state{x, y, (heading * -1) + math.Pi/2, speed, t}
+}
 
 func readPath() *path {
 	p := new(path)
@@ -449,14 +464,17 @@ func readPath() *path {
 }
 
 /**
-Remove the given state from the path. Modifies the original path.
+Update the given obstacle collection to account for n
+updated obstacles coming from stdin.
 */
-func (p *path) remove(s state) {
-	b := (*p)[0:]
-	for _, x := range *p {
-		if s == x {
-			b = append(b, x)
-		}
+func updateObstacles(o *obstacles, n int) {
+	for i := 0; i < n; i++ {
+		var id int
+		var x, y, heading, speed, t float64
+		var line string = getLine()
+		fmt.Sscanf(line, "%d %f %f %f %f %f", &id, &x, &y, &heading, &speed, &t)
+		s := &state{x, y, (heading * -1) + math.Pi/2, speed, t}
+		o.update(id, s)
 	}
 }
 
@@ -471,6 +489,8 @@ func main() {
 	//var startTime = float64(time.Now().UnixNano()) / 10e9
 	//printLog(fmt.Sprintf("Planner starting at %f", startTime))
 
+	rand.Seed(2) // set seed for now
+
 	// redoing the parsing stuff
 	var line string
 	getLine() // start
@@ -484,9 +504,8 @@ func main() {
 
 	fmt.Println("ready")
 
-	//printLog(fmt.Sprint(grid, path)) // to make Go stop complaining about unused variables
-
 	// planning loop
+	// TODO -- fix termination conditions to actually work (loops forever)
 	for {
 		printLog("ready to plan")
 		line = getLine()
@@ -507,7 +526,6 @@ func main() {
 			}
 			line = getLine()
 			line = strings.TrimPrefix(line, "start state ")
-			//fmt.Scanf("start state %s\n", &line) // this doesn't work because of some space rules in Scanf
 			start := parseState(line)
 
 			var nObstacles int
