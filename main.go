@@ -108,6 +108,32 @@ func (g *grid) block(x int, y int) {
 }
 
 /**
+Block cells at the specified resolution
+*/
+func (g *grid) blockRange(x int, y int, r int) {
+	for i := 0; i < r; i++ {
+		for j := 0; j < r; j++ {
+			g.block(x+i, y+j)
+		}
+	}
+}
+
+func (g *grid) dump() string {
+	var s = "\n"
+	for y := g.height - 1; y >= 0; y-- {
+		for x := 0; x < g.width; x++ {
+			if g.isBlocked(float64(x), float64(y)) {
+				s += "#"
+			} else {
+				s += "_"
+			}
+		}
+		s += "\n"
+	}
+	return s
+}
+
+/**
 Determine if a given point is within a static obstacle.
 */
 func (g *grid) isBlocked(x float64, y float64) bool {
@@ -423,16 +449,16 @@ Read the map from stdin and build the corresponding grid.
 */
 func buildGrid() *grid {
 	printLog("Reading map dimensions")
-	var width, height int
-	fmt.Sscanf(getLine(), "map %d %d", &width, &height)
+	var width, height, resolution int
+	fmt.Sscanf(getLine(), "map %d %d %d", &resolution, &width, &height)
 	printLog("Building grid")
-	grid := newGrid(width, height)
-	for y := 0; y < height; y++ {
+	grid := newGrid(width*resolution, height*resolution)
+	for y := height - 1; y >= 0; y-- {
 		var line string
 		line = getLine()
 		for x, c := range line {
 			if c == '#' {
-				grid.block(x, y)
+				grid.blockRange(x*resolution, y*resolution, resolution)
 			}
 		}
 	}
