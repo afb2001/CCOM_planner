@@ -479,20 +479,32 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 
 	// add states to plan and compute times
 	t := start.time
+	var prev *State = nil
+	var headingDelta float64
 	for _, n := range branch {
-		printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
+		//printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
 		t += dubinsInc / maxSpeed
 		cur := n.state
 		traj := n.trajectory // shorthand, I guess?
 		for _, s := range traj.states {
 			t += dubinsInc / maxSpeed
 			s.time += t
+			if prev == nil ||
+				// heading delta changes sign, i.e we moved to new dubins segment
+				headingDelta*(prev.heading-cur.heading) <= 0 {
+				p.appendState(s)
+			}
+			if prev != nil {
+				headingDelta = prev.heading - cur.heading
+			}
+			prev = s
 		}
 		//t = traj.states[len(traj.states) - 1].time + (dubinsInc / maxSpeed)
-		p.appendPlan(traj)
+		//p.appendPlan(traj)
 		t += dubinsInc / maxSpeed
 		cur.time = t
 		p.appendState(cur)
+		prev = cur
 	}
 
 	return p
