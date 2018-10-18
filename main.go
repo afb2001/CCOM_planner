@@ -3,6 +3,7 @@ package main
 import (
 	"./dubins"
 	"bufio"
+	"container/heap"
 	"fmt"
 	"log"
 	"math"
@@ -377,7 +378,7 @@ func randomState(bounds *grid) *State {
 Create a random sample using the biasing constants.
 */
 func biasedRandomState(bounds *grid, goal *State) *State {
-	verbose = false
+	//verbose = false
 	s := randomState(bounds)
 	if r := rand.Float64(); r < maxSpeedBias {
 		s.speed = maxSpeed
@@ -400,10 +401,15 @@ O(n) time.
 */
 func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, float64, *dubins.Path) {
 	var closest *rrtNode
-	minDistance := math.MaxFloat64
+	minDistance := math.MaxFloat64 // dubins distance
 	var bestPath dubins.Path
-	for _, node := range nodes {
-		dPath, err := shortestPath(node.state, n.state)
+	nodeHeap := heapify(nodes, n.state)
+	//printLog()
+	for heapNode := nodeHeap.Pop().(*rrtHeapNode);
+	// euclidean distance (2d) vs dubins distance
+	heapNode.node.state.DistanceTo(n.state) < minDistance; {
+		//for _, node := range nodes {
+		dPath, err := shortestPath(heapNode.node.state, n.state)
 		if err != dubins.EDUBOK {
 			if verbose {
 				printLog("Couldn't make dubins path")
@@ -414,9 +420,14 @@ func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, 
 			n.trajectory = getSamples(dPath, g, o)
 			if n.trajectory != nil {
 				minDistance = d
-				closest = node
+				closest = heapNode.node
 				bestPath = *dPath
 			}
+		}
+		if nodeHeap.Len() > 0 {
+			heapNode = nodeHeap.Pop().(*rrtHeapNode)
+		} else {
+			break
 		}
 	}
 	return closest, minDistance, &bestPath
@@ -525,6 +536,48 @@ func showSamples(nodes []*rrtNode, g *grid, start *State, goal *State) string {
 	arrays[int(goal.y)][int(goal.x)] = '*'
 	//printLog("Map:")
 	return string(bytes)
+}
+
+//endregion
+
+//region NodeHeap
+
+type rrtHeapNode struct {
+	node       *rrtNode
+	otherState *State
+}
+
+type NodeHeap []*rrtHeapNode
+
+func (h NodeHeap) Len() int { return len(h) }
+func (h NodeHeap) Less(i, j int) bool {
+	return h[i].node.state.DistanceTo(h[i].otherState) <
+		h[j].node.state.DistanceTo(h[j].otherState)
+}
+func (h NodeHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+
+func (h *NodeHeap) Push(x interface{}) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(*rrtHeapNode))
+}
+
+func (h *NodeHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
+func heapify(nodes []*rrtNode, otherState *State) *NodeHeap {
+	var nodeHeap NodeHeap
+	for _, n := range nodes {
+		//printLog(n.state.String())
+		nodeHeap = append(nodeHeap, &rrtHeapNode{n, otherState})
+	}
+	heap.Init(&nodeHeap)
+	return &nodeHeap
 }
 
 //endregion
