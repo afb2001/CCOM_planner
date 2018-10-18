@@ -15,9 +15,9 @@ import (
 //region Constants
 const (
 	rrtInc        float64 = 0.5
-	dubinsInc     float64 = 0.1 // this might be low
-	dubinsDensity float64 = 1   // factor of dubinsInc
-	timeToPlan    float64 = 0.5 // TOOO! -- make parameter
+	dubinsInc     float64 = 0.1  // this might be low
+	dubinsDensity float64 = 1    // factor of dubinsInc
+	timeToPlan    float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
 	goalBias      float64 = 0.1
 	maxSpeedBias  float64 = 0.5
 )
@@ -86,10 +86,10 @@ Create a new grid of given dimensions
 */
 func newGrid(width int, height int) grid {
 	cells := new([][]cell)
-	for x := 0; x < width; x++ {
+	for y := 0; y < height; y++ {
 		col := new([]cell)
-		for y := 0; y < height; y++ {
-			*col = append(*col, newCell(x, y))
+		for x := 0; x < width; x++ {
+			*col = append(*col, newCell(y, x))
 		}
 		*cells = append(*cells, *col)
 	}
@@ -100,7 +100,7 @@ func newGrid(width int, height int) grid {
 Get the cell at x, y.
 */
 func (g *grid) get(x int, y int) *cell {
-	return &(g.cells[x][y])
+	return &(g.cells[y][x])
 }
 
 /**
@@ -279,12 +279,13 @@ type path []State
 Remove the given state from the path. Modifies the original path.
 */
 func (p *path) remove(s State) {
-	b := (*p)[0:]
+	b := (*p)[0:0]
 	for _, x := range *p {
-		if s == x {
+		if s != x {
 			b = append(b, x)
 		}
 	}
+	p = &b
 }
 
 //endregion
@@ -448,8 +449,9 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 		}
 		//printLog((fmt.Sprintf("Current node count is now %d", len(nodes))))
 	}
-	printLog(float64(blockedCount) / float64(sampleCount))
+	printLog(fmt.Sprintf("Samples: %d, blocked: %d, ratio: %f", sampleCount, blockedCount, float64(blockedCount)/float64(sampleCount)))
 	// if we run out of time return a do-nothing plan (for now)
+	printLog("Samples on map:" + showSamples(nodes, g, start, goal))
 	if !(startTime+timeToPlan > float64(time.Now().UnixNano())/10e9) {
 		printLog("Time elapsed before we found a plan")
 		return defaultPlan(start)
@@ -480,11 +482,28 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 			s.time += t
 		}
 		//t = traj.states[len(traj.states) - 1].time + (dubinsInc / maxSpeed)
-		p.appendState(cur)
 		p.appendPlan(traj)
+		p.appendState(cur)
 	}
 
 	return p
+}
+
+func showSamples(nodes []*rrtNode, g *grid, start *State, goal *State) string {
+	var bytes = []byte(g.dump())
+	var arrays [][]byte
+	for i := g.height - 1; i >= 0; i-- {
+		arrays = append(arrays, bytes[1+(i*(g.width+1)):1+(i+1)*(g.width+1)])
+	}
+	//printLog("All nodes sampled:")
+	for _, n := range nodes {
+		//printLog(n.state.String())
+		arrays[int(n.state.y)][int(n.state.x)] = 'o'
+	}
+	arrays[int(start.y)][int(start.x)] = '@'
+	arrays[int(goal.y)][int(goal.x)] = '*'
+	//printLog("Map:")
+	return string(bytes)
 }
 
 //endregion
@@ -495,6 +514,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 Find the shortest Dubins path between two states.
 */
 func shortestPath(s1 *State, s2 *State) (path *dubins.Path, err int) {
+	//printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
 	path = new(dubins.Path)
 	err = dubins.ShortestPath(path, s1.ToArrayPointer(), s2.ToArrayPointer(), maxTurningRadius)
 	return path, err
@@ -607,7 +627,7 @@ func main() {
 	//var startTime = float64(time.Now().UnixNano()) / 10e9
 	//printLog(fmt.Sprintf("Planner starting at %f", startTime))
 
-	rand.Seed(2) // set seed for now
+	rand.Seed(3) // set seed for now
 
 	// redoing the parsing stuff
 	var line string
@@ -617,6 +637,8 @@ func main() {
 	fmt.Sscanf(getLine(), "max turning radius %f", &maxTurningRadius)
 
 	var grid = buildGrid()
+
+	//printLog(grid.dump())
 
 	var path = readPath()
 
