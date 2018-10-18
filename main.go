@@ -377,13 +377,13 @@ func randomState(bounds *grid) *State {
 Create a random sample using the biasing constants.
 */
 func biasedRandomState(bounds *grid, goal *State) *State {
-	sampleIsGoal = false
+	verbose = false
 	s := randomState(bounds)
 	if r := rand.Float64(); r < maxSpeedBias {
 		s.speed = maxSpeed
 	}
 	if r := rand.Float64(); r < goalBias {
-		sampleIsGoal = true
+		//verbose = true
 		return goal
 	}
 	return s
@@ -405,7 +405,7 @@ func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, 
 	for _, node := range nodes {
 		dPath, err := shortestPath(node.state, n.state)
 		if err != dubins.EDUBOK {
-			if sampleIsGoal {
+			if verbose {
 				printLog("Couldn't make dubins path")
 			}
 			continue
@@ -416,14 +416,13 @@ func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, 
 				minDistance = d
 				closest = node
 				bestPath = *dPath
-				//return nil, math.MaxFloat64, nil
 			}
 		}
 	}
 	return closest, minDistance, &bestPath
 }
 
-var sampleIsGoal = false
+var verbose = false
 
 // TODO! -- if we find a plan but still have time find the next plan along the path
 func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
@@ -524,7 +523,7 @@ func showSamples(nodes []*rrtNode, g *grid, start *State, goal *State) string {
 Find the shortest Dubins path between two states.
 */
 func shortestPath(s1 *State, s2 *State) (path *dubins.Path, err int) {
-	if sampleIsGoal {
+	if verbose {
 		printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
 	}
 	path = new(dubins.Path)
@@ -545,7 +544,7 @@ func getSamples(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
 		s.collisionProbability = o.collisionExists(s)
 		// collision probability is 0 or 1 for now
 		if g.isBlocked(s.x, s.y) || s.collisionProbability > 0 {
-			if sampleIsGoal {
+			if verbose {
 				printLog(fmt.Sprintf("Blocked path: %f %f %f", s.x, s.y, s.collisionProbability))
 			}
 			return dubins.EDUBNOPATH
