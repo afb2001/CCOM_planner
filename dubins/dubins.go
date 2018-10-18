@@ -1,6 +1,8 @@
 package dubins
 
-import "math"
+import (
+	"math"
+)
 
 // This is a direct port of dubins.cpp by Mostafa.
 const EPSILON = 10e-10
@@ -57,7 +59,7 @@ type IntermediateResults struct {
 	alpha, beta, d, sa, sb, ca, cb, c_ab, d_sq float64
 }
 
-type PathSamplingCallback func(q [3]float64, t float64, userData interface{}) int
+type PathSamplingCallback func(q *[3]float64, t float64) int
 
 func fmodr(x float64, y float64) float64 {
 	return x - y*math.Floor(x/y)
@@ -67,7 +69,7 @@ func mod2pi(theta float64) float64 {
 	return fmodr(theta, 2*math.Pi)
 }
 
-func ShortestPath(path *Path, q0 [3]float64, q1 [3]float64, rho float64) int {
+func ShortestPath(path *Path, q0 *[3]float64, q1 *[3]float64, rho float64) int {
 	var params [3]float64
 	var cost float64
 	bestCost := math.MaxFloat64
@@ -102,7 +104,7 @@ func ShortestPath(path *Path, q0 [3]float64, q1 [3]float64, rho float64) int {
 	return EDUBOK
 }
 
-func CreatePath(path *Path, q0 [3]float64, q1 [3]float64, rho float64, pathType PathType) int {
+func CreatePath(path *Path, q0 *[3]float64, q1 *[3]float64, rho float64, pathType PathType) int {
 	in, err := MakeIntermediateResults(q0, q1, rho)
 	if err == EDUBOK {
 		var params [3]float64
@@ -136,7 +138,8 @@ func (p Path) SegmentLength(i int) float64 {
 	return p.SegmentLengthNormalized(i) * p.rho
 }
 
-func Segment(t float64, qi [3]float64, qt [3]float64, segmentType SegmentType) {
+func Segment(t float64, qi [3]float64, qt *[3]float64, segmentType SegmentType) {
+	//log.Println(qt, t) // debug
 	st, ct := math.Sin(qi[2]), math.Cos(qi[2])
 	switch segmentType {
 	case L_SEG:
@@ -158,11 +161,13 @@ func Segment(t float64, qi [3]float64, qt [3]float64, segmentType SegmentType) {
 	qt[0] += qi[0]
 	qt[1] += qi[1]
 	qt[2] += qi[2]
+	//log.Println(qt) // debug
 }
 
-func (p *Path) Sample(t float64, q [3]float64) int {
+func (p *Path) Sample(t float64, q *[3]float64) int {
 	tPrime := t / p.rho
-	var qi, q1, q2 [3]float64
+	var qi [3]float64
+	q1, q2 := new([3]float64), new([3]float64)
 	var types = DIRDATA[p.pathType]
 
 	if t < 0 || t > p.Length() {
@@ -173,40 +178,46 @@ func (p *Path) Sample(t float64, q [3]float64) int {
 
 	p1, p2 := p.param[0], p.param[1]
 
+	//log.Println(q1, q2) // debug
+
 	Segment(p1, qi, q1, types[0])
-	Segment(p2, q1, q2, types[1])
+	Segment(p2, *q1, q2, types[1])
 
 	if tPrime < p1 {
 		Segment(tPrime, qi, q, types[0])
 	} else if tPrime < p1+p2 {
-		Segment(tPrime-p1, q1, q, types[1])
+		Segment(tPrime-p1, *q1, q, types[1])
 	} else {
-		Segment(tPrime-p1-p2, q2, q, types[2])
+		Segment(tPrime-p1-p2, *q2, q, types[2])
 	}
 
 	q[0] = q[0]*p.rho + p.qi[0]
 	q[1] = q[1]*p.rho + p.qi[1]
 	q[2] = mod2pi(q[2])
 
+	//log.Println(q1, q2) // debug
 	return EDUBOK
 }
 
 func (p *Path) SampleMany(stepSize float64,
-	cb PathSamplingCallback, userData interface{}) int {
+	cb PathSamplingCallback) int {
 	x, length := 0.0, p.Length()
-	var q [3]float64
+	var q = new([3]float64)
 	for ; x < length; x += stepSize {
+		//log.Println(x)
 		p.Sample(x, q)
-		if ret := cb(q, x, userData); ret != 0 {
+		if ret := cb(q, x); ret != 0 {
 			return ret
 		}
 	}
 	return EDUBOK
 }
 
-func (p *Path) EndPoint(q [3]float64) int {
+func (p *Path) EndPoint(q *[3]float64) int {
 	return p.Sample(p.Length()-EPSILON, q)
 }
+
+//region ExtractSubPath
 
 func (p *Path) ExtractSubpath(t float64, newPath *Path) int {
 	tprime := t / p.rho
@@ -224,7 +235,11 @@ func (p *Path) ExtractSubpath(t float64, newPath *Path) int {
 	return EDUBOK
 }
 
-func MakeIntermediateResults(q0 [3]float64, q1 [3]float64, rho float64) (results *IntermediateResults, err int) {
+//endregion
+
+//region MakeIntermediateResults
+
+func MakeIntermediateResults(q0 *[3]float64, q1 *[3]float64, rho float64) (results *IntermediateResults, err int) {
 	if rho <= 0 {
 		return nil, EDUBBADRHO
 	}
@@ -247,6 +262,10 @@ func MakeIntermediateResults(q0 [3]float64, q1 [3]float64, rho float64) (results
 		c_ab: math.Cos(alpha - beta), d_sq: d * d,
 	}, EDUBOK
 }
+
+//endregion
+
+//region Build Segments
 
 func BuildLSL(in *IntermediateResults) (out [3]float64, err int) {
 	tmp0 := in.d + in.sa - in.sb
@@ -327,3 +346,5 @@ func BuildWord(in *IntermediateResults, pathType PathType) (out [3]float64, err 
 	}
 	return out, EDUBOTHER
 }
+
+// endregion

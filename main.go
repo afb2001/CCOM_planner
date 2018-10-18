@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./dubins"
 	"bufio"
 	"fmt"
 	"log"
@@ -13,10 +14,12 @@ import (
 
 //region Constants
 const (
-	rrtInc       float64 = 0.5
-	timeToPlan   float64 = 0.5 // TOOO! -- make parameter
-	goalBias     float64 = 0.1
-	maxSpeedBias float64 = 0.5
+	rrtInc        float64 = 0.5
+	dubinsInc     float64 = 0.1 // this might be low
+	dubinsDensity float64 = 1   // factor of dubinsInc
+	timeToPlan    float64 = 0.5 // TOOO! -- make parameter
+	goalBias      float64 = 0.1
+	maxSpeedBias  float64 = 0.5
 )
 
 //endregion
@@ -137,6 +140,9 @@ func (g *grid) dump() string {
 Determine if a given point is within a static obstacle.
 */
 func (g *grid) isBlocked(x float64, y float64) bool {
+	if x < 0 || x > float64(g.width) || y < 0 || y > float64(g.height) {
+		return true
+	}
 	return g.get(int(x), int(y)).isBlocked()
 }
 
@@ -147,12 +153,12 @@ func (g *grid) isBlocked(x float64, y float64) bool {
 /**
 Type alias for (dynamic) obstacle collection.
 */
-type obstacles map[int]*state
+type obstacles map[int]*State
 
 /**
 Add or update the obstacle collection with the new obstacle.
 */
-func (o *obstacles) update(id int, newState *state) {
+func (o *obstacles) update(id int, newState *State) {
 	(*o)[id] = newState
 }
 
@@ -165,9 +171,9 @@ Check if any of the obstacles collide with the given state.
 
 Returns a float64 probability of collision.
 */
-func (o *obstacles) collisionExists(state *state) float64 {
+func (o *obstacles) collisionExists(state *State) float64 {
 	for _, s := range *o {
-		if s.collides(s.project(s.timeUntil(state))) {
+		if s.Collides(s.Project(s.TimeUntil(state))) {
 			return 1.0
 		}
 	}
@@ -181,25 +187,26 @@ func (o *obstacles) collisionExists(state *state) float64 {
 /**
 Represents a singular state in the world.
 */
-type state struct {
+type State struct {
 	x, y, heading, speed, time float64
+	collisionProbability       float64
 }
 
 /**
 Returns the time in seconds until state other.
 */
-func (s *state) timeUntil(other *state) float64 {
+func (s *State) TimeUntil(other *State) float64 {
 	return other.time - s.time
 }
 
 /**
 Returns the Euclidean distance in two dimensions (x,y).
 */
-func (s *state) distanceTo(other *state) float64 {
+func (s *State) DistanceTo(other *State) float64 {
 	return math.Sqrt(math.Pow(s.x-other.x, 2) + math.Pow(s.y-other.y, 2))
 }
 
-func (s *state) headingTo(other *state) float64 {
+func (s *State) HeadingTo(other *State) float64 {
 	dx := s.x - other.x
 	dy := s.y - other.y
 	h := math.Atan2(dy, dx)
@@ -213,17 +220,24 @@ func (s *state) headingTo(other *state) float64 {
 True iff other is within 1m in the x and y directions and
 within 1 second in time.
 */
-func (s *state) collides(other *state) bool {
+func (s *State) Collides(other *State) bool {
 	return (math.Abs(s.time-other.time) < 1) &&
 		(math.Abs(s.x-other.x) < 1) &&
 		(math.Abs(s.y-other.y) < 1)
 }
 
 /**
+Convert this state to a 3D vector for Dubins functions.
+*/
+func (s *State) ToArrayPointer() *[3]float64 {
+	return &[3]float64{s.x, s.y, s.heading}
+}
+
+/**
 Create a string representation of the state.
 Angle is turned back into heading.
 */
-func (s *state) String() string {
+func (s *State) String() string {
 	return fmt.Sprintf("%f %f %f %f %f", s.x, s.y, (-1*s.heading)+math.Pi/2, s.speed, s.time)
 }
 
@@ -233,12 +247,12 @@ Creates a new state.
 
 Meant to be used with future times but should work either way.
 */
-func (s *state) project(time float64) *state {
+func (s *State) Project(time float64) *State {
 	deltaT := time - s.time
 	magnitude := deltaT * s.speed
 	deltaX := math.Cos(s.heading) * magnitude
 	deltaY := math.Sin(s.heading) * magnitude
-	return &state{x: s.x + deltaX, y: s.y + deltaY, heading: s.heading, speed: s.speed, time: time}
+	return &State{x: s.x + deltaX, y: s.y + deltaY, heading: s.heading, speed: s.speed, time: time}
 }
 
 /**
@@ -248,7 +262,7 @@ Mutates the current state.
 Written for ray-casting of sorts during collision checking.
 Probably should not use past version 0.
 */
-func (s *state) push(heading float64, distance float64) {
+func (s *State) Push(heading float64, distance float64) {
 	dx := distance * math.Cos(heading)
 	dy := distance * math.Sin(heading)
 	s.x += dx
@@ -259,12 +273,12 @@ func (s *state) push(heading float64, distance float64) {
 
 //region Path
 
-type path []state
+type path []State
 
 /**
 Remove the given state from the path. Modifies the original path.
 */
-func (p *path) remove(s state) {
+func (p *path) remove(s State) {
 	b := (*p)[0:]
 	for _, x := range *p {
 		if s == x {
@@ -276,11 +290,11 @@ func (p *path) remove(s state) {
 //endregion
 
 //region Plan
-type plan struct {
-	states []*state
+type Plan struct {
+	states []*State
 }
 
-func (p *plan) String() string {
+func (p *Plan) String() string {
 	s := fmt.Sprintf("plan %d", len(p.states))
 	for _, state := range p.states {
 		s += "\n" + state.String()
@@ -289,21 +303,37 @@ func (p *plan) String() string {
 }
 
 /**
+Append a state to the plan.
+*/
+func (p *Plan) appendState(s *State) {
+	p.states = append(p.states, s)
+}
+
+/**
+Concatenate two plans.
+*/
+func (p *Plan) appendPlan(other *Plan) {
+	for _, s := range other.states {
+		p.appendState(s)
+	}
+}
+
+/**
 Default do-nothing plan.
 */
-func defaultPlan(start *state) *plan {
-	plan := new(plan)
-	s := state{x: start.x, y: start.y, heading: start.heading, speed: start.speed, time: start.time + 1.0}
+func defaultPlan(start *State) *Plan {
+	plan := new(Plan)
+	s := State{x: start.x, y: start.y, heading: start.heading, speed: start.speed, time: start.time + 1.0}
 	plan.states = append(plan.states, &s)
 	return plan
 }
 
-func makePlan(grid *grid, start *state, path path) *plan {
+func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 	printLog("Starting to plan")
 	//var plan = new(plan)
 	//
 	//// go north 50m over 20 seconds
-	//s := state{x: start.x, y: start.y + 50, heading: 0, speed: 2.5, time: start.time + 20}
+	//s := State{x: start.x, y: start.y + 50, heading: 0, speed: 2.5, time: start.time + 20}
 	//plan.states = append(plan.states, s)
 
 	if len(path) == 0 {
@@ -312,7 +342,7 @@ func makePlan(grid *grid, start *state, path path) *plan {
 	// for now...
 	goal := path[0]
 
-	p := rrt(grid, start, &goal)
+	p := rrt(grid, start, &goal, o)
 
 	printLog("Done planning")
 	return p
@@ -323,16 +353,18 @@ func makePlan(grid *grid, start *state, path path) *plan {
 //region RRT
 
 type rrtNode struct {
-	state  *state
-	parent *rrtNode
+	state        *State
+	parent       *rrtNode
+	pathToParent *dubins.Path
+	trajectory   *Plan // trajectory to parent
 }
 
 /**
 Create a new state with random values.
 Time is unset (zero).
 */
-func randomState(bounds *grid) *state {
-	s := new(state)
+func randomState(bounds *grid) *State {
+	s := new(State)
 	s.x = rand.Float64() * float64(bounds.width)
 	s.y = rand.Float64() * float64(bounds.height)
 	s.heading = rand.Float64() * math.Pi * 2
@@ -343,7 +375,7 @@ func randomState(bounds *grid) *state {
 /**
 Create a random sample using the biasing constants.
 */
-func biasedRandomState(bounds *grid, goal *state) *state {
+func biasedRandomState(bounds *grid, goal *State) *State {
 	s := randomState(bounds)
 	if r := rand.Float64(); r < maxSpeedBias {
 		s.speed = maxSpeed
@@ -354,7 +386,7 @@ func biasedRandomState(bounds *grid, goal *state) *state {
 	return s
 }
 
-func randomNode(bounds *grid, goal *state) *rrtNode {
+func randomNode(bounds *grid, goal *State) *rrtNode {
 	n := rrtNode{state: biasedRandomState(bounds, goal)}
 	return &n
 }
@@ -363,79 +395,137 @@ func randomNode(bounds *grid, goal *state) *rrtNode {
 Find the closest node in a list of nodes.
 O(n) time.
 */
-func getClosest(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64) {
+func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, float64, *dubins.Path) {
 	var closest *rrtNode
 	minDistance := math.MaxFloat64
+	var bestPath dubins.Path
 	for _, node := range nodes {
-		if d := n.state.distanceTo(node.state); d < minDistance {
+		dPath, err := shortestPath(node.state, n.state)
+		if err != dubins.EDUBOK {
+			continue
+		}
+		if d := dPath.Length(); d < minDistance {
 			minDistance = d
 			closest = node
+			bestPath = *dPath
+			n.trajectory = getSamples(dPath, g, o)
+			if n.trajectory == nil {
+				return nil, math.MaxFloat64, nil
+			}
 		}
 	}
-	return closest, minDistance
+	return closest, minDistance, &bestPath
 }
 
-func rrt(g *grid, start *state, goal *state) *plan {
+func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 	startTime := float64(time.Now().UnixNano()) / 10e9
 	printLog(fmt.Sprintf("Start state is %s", start.String()))
-	p := new(plan)
+	p := new(Plan)
 	root := &rrtNode{state: start}
 	nodes := []*rrtNode{root}
 	var n *rrtNode
+	var sampleCount, blockedCount int
 	// RRT loop
 	for startTime+timeToPlan > float64(time.Now().UnixNano())/10e9 {
+		//printLog("Starting RRT loop")
 		n = randomNode(g, goal)
+		sampleCount++
 		//printLog(fmt.Sprintf("Sampled state %s", n.state.String()))
-		closest, distance := getClosest(nodes, n)
-		angle := n.state.headingTo(closest.state)
+		closest, distance, dPath := getClosest(nodes, n, g, o)
 
-		// there should be a better way to do this
-		dummy := *(closest.state)
-		dummyPointer := &dummy
-		var collision bool
-		for l := 0.0; l < distance; l += rrtInc {
-			if l+rrtInc > distance {
-				dummyPointer.push(angle, distance-l)
-			} else {
-				dummyPointer.push(angle, rrtInc)
-			}
-			if g.isBlocked(dummyPointer.x, dummyPointer.y) {
-				collision = true
-				break
-			}
+		if distance == math.MaxFloat64 {
+			blockedCount++
+			//printLog("Could not find state to connect to")
+			continue // no path so continue
 		}
-		if collision {
-			continue
-		}
+		//printLog(fmt.Sprintf("Found nearest state %s at distance %f", closest.state.String(), distance))
+
 		n.parent = closest
+		n.pathToParent = dPath
 		nodes = append(nodes, n)
 		if n.state == goal {
 			break
 		}
+		//printLog((fmt.Sprintf("Current node count is now %d", len(nodes))))
 	}
+	printLog(float64(blockedCount) / float64(sampleCount))
 	// if we run out of time return a do-nothing plan (for now)
 	if !(startTime+timeToPlan > float64(time.Now().UnixNano())/10e9) {
+		printLog("Time elapsed before we found a plan")
 		return defaultPlan(start)
 	}
 
+	// collect all nodes into slice
+	var branch []*rrtNode
 	for cur := n; cur.state != start; cur = cur.parent {
-		p.states = append(p.states, cur.state)
+		branch = append(branch, cur)
 	}
 
-	// reverse the plan order
-	s := p.states
+	// reverse the plan order (this might look dumb)
+	s := branch
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
 		s[i], s[j] = s[j], s[i]
 	}
+	branch = s
 
-	// hack to put times on the states at 1s intervals
-	for i, j := range s {
-		j.time = float64(i + 1)
+	// add states to plan and compute times
+	t := start.time
+	for _, n := range branch {
+		t += dubinsInc / maxSpeed
+		cur := n.state
+		cur.time = t
+		traj := n.trajectory // shorthand, I guess?
+		for _, s := range traj.states {
+			t += dubinsInc / maxSpeed
+			s.time += t
+		}
+		//t = traj.states[len(traj.states) - 1].time + (dubinsInc / maxSpeed)
+		p.appendState(cur)
+		p.appendPlan(traj)
 	}
 
-	p.states = s
-
 	return p
+}
+
+//endregion
+
+//region Dubins integration
+
+/**
+Find the shortest Dubins path between two states.
+*/
+func shortestPath(s1 *State, s2 *State) (path *dubins.Path, err int) {
+	path = new(dubins.Path)
+	err = dubins.ShortestPath(path, s1.ToArrayPointer(), s2.ToArrayPointer(), maxTurningRadius)
+	return path, err
+}
+
+/**
+Convert the given path into a feasible plan.
+*/
+func getSamples(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
+	plan = new(Plan)
+	var t float64
+	callback := func(q *[3]float64, inc float64) int {
+		//printLog(q)
+		//t += inc / maxSpeed
+		s := &State{x: q[0], y: q[1], heading: q[2], speed: maxSpeed, time: t} // t = 0 now
+		s.collisionProbability = o.collisionExists(s)
+		// collision probability is 0 or 1 for now
+		if g.isBlocked(s.x, s.y) || s.collisionProbability > 0 {
+			//printLog(fmt.Sprintf("Blocked path: %f %f %f", s.x, s.y, s.collisionProbability))
+			return dubins.EDUBNOPATH
+		}
+		plan.appendState(s)
+		return 0
+	}
+	err := path.SampleMany(dubinsInc, callback)
+
+	if err != dubins.EDUBOK {
+		return nil
+	}
+
+	return plan
 }
 
 //endregion
@@ -469,11 +559,11 @@ func buildGrid() *grid {
 Parse a state from a string in the format: x y heading speed time.
 Turns heading into angle.
 */
-func parseState(line string) *state {
+func parseState(line string) *State {
 	//fmt.Println("parsing line", line)
 	var x, y, heading, speed, t float64
 	fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
-	return &state{x, y, (heading * -1) + math.Pi/2, speed, t}
+	return &State{x: x, y: y, heading: (heading * -1) + math.Pi/2, speed: speed, time: t}
 }
 
 func readPath() *path {
@@ -484,7 +574,7 @@ func readPath() *path {
 	var x, y float64
 	for l := 0; l < pathLength; l++ {
 		fmt.Sscanf(getLine(), "%f %f", &x, &y)
-		*p = append(*p, state{x: x, y: y})
+		*p = append(*p, State{x: x, y: y})
 	}
 	return p
 }
@@ -499,7 +589,7 @@ func updateObstacles(o *obstacles, n int) {
 		var x, y, heading, speed, t float64
 		var line string = getLine()
 		fmt.Sscanf(line, "%d %f %f %f %f %f", &id, &x, &y, &heading, &speed, &t)
-		s := &state{x, y, (heading * -1) + math.Pi/2, speed, t}
+		s := &State{x: x, y: y, heading: (heading * -1) + math.Pi/2, speed: speed, time: t}
 		o.update(id, s)
 	}
 }
@@ -507,6 +597,8 @@ func updateObstacles(o *obstacles, n int) {
 //endregion
 
 //region main
+
+// globals
 var maxSpeed, maxTurningRadius float64
 var reader = bufio.NewReader(os.Stdin)
 
@@ -544,7 +636,7 @@ func main() {
 		var x, y int
 		for i := 0; i < covered; i++ {
 			fmt.Sscanf(getLine(), "%d %d", &x, &y)
-			path.remove(state{x: float64(x), y: float64(y)})
+			path.remove(State{x: float64(x), y: float64(y)})
 		}
 		line = getLine()
 		line = strings.TrimPrefix(line, "start state ")
@@ -555,7 +647,7 @@ func main() {
 		fmt.Sscanf(getLine(), "dynamic obs %d", nObstacles)
 		updateObstacles(o, nObstacles)
 
-		plan := makePlan(grid, start, *path)
+		plan := makePlan(grid, start, *path, o)
 		fmt.Println(plan.String())
 
 		printLog("ready to plan")
