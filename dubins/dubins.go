@@ -55,6 +55,10 @@ type Path struct {
 	pathType PathType
 }
 
+func (p *Path) GetPathType() PathType {
+	return p.pathType
+}
+
 type IntermediateResults struct {
 	alpha, beta, d, sa, sb, ca, cb, c_ab, d_sq float64
 }
@@ -301,7 +305,7 @@ func BuildRSL(in *IntermediateResults) (out [3]float64, err int) {
 	tmp0 := in.d - in.sa - in.sb
 	p_sq := -2 + in.d_sq + (2 * in.c_ab) - (2 * in.d * (in.sa + in.sb))
 	if p_sq >= 0 {
-		tmp1 := math.Atan2(in.ca+in.cb, tmp0) - math.Atan2(-2, math.Sqrt(p_sq))
+		tmp1 := math.Atan2(in.ca+in.cb, tmp0) - math.Atan2(2, math.Sqrt(p_sq))
 		return [3]float64{mod2pi(in.alpha - tmp1), math.Sqrt(p_sq), mod2pi(in.beta - tmp1)}, EDUBOK
 	}
 	return out, EDUBNOPATH

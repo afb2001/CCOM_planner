@@ -481,9 +481,9 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 	// add states to plan and compute times
 	t := start.time
 	for _, n := range branch {
+		printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
 		t += dubinsInc / maxSpeed
 		cur := n.state
-		cur.time = t
 		traj := n.trajectory // shorthand, I guess?
 		for _, s := range traj.states {
 			t += dubinsInc / maxSpeed
@@ -491,6 +491,8 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 		}
 		//t = traj.states[len(traj.states) - 1].time + (dubinsInc / maxSpeed)
 		p.appendPlan(traj)
+		t += dubinsInc / maxSpeed
+		cur.time = t
 		p.appendState(cur)
 	}
 
