@@ -20,7 +20,7 @@ const (
 	dubinsDensity float64 = 1    // factor of dubinsInc
 	timeToPlan    float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
 	goalBias      float64 = 0.1
-	maxSpeedBias  float64 = 0.5
+	maxSpeedBias  float64 = 1.0
 )
 
 //endregion
@@ -47,6 +47,13 @@ I feel like I'm fighting the input stuff here...
 func getLine() string {
 	l, _ := reader.ReadString('\n')
 	return l
+}
+
+/**
+Returns the current time in seconds as a float
+*/
+func now() float64 {
+	return float64(time.Now().UnixNano()) / 10e9
 }
 
 //endregion
@@ -218,13 +225,19 @@ func (s *State) HeadingTo(other *State) float64 {
 }
 
 /**
-True iff other is within 1m in the x and y directions and
-within 1 second in time.
+True iff other is within 1.5m in the x and y directions.
 */
 func (s *State) Collides(other *State) bool {
-	return (math.Abs(s.time-other.time) < 1) &&
-		(math.Abs(s.x-other.x) < 1) &&
-		(math.Abs(s.y-other.y) < 1)
+	return s.time == other.time &&
+		(math.Abs(s.x-other.x) < 1.5) &&
+		(math.Abs(s.y-other.y) < 1.5)
+}
+
+/**
+Tests whether the states have same (x, y)
+*/
+func (s *State) IsSamePosition(other *State) bool {
+	return s.x == other.x && s.y == other.y
 }
 
 /**
@@ -330,21 +343,36 @@ func defaultPlan(start *State) *Plan {
 	return plan
 }
 
+// TODO! -- fix duplicate states when planning for multiple goals
 func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 	printLog("Starting to plan")
-	//var plan = new(plan)
-	//
-	//// go north 50m over 20 seconds
-	//s := State{x: start.x, y: start.y + 50, heading: 0, speed: 2.5, time: start.time + 20}
-	//plan.states = append(plan.states, s)
 
 	if len(path) == 0 {
 		return defaultPlan(start)
 	}
-	// for now...
-	goal := path[0]
+	// set goal as first item in path
+	goalCount := 0
+	goal := &path[goalCount]
 
-	p := rrt(grid, start, &goal, o)
+	startTime := float64(time.Now().UnixNano()) / 10e9
+	var p = new(Plan)
+	for startTime+timeToPlan > now() {
+		newPlan := rrt(grid, start, goal, o, (startTime+timeToPlan)-now())
+		if newPlan == nil {
+			if len(p.states) == 0 {
+				printLog("Done planning")
+				return defaultPlan(start)
+			}
+		} else {
+			p.appendPlan(newPlan)
+			if goalCount++; len(path) > goalCount {
+				start = goal
+				goal = &path[goalCount]
+			} else {
+				return p
+			}
+		}
+	}
 
 	printLog("Done planning")
 	return p
@@ -435,8 +463,7 @@ func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, 
 
 var verbose = false
 
-// TODO! -- if we find a plan but still have time find the next plan along the path
-func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
+func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64) *Plan {
 	startTime := float64(time.Now().UnixNano()) / 10e9
 	printLog(fmt.Sprintf("Start state is %s", start.String()))
 	p := new(Plan)
@@ -445,7 +472,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 	var n *rrtNode
 	var sampleCount, blockedCount int
 	// RRT loop
-	for startTime+timeToPlan > float64(time.Now().UnixNano())/10e9 {
+	for startTime+timeRemaining > now() {
 		//printLog("Starting RRT loop")
 		n = randomNode(g, goal)
 		sampleCount++
@@ -468,15 +495,21 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 		//printLog((fmt.Sprintf("Current node count is now %d", len(nodes))))
 	}
 	printLog(fmt.Sprintf("Samples: %d, blocked: %d, ratio: %f", sampleCount, blockedCount, float64(blockedCount)/float64(sampleCount)))
-	// if we run out of time return a do-nothing plan (for now)
-	printLog("Samples on map:" + showSamples(nodes, g, start, goal))
-	if !(startTime+timeToPlan > float64(time.Now().UnixNano())/10e9) {
+	//printLog("Samples on map:" + showSamples(nodes, g, start, goal))
+
+	if !(startTime+timeToPlan > now()) {
 		printLog("Time elapsed before we found a plan")
-		return defaultPlan(start)
+		return nil // calling function handles default plan
+	}
+
+	// if we couldn't even start
+	if n == nil {
+		return nil
 	}
 
 	// collect all nodes into slice
 	var branch []*rrtNode
+
 	for cur := n; cur.state != start; cur = cur.parent {
 		branch = append(branch, cur)
 	}
@@ -493,30 +526,34 @@ func rrt(g *grid, start *State, goal *State, o *obstacles) *Plan {
 	var prev *State = nil
 	var headingDelta float64
 	for _, n := range branch {
-		//printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
+		printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
 		t += dubinsInc / maxSpeed
 		cur := n.state
 		traj := n.trajectory // shorthand, I guess?
 		for _, s := range traj.states {
 			t += dubinsInc / maxSpeed
 			s.time += t
+			// filter which states to include in output plan
 			if prev == nil ||
-				// heading delta changes sign, i.e we moved to new dubins segment
-				headingDelta*(prev.heading-cur.heading) <= 0 {
+				(headingDelta != 0 &&
+					!prev.IsSamePosition(s) &&
+					// heading delta changes sign, i.e we moved to new dubins segment
+					headingDelta*(prev.heading-s.heading) <= 0) {
+				// so we want to include this state
 				p.appendState(s)
 			}
 			if prev != nil {
-				headingDelta = prev.heading - cur.heading
+				headingDelta = prev.heading - s.heading
 			}
 			prev = s
 		}
-		//t = traj.states[len(traj.states) - 1].time + (dubinsInc / maxSpeed)
-		//p.appendPlan(traj)
 		t += dubinsInc / maxSpeed
 		cur.time = t
 		p.appendState(cur)
 		prev = cur
 	}
+	//printLog(fmt.Sprintf("Found a plan for goal %s", goal.String()))
+	//printLog(p.String())
 
 	return p
 }
@@ -557,8 +594,6 @@ func (h NodeHeap) Less(i, j int) bool {
 func (h NodeHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
 
 func (h *NodeHeap) Push(x interface{}) {
-	// Push and Pop use pointer receivers because they modify the slice's length,
-	// not just its contents.
 	*h = append(*h, x.(*rrtHeapNode))
 }
 
@@ -672,7 +707,12 @@ func readPath() *path {
 	var x, y float64
 	for l := 0; l < pathLength; l++ {
 		fmt.Sscanf(getLine(), "%f %f", &x, &y)
-		*p = append(*p, State{x: x, y: y})
+		s := State{x: x, y: y, speed: maxSpeed}
+		*p = append(*p, s)
+		if l > 0 {
+			sPrev := (*p)[l-1]
+			sPrev.heading = sPrev.HeadingTo(&s)
+		}
 	}
 	return p
 }
