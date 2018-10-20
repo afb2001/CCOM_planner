@@ -16,9 +16,9 @@ import (
 //region Constants
 const (
 	rrtInc        float64 = 0.5
-	dubinsInc     float64 = 0.1  // this might be low
-	dubinsDensity float64 = 1    // factor of dubinsInc
-	timeToPlan    float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
+	dubinsInc     float64 = 0.1   // this might be low
+	dubinsDensity float64 = 1     // factor of dubinsInc
+	timeToPlan    float64 = 0.095 // TOOO! -- make parameter (why is it off by a factor of 10??)
 	goalBias      float64 = 0.1
 	maxSpeedBias  float64 = 1.0
 )
@@ -427,16 +427,19 @@ func randomNode(bounds *grid, goal *State) *rrtNode {
 Find the closest node in a list of nodes.
 O(n) time.
 */
-func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, float64, *dubins.Path) {
+func getClosest(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) {
+	return getClosestNoHeap(nodes, n)
+	//return getClosestWithHeap(nodes, n)
+}
+
+func getClosestWithHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) {
 	var closest *rrtNode
 	minDistance := math.MaxFloat64 // dubins distance
 	var bestPath dubins.Path
 	nodeHeap := heapify(nodes, n.state)
-	//printLog()
 	for heapNode := nodeHeap.Pop().(*rrtHeapNode);
 	// euclidean distance (2d) vs dubins distance
 	heapNode.node.state.DistanceTo(n.state) < minDistance; {
-		//for _, node := range nodes {
 		dPath, err := shortestPath(heapNode.node.state, n.state)
 		if err != dubins.EDUBOK {
 			if verbose {
@@ -445,12 +448,9 @@ func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, 
 			continue
 		}
 		if d := dPath.Length(); d < minDistance {
-			n.trajectory = getSamples(dPath, g, o)
-			if n.trajectory != nil {
-				minDistance = d
-				closest = heapNode.node
-				bestPath = *dPath
-			}
+			minDistance = d
+			closest = heapNode.node
+			bestPath = *dPath
 		}
 		if nodeHeap.Len() > 0 {
 			heapNode = nodeHeap.Pop().(*rrtHeapNode)
@@ -461,9 +461,33 @@ func getClosest(nodes []*rrtNode, n *rrtNode, g *grid, o *obstacles) (*rrtNode, 
 	return closest, minDistance, &bestPath
 }
 
+func getClosestNoHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) {
+	var closest *rrtNode
+	minDistance := math.MaxFloat64
+	var bestPath dubins.Path
+	for _, node := range nodes {
+		dPath, err := shortestPath(node.state, n.state)
+		if err != dubins.EDUBOK {
+			if verbose {
+				printLog("Couldn't make dubins path")
+			}
+			continue
+		}
+		if d := dPath.Length(); d < minDistance {
+			minDistance = d
+			closest = node
+			bestPath = *dPath
+		}
+	}
+	return closest, minDistance, &bestPath
+}
+
 var verbose = false
 
 func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64) *Plan {
+	if *start == *goal {
+		return defaultPlan(start)
+	}
 	startTime := float64(time.Now().UnixNano()) / 10e9
 	printLog(fmt.Sprintf("Start state is %s", start.String()))
 	p := new(Plan)
@@ -477,9 +501,14 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 		n = randomNode(g, goal)
 		sampleCount++
 		//printLog(fmt.Sprintf("Sampled state %s", n.state.String()))
-		closest, distance, dPath := getClosest(nodes, n, g, o)
-
-		if distance == math.MaxFloat64 || n.trajectory == nil { // should be able to just be one or the other
+		closest, distance, dPath := getClosest(nodes, n)
+		if distance == math.MaxFloat64 {
+			blockedCount++
+			//printLog("Could not find state to connect to")
+			continue
+		}
+		n.trajectory = getSamples(dPath, g, o)
+		if n.trajectory == nil {
 			blockedCount++
 			//printLog("Could not find state to connect to")
 			continue // no path so continue
@@ -510,7 +539,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 	// collect all nodes into slice
 	var branch []*rrtNode
 
-	for cur := n; cur.state != start; cur = cur.parent {
+	for cur := n; cur.state != start && cur.parent != nil; cur = cur.parent {
 		branch = append(branch, cur)
 	}
 
@@ -526,7 +555,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 	var prev *State = nil
 	var headingDelta float64
 	for _, n := range branch {
-		printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
+		//printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
 		t += dubinsInc / maxSpeed
 		cur := n.state
 		traj := n.trajectory // shorthand, I guess?
@@ -606,10 +635,10 @@ func (h *NodeHeap) Pop() interface{} {
 }
 
 func heapify(nodes []*rrtNode, otherState *State) *NodeHeap {
-	var nodeHeap NodeHeap
-	for _, n := range nodes {
+	var nodeHeap = make(NodeHeap, len(nodes))
+	for i, n := range nodes {
 		//printLog(n.state.String())
-		nodeHeap = append(nodeHeap, &rrtHeapNode{n, otherState})
+		nodeHeap[i] = &rrtHeapNode{n, otherState}
 	}
 	heap.Init(&nodeHeap)
 	return &nodeHeap
