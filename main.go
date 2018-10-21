@@ -437,10 +437,10 @@ func getClosestWithHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubin
 	minDistance := math.MaxFloat64 // dubins distance
 	var bestPath dubins.Path
 	nodeHeap := heapify(nodes, n.state)
-	for heapNode := nodeHeap.Pop().(*rrtHeapNode);
+	for heapNode := nodeHeap.Pop().(*rrtNode);
 	// euclidean distance (2d) vs dubins distance
-	heapNode.node.state.DistanceTo(n.state) < minDistance; {
-		dPath, err := shortestPath(heapNode.node.state, n.state)
+	heapNode.state.DistanceTo(n.state) < minDistance; {
+		dPath, err := shortestPath(heapNode.state, n.state)
 		if err != dubins.EDUBOK {
 			if verbose {
 				printLog("Couldn't make dubins path")
@@ -449,11 +449,11 @@ func getClosestWithHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubin
 		}
 		if d := dPath.Length(); d < minDistance {
 			minDistance = d
-			closest = heapNode.node
+			closest = heapNode
 			bestPath = *dPath
 		}
 		if nodeHeap.Len() > 0 {
-			heapNode = nodeHeap.Pop().(*rrtHeapNode)
+			heapNode = nodeHeap.Pop().(*rrtNode)
 		} else {
 			break
 		}
@@ -608,40 +608,42 @@ func showSamples(nodes []*rrtNode, g *grid, start *State, goal *State) string {
 
 //region NodeHeap
 
-type rrtHeapNode struct {
-	node       *rrtNode
+type NodeHeap struct {
+	nodes      []*rrtNode
 	otherState *State
 }
 
-type NodeHeap []*rrtHeapNode
-
-func (h NodeHeap) Len() int { return len(h) }
+func (h NodeHeap) Len() int { return len(h.nodes) }
 func (h NodeHeap) Less(i, j int) bool {
-	return h[i].node.state.DistanceTo(h[i].otherState) <
-		h[j].node.state.DistanceTo(h[j].otherState)
+	return h.nodes[i].state.DistanceTo(h.otherState) <
+		h.nodes[j].state.DistanceTo(h.otherState)
 }
-func (h NodeHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h NodeHeap) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *NodeHeap) Push(x interface{}) {
-	*h = append(*h, x.(*rrtHeapNode))
+	h.nodes = append(h.nodes, x.(*rrtNode))
 }
 
 func (h *NodeHeap) Pop() interface{} {
 	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
+	n := len(old.nodes)
+	x := old.nodes[n-1]
+	h.nodes = old.nodes[0 : n-1]
 	return x
 }
 
 func heapify(nodes []*rrtNode, otherState *State) *NodeHeap {
-	var nodeHeap = make(NodeHeap, len(nodes))
+	var nodeHeap = NodeHeap{nodes: nodes, otherState: otherState}
 	for i, n := range nodes {
-		//printLog(n.state.String())
-		nodeHeap[i] = &rrtHeapNode{n, otherState}
+		nodeHeap.nodes[i] = n
 	}
 	heap.Init(&nodeHeap)
 	return &nodeHeap
+}
+
+func (h *NodeHeap) update(otherState *State) {
+	h.otherState = otherState
+	heap.Init(h)
 }
 
 //endregion
