@@ -490,11 +490,11 @@ func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
 	heap.Init(h)
 }
 
-func (h *EdgeQueue) prune(cost float64) {
+func (h *EdgeQueue) prune(cost float64, vertexCost func(node *bitStarNode) float64) {
 	newNodes := make([]*bitStarEdge, len(h.nodes))
 	var j int
 	for i, j := 0, 0; i < len(h.nodes); i++ {
-		if n := h.nodes[i]; h.cost(n) < cost { // TODO! -- this isn't right yet... see paper
+		if n := h.nodes[i]; vertexCost(n.start) < cost || vertexCost(n.end) < cost { // this might be right?
 			newNodes[j] = n
 			j++
 		}
