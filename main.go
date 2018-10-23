@@ -572,7 +572,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 	// add states to plan and compute times
 	t := start.time
 	var prev *State = nil
-	var headingDelta float64
+	//var headingDelta float64
 	for _, n := range branch {
 		//printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
 		t += dubinsInc / maxSpeed
@@ -583,17 +583,21 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 			s.time += t
 			// filter which states to include in output plan
 			if prev == nil ||
-				(headingDelta != 0 &&
-					!prev.IsSamePosition(s) &&
-					// heading delta changes sign, i.e we moved to new dubins segment
-					headingDelta*(prev.heading-s.heading) <= 0) {
+				prev.TimeUntil(s) > 1.0 ||
+				prev.DistanceTo(s) > 1.0 {
+				//(headingDelta != 0 &&
+				//	!prev.IsSamePosition(s) &&
+				// heading delta changes sign, i.e we moved to new dubins segment
+				//headingDelta*(prev.heading-s.heading) <= 0)
+				//{
 				// so we want to include this state
 				p.appendState(s)
+				prev = s
 			}
-			if prev != nil {
-				headingDelta = prev.heading - s.heading
-			}
-			prev = s
+			//if prev != nil {
+			//	headingDelta = prev.heading - s.heading
+			//}
+			//prev = s
 		}
 		t += dubinsInc / maxSpeed
 		cur.time = t
