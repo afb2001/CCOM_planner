@@ -312,10 +312,17 @@ type Plan struct {
 func (p *Plan) String() string {
 	s := fmt.Sprintf("plan %d", len(p.states)-1) // - 1 is part of the hack
 	for i, state := range p.states {
+
+		// hack to chop off tails of plans
+		if p.states[0].TimeUntil(state) > 5 {
+			return s
+		}
+
 		if i == 0 {
 			continue
 		} // hack to skip start state at beginning of plan
 		s += "\n" + state.String()
+
 	}
 	return s
 }
@@ -374,6 +381,7 @@ func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 				goal = &path[goalCount]
 			} else {
 				printLog("Done planning")
+
 				//if p.states[0].IsSamePosition(start) { // doesn't work for some reason??
 				//	p.states = p.states[1:] // remove start state from plan
 				//}
@@ -507,6 +515,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 	if *start == *goal {
 		return defaultPlan(start)
 	}
+	trueStartTime := start.time
 	startTime := float64(time.Now().UnixNano()) / 10e9
 	printLog(fmt.Sprintf("Start state is %s", start.String()))
 	p := new(Plan)
@@ -582,9 +591,9 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 			t += dubinsInc / maxSpeed
 			s.time += t
 			// filter which states to include in output plan
-			if prev == nil ||
+			if s.time-trueStartTime < 5 && (prev == nil ||
 				prev.TimeUntil(s) > 1.0 ||
-				prev.DistanceTo(s) > 1.0 {
+				prev.DistanceTo(s) > 1.0) {
 				//(headingDelta != 0 &&
 				//	!prev.IsSamePosition(s) &&
 				// heading delta changes sign, i.e we moved to new dubins segment
@@ -594,6 +603,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 				p.appendState(s)
 				prev = s
 			}
+
 			//if prev != nil {
 			//	headingDelta = prev.heading - s.heading
 			//}
