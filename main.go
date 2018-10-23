@@ -391,9 +391,6 @@ func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 	}
 
 	printLog("Done planning")
-	//if p.states[0].IsSamePosition(start) { // doesn't work for some reason??
-	//	p.states = p.states[1:] // remove start state from plan
-	//}
 	return p
 }
 
