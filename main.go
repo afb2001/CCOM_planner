@@ -310,8 +310,11 @@ type Plan struct {
 }
 
 func (p *Plan) String() string {
-	s := fmt.Sprintf("plan %d", len(p.states))
-	for _, state := range p.states {
+	s := fmt.Sprintf("plan %d", len(p.states)-1) // - 1 is part of the hack
+	for i, state := range p.states {
+		if i == 0 {
+			continue
+		} // hack to skip start state at beginning of plan
 		s += "\n" + state.String()
 	}
 	return s
@@ -345,7 +348,6 @@ func defaultPlan(start *State) *Plan {
 	return plan
 }
 
-// TODO! -- fix duplicate states when planning for multiple goals
 func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 	printLog("Starting to plan")
 
@@ -371,12 +373,19 @@ func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 				start = goal
 				goal = &path[goalCount]
 			} else {
+				printLog("Done planning")
+				//if p.states[0].IsSamePosition(start) { // doesn't work for some reason??
+				//	p.states = p.states[1:] // remove start state from plan
+				//}
 				return p
 			}
 		}
 	}
 
 	printLog("Done planning")
+	//if p.states[0].IsSamePosition(start) { // doesn't work for some reason??
+	//	p.states = p.states[1:] // remove start state from plan
+	//}
 	return p
 }
 
