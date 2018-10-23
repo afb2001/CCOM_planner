@@ -16,9 +16,9 @@ import (
 //region Constants
 const (
 	rrtInc        float64 = 0.5
-	dubinsInc     float64 = 0.1   // this might be low
-	dubinsDensity float64 = 1     // factor of dubinsInc
-	timeToPlan    float64 = 0.095 // TOOO! -- make parameter (why is it off by a factor of 10??)
+	dubinsInc     float64 = 0.1  // this might be low
+	dubinsDensity float64 = 1    // factor of dubinsInc
+	timeToPlan    float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
 	goalBias      float64 = 0.1
 	maxSpeedBias  float64 = 1.0
 )
@@ -321,7 +321,9 @@ func (p *Plan) String() string {
 Append a state to the plan.
 */
 func (p *Plan) appendState(s *State) {
-	p.states = append(p.states, s)
+	if len(p.states) == 0 || !p.states[len(p.states)-1].IsSamePosition(s) {
+		p.states = append(p.states, s)
+	}
 }
 
 /**
@@ -432,6 +434,10 @@ func getClosest(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) 
 	//return getClosestWithHeap(nodes, n)
 }
 
+// debugging variables for keeping track of statistics
+//var iterationCount int
+//var shortestPathCompCount int
+
 func getClosestWithHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) {
 	var closest *rrtNode
 	minDistance := math.MaxFloat64 // dubins distance
@@ -440,6 +446,7 @@ func getClosestWithHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubin
 	for heapNode := nodeHeap.Pop().(*rrtNode);
 	// euclidean distance (2d) vs dubins distance
 	heapNode.state.DistanceTo(n.state) < minDistance; {
+		//shortestPathCompCount++
 		dPath, err := shortestPath(heapNode.state, n.state)
 		if err != dubins.EDUBOK {
 			if verbose {
@@ -458,6 +465,7 @@ func getClosestWithHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubin
 			break
 		}
 	}
+	//iterationCount++
 	return closest, minDistance, &bestPath
 }
 
@@ -466,6 +474,7 @@ func getClosestNoHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.
 	minDistance := math.MaxFloat64
 	var bestPath dubins.Path
 	for _, node := range nodes {
+		//shortestPathCompCount++
 		dPath, err := shortestPath(node.state, n.state)
 		if err != dubins.EDUBOK {
 			if verbose {
@@ -479,6 +488,7 @@ func getClosestNoHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.
 			bestPath = *dPath
 		}
 	}
+	//iterationCount++
 	return closest, minDistance, &bestPath
 }
 
@@ -820,6 +830,10 @@ func main() {
 
 		plan := makePlan(grid, start, *path, o)
 		fmt.Println(plan.String())
+
+		// show shortest path statistics
+		//printLog(fmt.Sprintf("Performed %d shortest path computations over %d iterations", shortestPathCompCount, iterationCount))
+		//printLog(fmt.Sprintf("That's on average %f per iteration", float64(shortestPathCompCount) / float64(iterationCount)))
 
 		printLog("ready to plan")
 	}
