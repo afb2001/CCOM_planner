@@ -382,7 +382,7 @@ func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 
 //endregion
 
-//region RRT
+//region BIT*
 
 type rrtNode struct {
 	state        *State
@@ -390,6 +390,121 @@ type rrtNode struct {
 	pathToParent *dubins.Path
 	trajectory   *Plan // trajectory to parent
 }
+
+type bitStarNode struct {
+	state                *State
+	approxCost, trueCost float64
+}
+
+type bitStarEdge struct {
+	start                *bitStarNode
+	end                  *bitStarNode
+	approxCost, trueCost float64
+}
+
+//region Queues
+
+type VertexQueue struct {
+	nodes []*bitStarNode
+	cost  func(node *bitStarNode) float64
+}
+
+func (h VertexQueue) Len() int { return len(h.nodes) }
+func (h VertexQueue) Less(i, j int) bool {
+	return h.cost(h.nodes[i]) < h.cost(h.nodes[j])
+}
+func (h VertexQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
+
+func (h *VertexQueue) Push(x interface{}) {
+	h.nodes = append(h.nodes, x.(*bitStarNode))
+}
+
+func (h *VertexQueue) Pop() interface{} {
+	old := *h
+	n := len(old.nodes)
+	x := old.nodes[n-1]
+	h.nodes = old.nodes[0 : n-1]
+	return x
+}
+
+func makeVertexQueue(nodes []*bitStarNode, cost func(node *bitStarNode) float64) *VertexQueue {
+	var nodeHeap = VertexQueue{nodes: nodes, cost: cost}
+	for i, n := range nodes {
+		nodeHeap.nodes[i] = n
+	}
+	heap.Init(&nodeHeap)
+	return &nodeHeap
+}
+
+func (h *VertexQueue) update(cost func(node *bitStarNode) float64) {
+	h.cost = cost
+	heap.Init(h)
+}
+
+func (h *VertexQueue) prune(cost float64) {
+	newNodes := make([]*bitStarNode, len(h.nodes))
+	var j int
+	for i, j := 0, 0; i < len(h.nodes); i++ {
+		if n := h.nodes[i]; h.cost(n) < cost {
+			newNodes[j] = n
+			j++
+		}
+	}
+	h.nodes = newNodes[0:j]
+}
+
+type EdgeQueue struct {
+	nodes []*bitStarEdge
+	cost  func(node *bitStarEdge) float64
+}
+
+func (h EdgeQueue) Len() int { return len(h.nodes) }
+func (h EdgeQueue) Less(i, j int) bool {
+	return h.cost(h.nodes[i]) < h.cost(h.nodes[j])
+}
+func (h EdgeQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
+
+func (h *EdgeQueue) Push(x interface{}) {
+	h.nodes = append(h.nodes, x.(*bitStarEdge))
+}
+
+func (h *EdgeQueue) Pop() interface{} {
+	old := *h
+	n := len(old.nodes)
+	x := old.nodes[n-1]
+	h.nodes = old.nodes[0 : n-1]
+	return x
+}
+
+func makeEdgeQueue(nodes []*bitStarEdge, cost func(node *bitStarEdge) float64) *EdgeQueue {
+	var nodeHeap = EdgeQueue{nodes: nodes, cost: cost}
+	for i, n := range nodes {
+		nodeHeap.nodes[i] = n
+	}
+	heap.Init(&nodeHeap)
+	return &nodeHeap
+}
+
+func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
+	h.cost = cost
+	heap.Init(h)
+}
+
+func (h *EdgeQueue) prune(cost float64) {
+	newNodes := make([]*bitStarEdge, len(h.nodes))
+	var j int
+	for i, j := 0, 0; i < len(h.nodes); i++ {
+		if n := h.nodes[i]; h.cost(n) < cost { // TODO! -- this isn't right yet... see paper
+			newNodes[j] = n
+			j++
+		}
+	}
+	h.nodes = newNodes[0:j]
+}
+
+//endregion
+
+//region State generation
 
 /**
 Create a new state with random values.
@@ -420,10 +535,22 @@ func biasedRandomState(bounds *grid, goal *State) *State {
 	return s
 }
 
+/**
+Sample a state whose euclidean distance to start is less than the given distance bound.
+*/
+func boundedBiasedRandomState(bounds *grid, goal *State, start *State, distance float64) *State {
+	s := biasedRandomState(bounds, goal)
+	for ; start.DistanceTo(s) > distance; s = biasedRandomState(bounds, goal) {
+	} // can this be O(1)?
+	return s
+}
+
 func randomNode(bounds *grid, goal *State) *rrtNode {
 	n := rrtNode{state: biasedRandomState(bounds, goal)}
 	return &n
 }
+
+//endregion
 
 /**
 Find the closest node in a list of nodes.
