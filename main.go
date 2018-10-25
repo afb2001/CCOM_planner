@@ -310,7 +310,17 @@ type Plan struct {
 }
 
 func (p *Plan) String() string {
-	s := fmt.Sprintf("plan %d", len(p.states)-1) // - 1 is part of the hack
+	var s string
+	//s := fmt.Sprintf("plan %d", len(p.states)-1) // - 1 is part of the hack
+	for i, state := range p.states {
+		if p.states[0].TimeUntil(state) > 5 {
+			s = fmt.Sprintf("plan %d", i-1)
+			break
+		}
+	}
+	if s == "" {
+		s = fmt.Sprintf("plan %d", len(p.states)-1)
+	}
 	for i, state := range p.states {
 
 		// hack to chop off tails of plans
