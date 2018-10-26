@@ -247,10 +247,8 @@ class DynamicObsSim:
                 data = self.soc.recv(4096)
                 data1 = data.split(' ');
                 self.estimateStart = (float(data1[0]),float(data1[1]),float(data1[2]))
-                print(self.estimateStart)
-                print(self.curr_x,self.curr_y,self.curr_heading)
                 data = self.soc.recv(4096)
-                print('***************', data, '*******************')
+                # print('***************', data, '*******************')
                 dummy = data.decode('utf-8').split(",")
                 #self.wpt_x = float(dummy[0])
                 #self.wpt_y = float(dummy[1])
@@ -500,7 +498,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--plot', dest='plot', action='store', default='False',
                         help='Generates a plot of the simulation. Receives True for plotting or False for not plotting. Default is False')
 
-    parser.add_argument('-f', '--file', dest='file', action='store', default='',
+    parser.add_argument('-m', '--map', dest='file', action='store', default='',
                         help='File for Grid world')
 
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',

@@ -9,6 +9,7 @@ import fileinput
 import sys
 import os
 import signal
+import argparse
 
 UDP_ASV_PORT = 9012
 UDP_OBS_PORT = 9020
@@ -31,7 +32,6 @@ def recv_asv():
         print("Location:\n%s [%s] " % (data, len(data)))
         print("\0")
         sys.stdout.flush()
-
 
 
 # listen for obstacle states on port 9020
@@ -60,7 +60,8 @@ def recv_control():
             count = int(line.split(' ')[1])
             while count != 0:
                 sending = raw_input() + '\n'
-                s3.sendto(sending.encode('utf-8'), ('localhost', UDP_CTRL_PORT))
+                s3.sendto(sending.encode('utf-8'),
+                          ('localhost', UDP_CTRL_PORT))
                 count -= 1
             sending = raw_input() + '\n'
             s3.sendto(sending.encode('utf-8'), ('localhost', UDP_CTRL_PORT))
@@ -69,15 +70,19 @@ def recv_control():
     sys.stderr.write('EOF encountered.')
 
 # open the pipe to communicate with executive
-def open_executive():
+
+
+def open_executive(arguments):
     pread, cwrite = os.pipe()
     cread, pwrite = os.pipe()
     processid = os.fork()
+    for i in arguments:
+        sys.stderr.write(i)
     if processid == 0:
         os.dup2(pread, 0)
         os.dup2(pwrite, 1)
         os.close(pread)
-        os.close(pwrite) 
+        os.close(pwrite)
         os.close(cread)
         os.close(cwrite)
     else:
@@ -87,18 +92,42 @@ def open_executive():
         os.close(pwrite)
         os.close(cread)
         os.close(cwrite)
-        if(len(sys.argv) > 2):
-            os.execl('executive', 'executive', sys.argv[1], sys.argv[2])
-        elif(len(sys.argv) > 1):
-            os.execl('executive', 'executive', sys.argv[1])
-        else:
-            os.execl('executive', 'executive')
+        os.execl('executive', 'executive', *arguments)
         sys.exit(0)
 
 
 if __name__ == "__main__":
     # start up threads to listen on UDP ports
-    open_executive()
+
+    parser = argparse.ArgumentParser(description=("This is a communication channal between simulator and executive with controler and planner"
+                                                  "you can set the goal and map of the world"
+                                                  "the world should start with the width and height with obstacle shown as # and freespace as _"
+                                                  "the goal file should start with number of goals and one goal point for each line after that"
+                                                  "the goal point should list as two numbers x y with whitespace between them"
+                                                  "the sample files can be found in root_dirctory/sample"
+                                                  "the sample goal file end with goal extension while grid file end with map extension"))
+
+    parser.add_argument('-m', '--map', dest='map', action='store', default='',
+                        help='File for Grid world')
+
+    parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
+                        help='File for goal location')
+
+    args = parser.parse_args()
+
+    gridmap = args.map
+    goal = args.goal
+
+    arguments = []
+
+    if gridmap:
+        arguments.append("-m")
+        arguments.append(gridmap)
+    if goal:
+        arguments.append("-g")
+        arguments.append(goal)
+
+    open_executive(arguments)
     asv_thread = threading.Thread(target=recv_asv)
     asv_thread.do_run = True
     asv_thread.start()

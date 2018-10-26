@@ -495,22 +495,35 @@ int main(int argc, char *argv[])
     communication_With_Planner.cwrite("Start");
     communication_With_Planner.cwrite("max speed 2.75");
     communication_With_Planner.cwrite("max turning radius 8");
-    if (argc > 2)
+    bool map = false, goal = false;
+
+    for(int i = 1; i< argc; i++)
     {
-        string file = argv[1], file1 = argv[2];
-        print_map(file);
-        read_goal(file1);
+        if(!strcmp(argv[i],"-m"))
+        {
+            if(i+1 < argc)
+            {
+                map = true;
+                print_map(argv[i+1]);
+            }
+        }
+        else if(!strcmp(argv[i],"-g"))
+        {
+            if(i+1 < argc)
+            {
+                goal = true;
+                read_goal(argv[i+1]);
+            }
+        }
     }
-    else if (argc > 1)
-    {
-        string file = argv[1], file1 = "NOFILE";
-        print_map(file1);
-        read_goal(file);
-    }
-    else
+    
+    if(!map)
     {
         string file1 = "NOFILE";
         print_map(file1);
+    }
+    if(!goal)
+    {
         cover.push_back(point(10, 10));
         cover.push_back(point(9, 0));
     }
