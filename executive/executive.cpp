@@ -353,11 +353,12 @@ void requestWorldInformation()
 void sendPath(string &s)
 {
     int size = path.size() - pathindex;
+    int size1 = path.size();
     s += "path " + to_string(size) + "\n";
-    for (int i = pathindex; i < path.size(); i++)
+    for (int i = pathindex; i < size1; i++)
     {
         s += path[i].toString();
-        if (path.size() - 1 != i)
+        if (size1 - 1 != i)
             s += '\n';
     }
     s+= "\n" + estimateStart.toString();//for estimate start
