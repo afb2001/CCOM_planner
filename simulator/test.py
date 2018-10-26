@@ -2,10 +2,13 @@
 import pygame
 from pygame.locals import *
 import threading
+from threading import Lock
 import sys
 import math
 import os
 import glob
+
+mutex = Lock()
 
 Color_line = (0, 0, 0)
 Color_line_middle = (180, 180, 180)
@@ -56,6 +59,7 @@ class PLOT:
         self.cost = 0
         self.future_x = []
         self.future_y = []
+        self.goal_location = []
         self.future_heading = []
         self.estimateStart = (0,0,0)
         self.triangleX = (0, -5, 5)
@@ -194,7 +198,7 @@ class PLOT:
         # self.stop()
         self.pathList = [(curr_x, curr_y)]
         self.updateInformation(
-            curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [],self.estimateStart)
+            curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [],self.estimateStart,[])
         self.update()
 
     def checkCollision(self):
@@ -231,20 +235,21 @@ class PLOT:
                 i * scalew, 0), self.scale_xy(i*scalew, self.scaleh))
             # self.draw_text(self.scalew,i * scaleh, i * self.maxX/(self.lines + 1) )
 
-    def updateInformation(self, curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, future_x, future_y, future_heading,estimateStart):
-        if self.pathList[-1] != (curr_x, curr_y):
-            self.pathList.append((curr_x, curr_y))
-        self.curr_x = curr_x
-        self.curr_y = curr_y
-        self.start_heading = start_heading
-        self.nobs = nobs
-        self.xobs = xobs
-        self.yobs = yobs
-        self.hobs = hobs
-        self.future_heading = future_heading
-        self.future_x = future_x
-        self.future_y = future_y
-        self.estimateStart = estimateStart
+    def updateInformation(self, curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, future_x, future_y, future_heading,estimateStart,goal_location):
+            if self.pathList[-1] != (curr_x, curr_y):
+                self.pathList.append((curr_x, curr_y))
+            self.curr_x = curr_x
+            self.curr_y = curr_y
+            self.start_heading = start_heading
+            self.nobs = nobs
+            self.xobs = xobs
+            self.yobs = yobs
+            self.hobs = hobs
+            self.future_heading = future_heading
+            self.future_x = future_x
+            self.future_y = future_y
+            self.estimateStart = estimateStart
+            self.goal_location = goal_location
 
     def draw_future(self):
         size = len(self.future_heading)
@@ -278,10 +283,13 @@ class PLOT:
                 self.hobs[index], Color_Red, *self.scale_item(self.xobs[index], self.yobs[index]))
 
         for obs in self.static_obs:
-            self.draw_static_obs(*obs)
+            self.draw_static_obs((0,0,0),*obs)
+        
+        for goal in self.goal_location:
+            self.draw_static_obs((0,255,0),*goal)
 
-    def draw_static_obs(self, x, y):
-        pygame.draw.polygon(self.display, (0, 0, 0), (self.scale_item(x, y), self.scale_item(
+    def draw_static_obs(self, color,x, y):
+        pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
             x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
 
     def draw_vehicle(self, angle, color, x, y):

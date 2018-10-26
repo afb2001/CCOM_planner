@@ -25,7 +25,7 @@ vector<ObjectPar> dyamic_obstacles;
 string path = "";
 double currentTimestamp = -1,previous_location_time = -1;
 double currenttime_for_action = -1;
-string pheading;
+string pheading = "0";
 string previousrequestString;
 string default_Command = "0,0";
 int sendPipeToParent, receivePipeFromParent;
@@ -117,6 +117,10 @@ void sendAction()
                     command += previousrequestString;
                     currenttime_for_action += 0.05;
                 }
+            }
+            else if(start.otime > action.otime)
+            {
+                command += pheading + ",0";
             }
             else
             {

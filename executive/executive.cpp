@@ -17,7 +17,10 @@
 #include <fstream>
 #include <list>
 
+
 using namespace std;
+
+
 
 mutex mtx_path;
 mutex mtx_obs;
@@ -65,6 +68,12 @@ void checkTerminate()
 
 void findStart()
 {
+    // ObjectPar current = current_location;
+    // current.otime += 1;
+    // cerr << "current::" << current.toString() << endl;
+    // estimateStart = current;
+    // cerr << "currente::" << estimateStart.toString() << endl;
+    // return;
     mtx_path.lock();
     int path_size = path.size();
     bool find = false;
@@ -76,10 +85,59 @@ void findStart()
         {
             if (path[i].otime > otime && i != 0)
             {
-                cerr << "FIRST" << endl;
-                double timeiterval = otime - path[i - 1].otime;
-                double heading = atan2(path[i].x  - current.x,path[i].y - current.y );
-                estimateStart = ObjectPar(current.x + timeiterval * (path[i].x - current.x), current.y + timeiterval * (path[i].y - current.y), heading, current.speed, otime); //chage to relative heading
+                
+                double timeiterval = 1;//otime - path[i - 1].otime;
+                double x = path[i-1].x + (otime - path[i - 1].otime)*(path[i].x  -  path[i-1].x);
+                double y = path[i-1].y + (otime - path[i - 1].otime)*(path[i].y  -  path[i-1].y);
+                // double h1 = path[i].heading,h2 = path[i-1].heading;
+                
+                double h1 = current.heading, h2 = current.heading - 1;
+                while(h1 < 0)
+                    h1 += 2*M_PI;
+                while(h1 > 2*M_PI)
+                    h1 -= 2*M_PI;
+                while(h2 < 0)
+                    h2 += 2*M_PI;
+                while(h2 > 2*M_PI)
+                    h2 -= 2*M_PI;
+                //double heading = (h1 + h2) /2; 
+                double heading = path[i - 1].heading;
+                while(heading < 0)
+                    heading += 2*M_PI;
+                while(heading > 2*M_PI)
+                    heading -= 2*M_PI;
+                
+                if(M_PI - abs(abs(heading - h1) - M_PI) > 0.5)
+                {
+                    if(heading > h1)
+                    {
+                        if(heading - M_PI > h1)
+                        {
+                            heading = h1 - 0.5; 
+                        }
+                        else
+                        {
+                            heading = h1 + 0.5; 
+                        }
+                    }
+                    else
+                    {
+                        if(h1 - M_PI > heading)
+                        {
+                            heading = h1 + 0.5; 
+                        }
+                        else
+                        {
+                            heading = h1 - 0.5; 
+                        }
+                    }
+                }
+                
+
+                
+               // cerr << "FIRST " << h1 << " " <<  h2 << " " << heading  << endl;
+                
+                estimateStart = ObjectPar(current.x + timeiterval * (x - current.x), current.y + timeiterval * (y - current.y), heading, current.speed, otime); //chage to relative heading
                 find = true;
                 break;
             }
@@ -89,7 +147,7 @@ void findStart()
 
     if (!find)
     {
-        cerr << "SECOND" << endl;
+        //cerr << "SECOND" << endl;
         ObjectPar current = current_location;
         double timeiterval = 1;
         double heading = atan2(previousAction.x  - pstart.x,previousAction.y - pstart.y );
@@ -108,7 +166,6 @@ void requestPath()
     double x, y, heading, speed, otime;
     FILE *readstream = fdopen(communication_With_Planner.getWpipe(), "r");
     char response[1024];
-    double duration_time; //,time_bound;
     while (!request_start || !request_start1)
         this_thread::sleep_for(std::chrono::milliseconds(50));
 
@@ -133,7 +190,8 @@ void requestPath()
         mtx_cover.unlock();
 
         findStart();
-        cerr << "EXECUTIVE::SENDSTART::" << estimateStart.toString() << endl;
+        //cerr << "REAL::" << current_location.toString() << endl;
+        //cerr << "EXECUTIVE::SENDSTART::" << estimateStart.toString() << endl;
         communication_With_Planner.cwrite("start state " + estimateStart.toString());
         mtx_obs.lock();
         int d_obstacles_size = dyamic_obstacles.size();
@@ -148,7 +206,6 @@ void requestPath()
         }
 
         mtx_obs.unlock();
-        double start_time = getCurrentTime();
 
         fgets(response, sizeof response, readstream);
         
@@ -176,7 +233,6 @@ void requestPath()
             else
                 break;
         }
-        cerr << "START" << endl;
         for (int i = 0; i < numberOfState; i++) // if no new path then keep old path
         {
             fgets(response, sizeof response, readstream);
@@ -184,7 +240,7 @@ void requestPath()
             if (time_bound > otime)
                 continue;
             
-            cerr << ObjectPar(x,y,heading,speed,otime).toString()<< endl;
+            //cerr << ObjectPar(x,y,heading,speed,otime).toString()<< endl;
             
 
             if (unvisit)
@@ -224,16 +280,13 @@ void requestPath()
             p = ObjectPar(x + diffx, y + diffy, heading, speed, otime);
             newpath.push_back(p);
         }
-        cerr << "END" << endl;
+        // cerr << "END" << endl;
         if(!unvisit)
         {
             path = newpath;
             pathindex = 0;
         }
         mtx_path.unlock();
-        duration_time = getCurrentTime() - start_time;
-        if (duration_time < 1)
-            this_thread::sleep_for(std::chrono::milliseconds((int)((sleeptime)*1000)));
         checkTerminate();
     }
 }
@@ -250,7 +303,7 @@ void requestWorldInformation()
         if (!strncmp(locationString, "Location", 8))
         {
             request_start = 1;
-            sscanf(locationString + 9, "%lf,%lf,%lf,%lf,%lf [%d]", &current_location.x, &current_location.y, &current_location.heading, &current_location.speed, &current_location.otime, &h);
+            sscanf(locationString + 9, "%lf,%lf,%lf,%lf,%lf [%d]", &current_location.x, &current_location.y, &current_location.speed, &current_location.heading, &current_location.otime, &h);
             mtx_cover.lock();
             auto it = cover.begin();
             while (it != cover.end())
@@ -276,7 +329,7 @@ void requestWorldInformation()
             oldbytesRead = bytesRead;
             mtx_obs.lock();
             int d_obstacles_size = dyamic_obstacles.size();
-            while (sscanf(locationString + bytesRead, "%d,%lf,%lf,%lf,%lf,%lf\n%n", &index, &x, &y, &heading, &speed, &otime, &bytesRead) == 6)
+            while (sscanf(locationString + bytesRead, "%d,%lf,%lf,%lf,%lf,%lf\n%n", &index, &x, &y, &speed, &heading, &otime, &bytesRead) == 6)
             {
                 bytesRead += oldbytesRead;
                 oldbytesRead = bytesRead;
@@ -355,12 +408,21 @@ void sendAction()
             }
             else
             {
+                communication_With_Controler.cwrite(s);if (send && path_size > pathindex)
                 mtx_path.unlock();
                 this_thread::sleep_for(std::chrono::milliseconds(50));
             }
         }
         else
         {
+            string s = "";
+            pstart = current_location;
+            s += pstart.toString() + "\n";
+            s += ObjectPar(-1,-1,-1,-1,-1).toString() + "\n";
+            s += "path 0";
+            s+= "\n" + estimateStart.toString();//for estimate start
+            s += '\0';
+            communication_With_Controler.cwrite(s);
             mtx_path.unlock();
             this_thread::sleep_for(std::chrono::milliseconds(50));
         }
@@ -382,7 +444,7 @@ void print_map(string file)
             string h = line;
             cerr << "EXEUTIVE::START " << w << " " << h << endl;
             cerr << "EXECUTIVE::MAP::" + w + " " + h << endl;
-            communication_With_Planner.cwrite("map 10 " + w + " " + h);
+            communication_With_Planner.cwrite("map 1 " + w + " " + h);
             while (getline(f, line))
                 communication_With_Planner.cwrite(line);
 
@@ -401,7 +463,6 @@ void read_goal(string goal)
     ifstream f(goal);
     if (f.is_open())
     {
-        cerr<< "FILE" << endl;
         int numofgoal;
         f >> numofgoal;
         double x, y;
@@ -412,6 +473,11 @@ void read_goal(string goal)
         }
         f.close();
         return;
+    }
+    else
+    {
+        cover.push_back(point(10, 10));
+        cover.push_back(point(9, 0));
     }
 }
 
@@ -428,8 +494,7 @@ int main(int argc, char *argv[])
 
     communication_With_Planner.cwrite("Start");
     communication_With_Planner.cwrite("max speed 2.75");
-    communication_With_Planner.cwrite("max turning radius 0.75");
-    cerr << argc << endl;
+    communication_With_Planner.cwrite("max turning radius 8");
     if (argc > 2)
     {
         string file = argv[1], file1 = argv[2];

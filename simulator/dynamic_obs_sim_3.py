@@ -7,6 +7,7 @@ import argparse
 import dynamics
 import cw4
 import numpy as np
+import threading
 import time
 # import matplotlib
 import test
@@ -19,7 +20,7 @@ import datetime
 
 
 class DynamicObsSim:
-    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world=''):
+    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = ''):
         self.debug = False
         self.throttle = 0.0
         self.rudder = 0.0
@@ -79,7 +80,8 @@ class DynamicObsSim:
 
         # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
         self.static_obs = []
-        self.read_world(file_world)
+        self.goal_location = []
+        self.read_world(file_world, goal_location)
 
         # Initializing obstacles:
         self.nobs = nobs  # number of obstacles
@@ -126,7 +128,7 @@ class DynamicObsSim:
         self.plotaxes_obs = list(range(self.nobs))
 
     # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
-    def read_world(self,file_world):
+    def read_world(self,file_world,goal_location):
         maxx = 0
         maxy = 0
         if file_world != '':
@@ -147,6 +149,13 @@ class DynamicObsSim:
                             if f1[i][j] == '#':
                                 self.static_obs.append((j ,( maxy - i + 1 )))
             self.boat_dynamics = dynamics.Dynamics(cw4.cw4, self.curr_x, self.curr_y)
+        if goal_location != '':
+            f=open(goal_location, "r")
+            f1 = f.readlines()
+            numOfGoal = int(f1[0])
+            for i in range(1, len(f1)):
+                s = f1[i].split(' ')
+                self.goal_location.append((float(s[0]),float(s[1])))
 
 
 
@@ -176,10 +185,11 @@ class DynamicObsSim:
 
     def do_every(self, period, f, *args):
         g = self.g_tick(period)
-        while True:
+        while True and getattr(threading.current_thread(), 'do_run'):
             self.update_time, self.sleeptime = next(g)
             time.sleep(self.sleeptime)
             f(*args)
+            
             
 
     # def hello(self,s):   #TEST
@@ -237,6 +247,8 @@ class DynamicObsSim:
                 data = self.soc.recv(4096)
                 data1 = data.split(' ');
                 self.estimateStart = (float(data1[0]),float(data1[1]),float(data1[2]))
+                print(self.estimateStart)
+                print(self.curr_x,self.curr_y,self.curr_heading)
                 data = self.soc.recv(4096)
                 print('***************', data, '*******************')
                 dummy = data.decode('utf-8').split(",")
@@ -273,11 +285,10 @@ class DynamicObsSim:
 
     def update(self):
         ''' Update the state of the world. '''
-
         self.get_new_waypoint()
         self.update_asv()
         self.update_obs()
-
+        
         # Insert here --> send UPD messages to world ---> make it independent method
         self.send_asv_state_UDP()
         self.send_obs_state_UDP()
@@ -290,10 +301,11 @@ class DynamicObsSim:
         if self.debug:
             print("plot_boolean in update = ", self.plot_boolean)
 
-        if self.plot_boolean:
-            if self.debug:
-                print("plot_boolean in update inside if = ", self.plot_boolean)
-            self.plot()
+        # if self.plot_boolean:
+        #     if self.debug:
+        #         print("plot_boolean in update inside if = ", self.plot_boolean)
+        #     self.plot()
+        
 
     def print_state(self):
         print("x: %0.2f, y: %0.2f, s: %0.2f , h: %0.2f" %
@@ -333,8 +345,10 @@ class DynamicObsSim:
 
 
         if self.plotaxes == None:
+            # start_time = time.time()
             self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.future_x,self.future_y,self.future_heading,self.estimateStart)
             self.plot_draw.update()
+            # print("--- %s seconds ---" % ((time.time() - start_time)*1000))
             # self.plotaxes = plt.plot(self.xx, self.yy, ".b")
 
             # # plt.hold(True)
@@ -385,6 +399,8 @@ class DynamicObsSim:
 		self.plotaxes[0].set_ydata(self.yy)
 	'''
 
+    
+
     def update_obs(self):
         if self.last_update_time is None:
             self.last_update_time = self.update_time
@@ -408,14 +424,39 @@ class DynamicObsSim:
 
         self.last_update_time = self.update_time
 
+    def update_th(self):
+        self.do_every(self.period, self.update)
+    
+
     def run(self):
         # self.do_every(1.0,self.hello,'foo')		#TEST
+        
+    
         if self.plot_boolean:
             self.plot_draw.on_execute(self.curr_x, self.curr_y, self.start_heading, self.nobs, self.xobs, self.yobs, self.hobs)
             self.plot_draw.update()
-        self.do_every(self.period, self.update)
-        if self.plot_boolean:
-            self.plot_draw.stop()
+        
+        update_thread = threading.Thread(target=self.update_th)
+        update_thread.do_run = True
+        update_thread.start() 
+
+        try:
+            if self.plot_boolean:
+                while True:
+                    self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.future_x,self.future_y,self.future_heading,self.estimateStart,self.goal_location)
+                    self.plot_draw.update()
+                    time.sleep(0.05)
+                update_thread.join(timeout=1000)
+            else:
+                update_thread.join(timeout=1000)
+        finally:
+            update_thread.do_run = False
+            if self.plot_boolean:
+                self.plot_draw.stop()
+            update_thread.join(timeout=1000)
+            
+        
+        
 
         '''		
 		# WHERE TO PUT THIS ?!?
@@ -462,6 +503,9 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--file', dest='file', action='store', default='',
                         help='File for Grid world')
 
+    parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
+                        help='File for goal location')
+
     # Handle arguments
     args = parser.parse_args()
 
@@ -482,13 +526,15 @@ if __name__ == '__main__':
     plot_bool = args.plot
 
     file_world = args.file
+
+    goal_location = args.goal
     '''
 	print("plot_bool = ",plot_bool)
 	print("Type of plot_bool = ",type(plot_bool))
 	'''
     # Setup simulation
     sim = DynamicObsSim(start_x, start_y, start_heading,
-                        start_speed, nobs, xlim, ylim, plot_bool,file_world)
+                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location)
     '''
 	# Example - Con'd:
 	sim.curr_x = float(fields[0])
@@ -503,17 +549,17 @@ if __name__ == '__main__':
     sim.port = 9000
 
     try:
-        sim.soc.settimeout(0.1)  # needs to be lower then self.period
+        sim.soc.settimeout(0.015)  # needs to be lower then self.period
         sim.soc.bind((sim.host, sim.port))
     except socket.error as e:
         exit("unable to bind to: %s:%s" % (sim.host, sim.port))
     print("socket to receive desired ASV state: %s %s" % sim.soc.getsockname())
 
     # Send to UDP server (via UDP client) the current ASV state
-    sim.soc_asv_out.settimeout(0.1)  # needs to be lower then self.period
+    sim.soc_asv_out.settimeout(0.015)  # needs to be lower then self.period
 
     # Send to UDP server (via UDP client) the current Obstacles states
-    sim.soc_obs_out.settimeout(0.1)
+    sim.soc_obs_out.settimeout(0.015)
 
     try:
         sim.run()
