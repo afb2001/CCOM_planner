@@ -21,6 +21,7 @@ const (
 	timeToPlan    float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
 	goalBias      float64 = 0.1
 	maxSpeedBias  float64 = 1.0
+	K             int     = 5 // number of closest states to consider for BIT*
 )
 
 //endregion
@@ -391,22 +392,22 @@ type rrtNode struct {
 	trajectory   *Plan // trajectory to parent
 }
 
-type bitStarNode struct {
-	state                *State
-	approxCost, trueCost float64
+type bitStarVertex struct {
+	state                   *State
+	approxCost, currentCost float64
+	approxToGo              float64
 }
 
 type bitStarEdge struct {
-	start                *bitStarNode
-	end                  *bitStarNode
+	start, end           *bitStarVertex
 	approxCost, trueCost float64
 }
 
 //region Queues
 
 type VertexQueue struct {
-	nodes []*bitStarNode
-	cost  func(node *bitStarNode) float64
+	nodes []*bitStarVertex
+	cost  func(node *bitStarVertex) float64
 }
 
 func (h VertexQueue) Len() int { return len(h.nodes) }
@@ -416,7 +417,7 @@ func (h VertexQueue) Less(i, j int) bool {
 func (h VertexQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *VertexQueue) Push(x interface{}) {
-	h.nodes = append(h.nodes, x.(*bitStarNode))
+	h.nodes = append(h.nodes, x.(*bitStarVertex))
 }
 
 func (h *VertexQueue) Pop() interface{} {
@@ -427,7 +428,11 @@ func (h *VertexQueue) Pop() interface{} {
 	return x
 }
 
-func makeVertexQueue(nodes []*bitStarNode, cost func(node *bitStarNode) float64) *VertexQueue {
+func (h *VertexQueue) Peek() interface{} {
+	return h.nodes[len(h.nodes)-1]
+}
+
+func makeVertexQueue(nodes []*bitStarVertex, cost func(node *bitStarVertex) float64) *VertexQueue {
 	var nodeHeap = VertexQueue{nodes: nodes, cost: cost}
 	for i, n := range nodes {
 		nodeHeap.nodes[i] = n
@@ -436,13 +441,13 @@ func makeVertexQueue(nodes []*bitStarNode, cost func(node *bitStarNode) float64)
 	return &nodeHeap
 }
 
-func (h *VertexQueue) update(cost func(node *bitStarNode) float64) {
+func (h *VertexQueue) update(cost func(node *bitStarVertex) float64) {
 	h.cost = cost
 	heap.Init(h)
 }
 
 func (h *VertexQueue) prune(cost float64) {
-	newNodes := make([]*bitStarNode, len(h.nodes))
+	newNodes := make([]*bitStarVertex, len(h.nodes))
 	var j int
 	for i, j := 0, 0; i < len(h.nodes); i++ {
 		if n := h.nodes[i]; h.cost(n) < cost {
@@ -476,6 +481,10 @@ func (h *EdgeQueue) Pop() interface{} {
 	return x
 }
 
+func (h *EdgeQueue) Peek() interface{} {
+	return h.nodes[len(h.nodes)-1]
+}
+
 func makeEdgeQueue(nodes []*bitStarEdge, cost func(node *bitStarEdge) float64) *EdgeQueue {
 	var nodeHeap = EdgeQueue{nodes: nodes, cost: cost}
 	for i, n := range nodes {
@@ -490,7 +499,7 @@ func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
 	heap.Init(h)
 }
 
-func (h *EdgeQueue) prune(cost float64, vertexCost func(node *bitStarNode) float64) {
+func (h *EdgeQueue) prune(cost float64, vertexCost func(node *bitStarVertex) float64) {
 	newNodes := make([]*bitStarEdge, len(h.nodes))
 	var j int
 	for i, j := 0, 0; i < len(h.nodes); i++ {
@@ -551,6 +560,60 @@ func randomNode(bounds *grid, goal *State) *rrtNode {
 }
 
 //endregion
+
+func h(x *bitStarVertex) float64 {
+	return 0
+}
+
+func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
+	samples []*bitStarVertex, vertices []*bitStarVertex, edges []*bitStarEdge,
+	goalCost float64) {
+	// already should have popped v from qV
+
+	// find k nearest samples and make edges (Alg 2 lines 2-3)
+	for _, e := range getKClosest(v, samples, goalCost) {
+		qE.Push(e)
+	}
+
+	// find k nearest vertices already in the tree??
+	// if !vertices.contains(v, TODO!)
+	for _, e := range getKClosest(v, vertices, goalCost) {
+		// if !edges.contains(v, TODO)
+		if v.currentCost+e.approxCost < e.end.currentCost {
+			qE.Push(e)
+		}
+	}
+}
+
+// currently uses 2D Euclidean distance for approximate edge cost
+func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (closest []*bitStarEdge) {
+	closest = make([]*bitStarEdge, K)
+	var i int
+	var x *bitStarVertex
+	for i, x = range samples {
+		distance := v.state.DistanceTo(x.state)
+		// Can we assume that h has been calculated for all x we're being given?
+		// This seems like a problematic assumption because h may depend on the branch
+		// of the tree we're connecting to (path covered so far?)
+		if !(v.approxCost+distance+h(x) < goalCost) { // TODO! -- h
+			continue // skip edges that can't contribute to a better solution
+		}
+		// iterate through current best edges and replace the first one that's worse than this
+		for j, edge := range closest {
+			if edge == nil {
+				closest[j] = &bitStarEdge{start: v, end: x, approxCost: distance} // is approx cost right here?
+			} else if distance < edge.approxCost {
+				edge.end = x
+				edge.approxCost = distance
+				break
+			}
+		}
+	}
+	if i < K {
+		return closest[0:i]
+	}
+	return
+}
 
 /**
 Find the closest node in a list of nodes.
