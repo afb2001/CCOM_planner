@@ -3,7 +3,7 @@ Go planner for CCOM ASV
 
 ## Requirements
 I'm using go version <a href="https://golang.org/dl/">go1.10.3</a> and gccgo (GCC) 8.2.1, so those (or newer) should work for you.
-The Python files can run under both python 2.7 and 3.6.
+The Python files can run under python 2.7.
 
 ## Instructions
 To use, clone the repository and change directories to the root of the project. 
