@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-//region Constants
+// region Constants
 const (
 	rrtInc         float64 = 0.5
 	dubinsInc      float64 = 0.1  // this might be low
@@ -394,20 +394,33 @@ type rrtNode struct {
 	trajectory   *Plan // trajectory to parent
 }
 
+//region Vertex
+
 type bitStarVertex struct {
 	state                   *State
 	approxCost, currentCost float64
 	approxToGo              float64
-	parent                  *bitStarVertex
+	parentEdge              *bitStarEdge
 	uncovered               path
 }
 
-type bitStarEdge struct {
-	start, end           *bitStarVertex
-	approxCost, trueCost float64
+// accessor methods that should handle caching and stuff
+func (v bitStarVertex) ApproxCost() float64 {
+	return v.approxCost
 }
 
-// contains functions for convenience.
+func (v bitStarVertex) CurrentCost() float64 {
+	return v.currentCost
+}
+
+func (v bitStarVertex) ApproxToGo(parent *bitStarVertex) float64 {
+	if parent == nil {
+		parent = v.parentEdge.start
+	}
+	return v.approxToGo
+}
+
+// contains function for convenience.
 // Should consider using maps instead for contains performance.
 func containsVertex(s []*bitStarVertex, e *bitStarVertex) bool {
 	for _, a := range s {
@@ -418,6 +431,49 @@ func containsVertex(s []*bitStarVertex, e *bitStarVertex) bool {
 	return false
 }
 
+/**
+I know this has the name filter and mutates the collection but just let me be.
+It also may be dumb to do it this way; I'm just not confident enough with Go to
+be sure or do it better.
+*/
+func verticesFilter(vertices *[]*bitStarVertex, f func(edge *bitStarVertex) bool) {
+	if vertices == nil {
+		return
+	}
+	b := (*vertices)[:0]
+	for _, x := range *vertices {
+		if f(x) {
+			b = append(b, x)
+		}
+	}
+	*vertices = b
+}
+
+func removeVertex(vertices *[]*bitStarVertex, v *bitStarVertex) {
+	verticesFilter(vertices, func(x *bitStarVertex) bool {
+		return v != x
+	})
+}
+
+//endregion
+
+//region Edge
+
+type bitStarEdge struct {
+	start, end           *bitStarVertex
+	approxCost, trueCost float64
+}
+
+func (e bitStarEdge) ApproxCost() float64 {
+	return e.approxCost
+}
+
+func (e bitStarEdge) TrueCost() float64 {
+	return e.trueCost
+}
+
+// contains function for convenience.
+// Should consider using maps instead for contains performance.
 func containsEdge(s []*bitStarEdge, e *bitStarEdge) bool {
 	for _, a := range s {
 		if reflect.DeepEqual(e, a) {
@@ -427,7 +483,38 @@ func containsEdge(s []*bitStarEdge, e *bitStarEdge) bool {
 	return false
 }
 
+/**
+I know this has the name filter and mutates the collection but just let me be.
+It also may be dumb to do it this way; I'm just not confident enough with Go to
+be sure or do it better.
+*/
+func edgesFilter(edges *[]*bitStarEdge, f func(edge *bitStarEdge) bool) {
+	if edges == nil {
+		return
+	}
+	b := (*edges)[:0]
+	for _, x := range *edges {
+		if f(x) {
+			b = append(b, x)
+		}
+	}
+	*edges = b
+}
+
+/**
+Remove all the edges ending in a certain vertex (for line 18)
+*/
+func removeEdgesEndingIn(edges *[]*bitStarEdge, v *bitStarVertex) {
+	edgesFilter(edges, func(e *bitStarEdge) bool {
+		return e.end != v
+	})
+}
+
+//endregion
+
 //region Queues
+
+//region VertexQueue
 
 type VertexQueue struct {
 	nodes []*bitStarVertex
@@ -472,17 +559,21 @@ func (h *VertexQueue) update(cost func(node *bitStarVertex) float64) {
 	heap.Init(h)
 }
 
-func (h *VertexQueue) prune(cost float64) {
-	newNodes := make([]*bitStarVertex, len(h.nodes))
-	var j int
-	for i, j := 0, 0; i < len(h.nodes); i++ {
-		if n := h.nodes[i]; h.cost(n) < cost {
-			newNodes[j] = n
-			j++
-		}
-	}
-	h.nodes = newNodes[0:j]
-}
+// func (h *VertexQueue) prune(cost float64) {
+// 	newNodes := make([]*bitStarVertex, len(h.nodes))
+// 	var j int
+// 	for i, j := 0, 0; i < len(h.nodes); i++ {
+// 		if n := h.nodes[i]; h.cost(n) < cost {
+// 			newNodes[j] = n
+// 			j++
+// 		}
+// 	}
+// 	h.nodes = newNodes[0:j]
+// }
+
+//endregion
+
+//region EdgeQueue
 
 type EdgeQueue struct {
 	nodes []*bitStarEdge
@@ -527,17 +618,19 @@ func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
 	heap.Init(h)
 }
 
-func (h *EdgeQueue) prune(cost float64, vertexCost func(node *bitStarVertex) float64) {
-	newNodes := make([]*bitStarEdge, len(h.nodes))
-	var j int
-	for i, j := 0, 0; i < len(h.nodes); i++ {
-		if n := h.nodes[i]; vertexCost(n.start) < cost || vertexCost(n.end) < cost { // this might be right?
-			newNodes[j] = n
-			j++
-		}
-	}
-	h.nodes = newNodes[0:j]
-}
+// func (h *EdgeQueue) prune(cost float64, vertexCost func(node *bitStarVertex) float64) {
+// 	newNodes := make([]*bitStarEdge, len(h.nodes))
+// 	var j int
+// 	for i, j := 0, 0; i < len(h.nodes); i++ {
+// 		if n := h.nodes[i]; vertexCost(n.start) < cost || vertexCost(n.end) < cost { // this might be right?
+// 			newNodes[j] = n
+// 			j++
+// 		}
+// 	}
+// 	h.nodes = newNodes[0:j]
+// }
+
+//endregion
 
 //endregion
 
@@ -625,7 +718,7 @@ func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
 	if !containsVertex(vertices, v) {
 		for _, e := range getKClosest(v, vertices, goalCost) {
 			if !containsEdge(edges, e) {
-				if v.currentCost+e.approxCost < e.end.currentCost {
+				if v.CurrentCost()+e.ApproxCost() < e.end.CurrentCost() {
 					// line 6.2 is in getKClosest
 					qE.Push(e)
 				}
@@ -646,19 +739,19 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 		// Can we assume that h has been calculated for all x we're being given?
 		// This seems like a problematic assumption because h may depend on the branch
 		// of the tree we're connecting to (path covered so far?)
-		if !(v.approxCost+distance+h(x, v) < goalCost) {
+		if !(v.ApproxCost()+distance+x.ApproxToGo(v) < goalCost) {
 			continue // skip edges that can't contribute to a better solution
 		}
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
 			if edge == nil {
 				closest[j] = &bitStarEdge{start: v, end: x, approxCost: distance} // is approx cost right here?
-				x.parent = v
+				x.parentEdge = closest[j]
 				break
-			} else if distance < edge.approxCost {
+			} else if distance < edge.ApproxCost() {
 				edge.end = x
 				edge.approxCost = distance
-				x.parent = v
+				x.parentEdge = edge
 				break
 			}
 		}
@@ -671,11 +764,11 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 
 // functions for queueing vertices and edges
 func vertexCost(v *bitStarVertex) float64 {
-	return v.currentCost + h(v, v.parent) // TODO! -- gotta cache that heuristic value for sure...
+	return v.CurrentCost() + v.ApproxToGo(nil) // TODO! -- gotta cache that heuristic value for sure...
 }
 
 func edgeCost(edge *bitStarEdge) float64 {
-	return edge.start.currentCost + edge.approxCost + h(edge.end, edge.start)
+	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.ApproxToGo(edge.start)
 }
 
 /**
@@ -719,24 +812,41 @@ func bitStar(g *grid, start *State, toCover path, o *obstacles, timeRemaining fl
 		// lines 12, 13
 		edge := qE.Pop().(*bitStarEdge)
 		vM, xM := edge.start, edge.end
-		if vM.currentCost+edge.approxCost+h(xM, vM) < goalCost {
-			if vM.approxCost+edge.trueCost+h(xM, vM) < goalCost {
-				if vM.currentCost+edge.trueCost < goalCost {
-					if containsVertex(vertices, vM) {
-						// is this right?? see line 18
-						edges = make([]*bitStarEdge, 0) // reset edges for some reason
-						// beware memory leak above... just a thought
+		// line 14
+		if vM.CurrentCost()+edge.ApproxCost()+xM.ApproxToGo(vM) < goalCost {
+			// line 15
+			if vM.ApproxCost()+edge.TrueCost()+xM.ApproxToGo(vM) < goalCost {
+				// line 16
+				if vM.CurrentCost()+edge.TrueCost() < goalCost {
+					// line 17
+					if containsVertex(vertices, xM) {
+						// line 18
+						// remove edges ending in xM
+						removeEdgesEndingIn(&edges, xM)
 					} else {
-						// TODO
+						// line 20
 						// remove xM from samples
+						removeVertex(&samples, xM)
+						// line 21
 						// add xM to vertices
+						vertices = append(vertices, xM)
+						// add xM to vertex queue
 						qV.Push(xM)
 					}
+					// line 22
 					edges = append(edges, edge)
+					// line 23
 					// do some pruning on qE
+					edgesFilter(&qE.nodes, func(e *bitStarEdge) bool {
+						return !(e.end == xM && e.start.CurrentCost()+e.ApproxCost() >= xM.CurrentCost())
+					})
+					// Should probably try to remove items from the heap while maintaining the
+					// heap property but that sounds hard so I'm not gonna worry about it yet.
+					heap.Init(qE) // re-do heap order (O(n))
 				}
 			}
 		} else {
+			// line 25
 			qV.nodes = make([]*bitStarVertex, 0)
 			qE.nodes = make([]*bitStarEdge, 0)
 		}
