@@ -9,19 +9,21 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 )
 
 //region Constants
 const (
-	rrtInc        float64 = 0.5
-	dubinsInc     float64 = 0.1  // this might be low
-	dubinsDensity float64 = 1    // factor of dubinsInc
-	timeToPlan    float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
-	goalBias      float64 = 0.1
-	maxSpeedBias  float64 = 1.0
-	K             int     = 5 // number of closest states to consider for BIT*
+	rrtInc         float64 = 0.5
+	dubinsInc      float64 = 0.1  // this might be low
+	dubinsDensity  float64 = 1    // factor of dubinsInc
+	timeToPlan     float64 = 0.09 // TOOO! -- make parameter (why is it off by a factor of 10??)
+	goalBias       float64 = 0    // TODO! -- refactor state sampling for BIT*
+	maxSpeedBias   float64 = 1.0
+	K              int     = 5   // number of closest states to consider for BIT*
+	bitStarSamples int     = 200 // parameterize
 )
 
 //endregion
@@ -396,11 +398,33 @@ type bitStarVertex struct {
 	state                   *State
 	approxCost, currentCost float64
 	approxToGo              float64
+	parent                  *bitStarVertex
+	uncovered               path
 }
 
 type bitStarEdge struct {
 	start, end           *bitStarVertex
 	approxCost, trueCost float64
+}
+
+// contains functions for convenience.
+// Should consider using maps instead for contains performance.
+func containsVertex(s []*bitStarVertex, e *bitStarVertex) bool {
+	for _, a := range s {
+		if reflect.DeepEqual(e, a) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsEdge(s []*bitStarEdge, e *bitStarEdge) bool {
+	for _, a := range s {
+		if reflect.DeepEqual(e, a) {
+			return true
+		}
+	}
+	return false
 }
 
 //region Queues
@@ -442,7 +466,9 @@ func makeVertexQueue(nodes []*bitStarVertex, cost func(node *bitStarVertex) floa
 }
 
 func (h *VertexQueue) update(cost func(node *bitStarVertex) float64) {
-	h.cost = cost
+	if cost != nil {
+		h.cost = cost
+	}
 	heap.Init(h)
 }
 
@@ -495,7 +521,9 @@ func makeEdgeQueue(nodes []*bitStarEdge, cost func(node *bitStarEdge) float64) *
 }
 
 func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
-	h.cost = cost
+	if cost != nil {
+		h.cost = cost
+	}
 	heap.Init(h)
 }
 
@@ -547,9 +575,9 @@ func biasedRandomState(bounds *grid, goal *State) *State {
 /**
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
-func boundedBiasedRandomState(bounds *grid, goal *State, start *State, distance float64) *State {
-	s := biasedRandomState(bounds, goal)
-	for ; start.DistanceTo(s) > distance; s = biasedRandomState(bounds, goal) {
+func boundedBiasedRandomState(bounds *grid, path path, start *State, distance float64) *State {
+	s := biasedRandomState(bounds, nil) // TODO! -- path bias instead of goal bias
+	for ; start.DistanceTo(s) > distance; s = biasedRandomState(bounds, nil) {
 	} // can this be O(1)?
 	return s
 }
@@ -561,10 +589,28 @@ func randomNode(bounds *grid, goal *State) *rrtNode {
 
 //endregion
 
-func h(x *bitStarVertex) float64 {
+/**
+parent is the potential parent for x that we're using for
+the uncovered path.
+*/
+func h(x *bitStarVertex, parent *bitStarVertex) float64 {
 	return 0
 }
 
+// TODO! -- compute current cost somewhere
+// also make sure all other costs have been computed somewhere
+// oh and figure out what to do about caching heuristic values (is it necessary/easy?)
+
+/**
+Alg 3
+*/
+func prune(vertices []*bitStarVertex, edges []*bitStarEdge, goalCost float64) {
+	// TODO -- this is gonna be different if I convert the slices to maps so I'll hold off
+}
+
+/**
+Alg 2
+*/
 func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
 	samples []*bitStarVertex, vertices []*bitStarVertex, edges []*bitStarEdge,
 	goalCost float64) {
@@ -575,17 +621,22 @@ func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
 		qE.Push(e)
 	}
 
-	// find k nearest vertices already in the tree??
-	// if !vertices.contains(v, TODO!)
-	for _, e := range getKClosest(v, vertices, goalCost) {
-		// if !edges.contains(v, TODO)
-		if v.currentCost+e.approxCost < e.end.currentCost {
-			qE.Push(e)
+	// find k nearest vertices already in the tree? (Alg 2 lines 4-6)
+	if !containsVertex(vertices, v) {
+		for _, e := range getKClosest(v, vertices, goalCost) {
+			if !containsEdge(edges, e) {
+				if v.currentCost+e.approxCost < e.end.currentCost {
+					// line 6.2 is in getKClosest
+					qE.Push(e)
+				}
+			}
 		}
 	}
 }
 
-// currently uses 2D Euclidean distance for approximate edge cost
+/**
+samples doesn't have to be actual samples it can come from anywhere
+*/
 func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (closest []*bitStarEdge) {
 	closest = make([]*bitStarEdge, K)
 	var i int
@@ -595,16 +646,19 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 		// Can we assume that h has been calculated for all x we're being given?
 		// This seems like a problematic assumption because h may depend on the branch
 		// of the tree we're connecting to (path covered so far?)
-		if !(v.approxCost+distance+h(x) < goalCost) { // TODO! -- h
+		if !(v.approxCost+distance+h(x, v) < goalCost) {
 			continue // skip edges that can't contribute to a better solution
 		}
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
 			if edge == nil {
 				closest[j] = &bitStarEdge{start: v, end: x, approxCost: distance} // is approx cost right here?
+				x.parent = v
+				break
 			} else if distance < edge.approxCost {
 				edge.end = x
 				edge.approxCost = distance
+				x.parent = v
 				break
 			}
 		}
@@ -613,6 +667,82 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 		return closest[0:i]
 	}
 	return
+}
+
+// functions for queueing vertices and edges
+func vertexCost(v *bitStarVertex) float64 {
+	return v.currentCost + h(v, v.parent) // TODO! -- gotta cache that heuristic value for sure...
+}
+
+func edgeCost(edge *bitStarEdge) float64 {
+	return edge.start.currentCost + edge.approxCost + h(edge.end, edge.start)
+}
+
+/**
+Alg 1 (obviously)
+*/
+func bitStar(g *grid, start *State, toCover path, o *obstacles, timeRemaining float64) *Plan {
+	endTime := timeRemaining + now()
+	startV := &bitStarVertex{state: start}
+	goalCost := math.MaxFloat64
+	samples := make([]*bitStarVertex, bitStarSamples)
+	// line 1
+	vertices := []*bitStarVertex{startV}
+	edges := make([]*bitStarEdge, 0)
+	// line 2
+	qE := new(EdgeQueue)
+	qV := new(VertexQueue)
+	// TODO -- consider refactoring this as it doesn't really add any generality
+	qE.cost = edgeCost
+	qV.cost = vertexCost
+	// line 3
+	for now() < endTime {
+		// line 4
+		if qE.Len() == 0 && qV.Len() == 0 {
+			// line 5
+			prune(vertices, edges, goalCost)
+			// line 6
+			for m := 0; m < bitStarSamples; m++ {
+				samples[m] = &bitStarVertex{state: boundedBiasedRandomState(g, toCover, start, goalCost)}
+			}
+			// TODO! -- what do we need V_old for? (line 7, A2 line 4)
+			// line 8
+			qV.nodes = make([]*bitStarVertex, len(vertices))
+			copy(qV.nodes, vertices)
+			qV.update(nil) // refactor?
+			// line 9 -- TODO! -- how to find the cost of the best plan so far?
+		}
+		// lines 10, 11
+		// this is all a for loop but the formatting is weird...
+		for v := qV.Peek().(*bitStarVertex); qV.cost(v) <= qE.cost(qE.Peek().(*bitStarEdge)); expandVertex(qV.Pop().(*bitStarVertex), qV, qE, samples, vertices, edges, goalCost) {
+		}
+		// lines 12, 13
+		edge := qE.Pop().(*bitStarEdge)
+		vM, xM := edge.start, edge.end
+		if vM.currentCost+edge.approxCost+h(xM, vM) < goalCost {
+			if vM.approxCost+edge.trueCost+h(xM, vM) < goalCost {
+				if vM.currentCost+edge.trueCost < goalCost {
+					if containsVertex(vertices, vM) {
+						// is this right?? see line 18
+						edges = make([]*bitStarEdge, 0) // reset edges for some reason
+						// beware memory leak above... just a thought
+					} else {
+						// TODO
+						// remove xM from samples
+						// add xM to vertices
+						qV.Push(xM)
+					}
+					edges = append(edges, edge)
+					// do some pruning on qE
+				}
+			}
+		} else {
+			qV.nodes = make([]*bitStarVertex, 0)
+			qE.nodes = make([]*bitStarEdge, 0)
+		}
+	}
+	// figure out the plan I guess
+	return nil
 }
 
 /**
