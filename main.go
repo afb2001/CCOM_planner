@@ -24,6 +24,10 @@ const (
 	maxSpeedBias   float64 = 1.0
 	K              int     = 5   // number of closest states to consider for BIT*
 	bitStarSamples int     = 200 // parameterize
+	// BIT* penalties
+	coveragePenalty  float64 = 10
+	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
+	timePenalty      float64 = 1
 )
 
 //endregion
@@ -295,14 +299,33 @@ type path []State
 /**
 Remove the given state from the path. Modifies the original path.
 */
-func (p *path) remove(s State) {
+func (p *path) remove(s State) path {
 	b := (*p)[0:0]
 	for _, x := range *p {
 		if s != x {
 			b = append(b, x)
 		}
 	}
-	p = &b
+	// p = &b // this was wrong... should fix in v1
+	return b
+}
+
+func (p path) maxDistanceFrom(s State) (max float64) {
+	for _, x := range p {
+		if d := s.DistanceTo(&x); d > max {
+			max = d
+		}
+	}
+	return
+}
+
+func (p path) newlyCovered(s State) (covered path) {
+	for _, x := range p {
+		if s.DistanceTo(&x) < 1.0 {
+			covered = append(covered, x)
+		}
+	}
+	return
 }
 
 //endregion
@@ -387,6 +410,19 @@ func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
 
 //region BIT*
 
+//region BIT* globals
+
+// make sure to set these before you call bitStar()
+
+// these should be immutable so no pointers necessary
+var start State
+var g grid
+var o obstacles
+var toCover path
+var bestVertex *bitStarVertex
+
+//endregion
+
 type rrtNode struct {
 	state        *State
 	parent       *rrtNode
@@ -405,19 +441,38 @@ type bitStarVertex struct {
 }
 
 // accessor methods that should handle caching and stuff
-func (v bitStarVertex) ApproxCost() float64 {
+func (v *bitStarVertex) ApproxCost() float64 {
+	if v.approxCost == 0 {
+		v.approxCost = start.DistanceTo(v.state) / maxSpeed * timePenalty
+	}
 	return v.approxCost
 }
 
-func (v bitStarVertex) CurrentCost() float64 {
+func (v *bitStarVertex) CurrentCost() float64 {
+	// updated in bitStarEdge.UpdateTrueCost()
 	return v.currentCost
 }
 
-func (v bitStarVertex) ApproxToGo(parent *bitStarVertex) float64 {
+// get the cached heuristic value
+func (v *bitStarVertex) ApproxToGo() float64 {
+	return v.approxToGo
+}
+
+// update the cached heuristic value
+func (v *bitStarVertex) UpdateApproxToGo(parent *bitStarVertex) float64 {
 	if parent == nil {
 		parent = v.parentEdge.start
 	}
+	// max euclidean distance to an uncovered point - coverage penalty for covering all of them
+	// This is actually accurate if they're all in a straight line from your current heading,
+	// which is not a super unlikely scenario, making this heuristic not as horrible as it may seem.
+	v.approxToGo = v.uncovered.maxDistanceFrom(*v.state)/maxSpeed*timePenalty -
+		float64(len(v.uncovered))*coveragePenalty
 	return v.approxToGo
+}
+
+func (v bitStarVertex) fValue() float64 {
+	return v.ApproxCost() + v.UpdateApproxToGo(nil)
 }
 
 // contains function for convenience.
@@ -462,14 +517,48 @@ func removeVertex(vertices *[]*bitStarVertex, v *bitStarVertex) {
 type bitStarEdge struct {
 	start, end           *bitStarVertex
 	approxCost, trueCost float64
+	dPath                *dubins.Path
+	plan                 *Plan // plan to traverse dPath
 }
 
 func (e bitStarEdge) ApproxCost() float64 {
 	return e.approxCost
 }
 
+// get the cached true cost
 func (e bitStarEdge) TrueCost() float64 {
 	return e.trueCost
+}
+
+// Updates the cached true cost of this edge.
+// This is expensive.
+func (e *bitStarEdge) UpdateTrueCost() float64 {
+	var collisionPenalty float64
+	var newlyCovered path
+	var err int
+	e.dPath, err = shortestPath(e.start.state, e.end.state)
+	if err != dubins.EDUBOK {
+		printLog("Error computing dubins path")
+		return math.MaxFloat64 // encountered an error making the dubins path
+	}
+	// compute the plan along the dubins path, the collision penalty, and the ending time
+	// NOTE: this does a lot of work
+	e.plan, collisionPenalty, newlyCovered, e.end.state.time = getSamples(e.dPath, e.start.state.time, e.start.uncovered)
+	// update the uncovered path in e.end
+	e.end.uncovered = e.start.uncovered
+	for _, c := range newlyCovered {
+		// TODO -- maybe make this more efficient... it shouldn't happen that much though
+		e.end.uncovered = e.end.uncovered.remove(c)
+	}
+	// update e's true cost
+	e.trueCost = e.netTime()*timePenalty + collisionPenalty
+	// update e.end's current cost
+	e.end.currentCost = e.start.currentCost + e.trueCost
+	return e.trueCost
+}
+
+func (e bitStarEdge) netTime() float64 {
+	return e.end.state.time - e.start.state.time
 }
 
 // contains function for convenience.
@@ -682,14 +771,6 @@ func randomNode(bounds *grid, goal *State) *rrtNode {
 
 //endregion
 
-/**
-parent is the potential parent for x that we're using for
-the uncovered path.
-*/
-func h(x *bitStarVertex, parent *bitStarVertex) float64 {
-	return 0
-}
-
 // TODO! -- compute current cost somewhere
 // also make sure all other costs have been computed somewhere
 // oh and figure out what to do about caching heuristic values (is it necessary/easy?)
@@ -706,7 +787,7 @@ Alg 2
 */
 func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
 	samples []*bitStarVertex, vertices []*bitStarVertex, edges []*bitStarEdge,
-	goalCost float64) {
+	vOld []*bitStarVertex, goalCost float64) {
 	// already should have popped v from qV
 
 	// find k nearest samples and make edges (Alg 2 lines 2-3)
@@ -739,13 +820,14 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 		// Can we assume that h has been calculated for all x we're being given?
 		// This seems like a problematic assumption because h may depend on the branch
 		// of the tree we're connecting to (path covered so far?)
-		if !(v.ApproxCost()+distance+x.ApproxToGo(v) < goalCost) {
+		// No longer making that assumption but maybe we should in the future when h is more expensive?
+		if !(v.ApproxCost()+distance+x.UpdateApproxToGo(v) < goalCost) {
 			continue // skip edges that can't contribute to a better solution
 		}
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
 			if edge == nil {
-				closest[j] = &bitStarEdge{start: v, end: x, approxCost: distance} // is approx cost right here?
+				closest[j] = &bitStarEdge{start: v, end: x, approxCost: distance}
 				x.parentEdge = closest[j]
 				break
 			} else if distance < edge.ApproxCost() {
@@ -764,21 +846,23 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 
 // functions for queueing vertices and edges
 func vertexCost(v *bitStarVertex) float64 {
-	return v.CurrentCost() + v.ApproxToGo(nil) // TODO! -- gotta cache that heuristic value for sure...
+	return v.CurrentCost() + v.ApproxToGo() // TODO! -- gotta cache that heuristic value for sure...
 }
 
 func edgeCost(edge *bitStarEdge) float64 {
-	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.ApproxToGo(edge.start)
+	// NOTE: when the heuristic function becomes more expensive this will need to get changed
+	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
 }
 
 /**
 Alg 1 (obviously)
 */
-func bitStar(g *grid, start *State, toCover path, o *obstacles, timeRemaining float64) *Plan {
+func bitStar(start *State, timeRemaining float64) *Plan {
 	endTime := timeRemaining + now()
 	startV := &bitStarVertex{state: start}
-	goalCost := math.MaxFloat64
+	bestVertex = startV
 	samples := make([]*bitStarVertex, bitStarSamples)
+	var vOld []*bitStarVertex
 	// line 1
 	vertices := []*bitStarVertex{startV}
 	edges := make([]*bitStarEdge, 0)
@@ -793,31 +877,40 @@ func bitStar(g *grid, start *State, toCover path, o *obstacles, timeRemaining fl
 		// line 4
 		if qE.Len() == 0 && qV.Len() == 0 {
 			// line 5
-			prune(vertices, edges, goalCost)
+			prune(vertices, edges, bestVertex.fValue())
 			// line 6
 			for m := 0; m < bitStarSamples; m++ {
-				samples[m] = &bitStarVertex{state: boundedBiasedRandomState(g, toCover, start, goalCost)}
+				samples[m] = &bitStarVertex{state: boundedBiasedRandomState(&g, toCover, start, bestVertex.fValue())}
 			}
-			// TODO! -- what do we need V_old for? (line 7, A2 line 4)
+			// line 7
+			// vOld is used in expandVertex to make sure we only add
+			vOld = append([]*bitStarVertex(nil), vertices...)
 			// line 8
 			qV.nodes = make([]*bitStarVertex, len(vertices))
 			copy(qV.nodes, vertices)
 			qV.update(nil) // refactor?
 			// line 9 -- TODO! -- how to find the cost of the best plan so far?
+			// update goalCost
 		}
 		// lines 10, 11
-		// this is all a for loop but the formatting is weird...
-		for v := qV.Peek().(*bitStarVertex); qV.cost(v) <= qE.cost(qE.Peek().(*bitStarEdge)); expandVertex(qV.Pop().(*bitStarVertex), qV, qE, samples, vertices, edges, goalCost) {
+		for qV.cost(qV.Peek().(*bitStarVertex)) <= qE.cost(qE.Peek().(*bitStarEdge)) {
+			expandVertex(qV.Pop().(*bitStarVertex), qV, qE, samples, vertices, edges, vOld, bestVertex.fValue())
 		}
 		// lines 12, 13
 		edge := qE.Pop().(*bitStarEdge)
 		vM, xM := edge.start, edge.end
 		// line 14
-		if vM.CurrentCost()+edge.ApproxCost()+xM.ApproxToGo(vM) < goalCost {
+		// vM should  be fully up to date at this point, but xM likely is not
+		// Should we be using the f value for the best vertex here? I think that's
+		// right but the paper is giving me pause...
+		// Yeah pretty sure it's right. This is one of those places we're going to
+		// do something different than the paper because of our path coverage goal.
+		if vM.CurrentCost()+edge.ApproxCost()+xM.UpdateApproxToGo(vM) < bestVertex.fValue() {
 			// line 15
-			if vM.ApproxCost()+edge.TrueCost()+xM.ApproxToGo(vM) < goalCost {
+			if vM.ApproxCost()+edge.UpdateTrueCost()+xM.ApproxToGo() < bestVertex.fValue() {
+				// by now xM is fully up to date and we have a path
 				// line 16
-				if vM.CurrentCost()+edge.TrueCost() < goalCost {
+				if vM.CurrentCost()+edge.TrueCost() < xM.currentCost { // xM.currentCost is up to date
 					// line 17
 					if containsVertex(vertices, xM) {
 						// line 18
@@ -842,7 +935,13 @@ func bitStar(g *grid, start *State, toCover path, o *obstacles, timeRemaining fl
 					})
 					// Should probably try to remove items from the heap while maintaining the
 					// heap property but that sounds hard so I'm not gonna worry about it yet.
+					// Or at least see if anything changed before doing this
 					heap.Init(qE) // re-do heap order (O(n))
+				}
+				// this is different:
+				// update best vertex (may not want to do it here but it seems convenient)
+				if bestVertex.fValue() > xM.fValue() {
+					bestVertex = xM
 				}
 			}
 		} else {
@@ -947,7 +1046,7 @@ func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64
 			//printLog("Could not find state to connect to")
 			continue
 		}
-		n.trajectory = getSamples(dPath, g, o)
+		n.trajectory = getSamples2(dPath, g, o)
 		if n.trajectory == nil {
 			blockedCount++
 			//printLog("Could not find state to connect to")
@@ -1105,7 +1204,7 @@ func shortestPath(s1 *State, s2 *State) (path *dubins.Path, err int) {
 /**
 Convert the given path into a feasible plan.
 */
-func getSamples(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
+func getSamples2(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
 	plan = new(Plan)
 	var t float64
 	callback := func(q *[3]float64, inc float64) int {
@@ -1130,6 +1229,33 @@ func getSamples(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
 	}
 
 	return plan
+}
+
+/**
+Convert the given path into a plan and compute the sum collision cost and the newly covered path.
+*/
+func getSamples(path *dubins.Path, startTime float64, toCover path) (plan *Plan, penalty float64, newlyCovered path, finalTime float64) {
+	plan = new(Plan)
+	t := startTime
+	callback := func(q *[3]float64, inc float64) int {
+		t += inc / maxSpeed
+		s := &State{x: q[0], y: q[1], heading: q[2], speed: maxSpeed, time: t}
+		s.collisionProbability = o.collisionExists(s)
+		if g.isBlocked(s.x, s.y) {
+			penalty += collisionPenalty
+		} else if s.collisionProbability > 0 {
+			penalty += collisionPenalty * s.collisionProbability
+		}
+		newlyCovered = append(newlyCovered, toCover.newlyCovered(*s)...) // splash operator I guess
+		plan.appendState(s)
+		return 0
+	}
+	err := path.SampleMany(dubinsInc, callback)
+
+	if err != dubins.EDUBOK {
+		return nil, math.MaxFloat64, newlyCovered, 0
+	}
+	return plan, penalty, newlyCovered, t
 }
 
 //endregion
