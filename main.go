@@ -295,11 +295,11 @@ Remove the given state from the path. Modifies the original path.
 func (p *path) remove(s State) {
 	b := (*p)[0:0]
 	for _, x := range *p {
-		if s != x {
+		if s.x != x.x || s.y != x.y  {
 			b = append(b, x)
 		}
 	}
-	p = &b
+	*p = b
 }
 
 //endregion
