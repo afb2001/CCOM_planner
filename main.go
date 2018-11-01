@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./common"
 	"./dubins"
 	"bufio"
 	"container/heap"
@@ -16,18 +17,15 @@ import (
 
 // region Constants
 const (
-	verbose                     = true
-	rrtInc              float64 = 0.5
-	dubinsInc           float64 = 0.1 // this might be low
-	dubinsDensity       float64 = 1   // factor of dubinsInc
-	planDistanceDensity float64 = 1
-	planTimeDensity     float64 = 1
-	timeToPlan          float64 = 0.09 // make parameter (why is it off by a factor of 10??)
-	goalBias            float64 = 0
-	maxSpeedBias        float64 = 1.0
-	K                   int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples      int     = 200 // make this a parameter too
-	timeHorizon         float64 = 30  // not used as intended yet
+	verbose                = true
+	rrtInc         float64 = 0.5
+	dubinsInc      float64 = 0.1  // this might be low
+	dubinsDensity  float64 = 1    // factor of dubinsInc
+	timeToPlan     float64 = 0.09 // make parameter (why is it off by a factor of 10??)
+	goalBias       float64 = 0
+	maxSpeedBias   float64 = 1.0
+	K              int     = 5   // number of closest states to consider for BIT*
+	bitStarSamples int     = 200 // make this a parameter too
 	// BIT* penalties
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -69,354 +67,6 @@ func now() float64 {
 
 //endregion
 
-//region Grid
-/**
-Cell struct to make up grid
-*/
-type cell struct {
-	x, y            int // location
-	distanceToShore int // in cells
-}
-
-/**
-Cell constructor.
-*/
-func newCell(x int, y int) cell {
-	return cell{x: x, y: y, distanceToShore: math.MaxInt32}
-}
-
-/**
-Convenience function to tell if cell is a static obstacle
-*/
-func (c *cell) isBlocked() bool {
-	return c.distanceToShore == 0
-}
-
-/**
-Grid struct for holding distances to static obstacles (shore)
-*/
-type grid struct {
-	cells         [][]cell
-	width, height int
-}
-
-/**
-Create a new grid of given dimensions
-*/
-func newGrid(width int, height int) grid {
-	cells := new([][]cell)
-	for y := 0; y < height; y++ {
-		col := new([]cell)
-		for x := 0; x < width; x++ {
-			*col = append(*col, newCell(y, x))
-		}
-		*cells = append(*cells, *col)
-	}
-	return grid{cells: *cells, width: width, height: height}
-}
-
-/**
-Get the cell at x, y.
-*/
-func (g *grid) get(x int, y int) *cell {
-	return &(g.cells[y][x])
-}
-
-/**
-Block the cell at x, y. For initialization only (probably).
-*/
-func (g *grid) block(x int, y int) {
-	g.get(x, y).distanceToShore = 0
-}
-
-/**
-Block cells at the specified resolution
-*/
-func (g *grid) blockRange(x int, y int, r int) {
-	for i := 0; i < r; i++ {
-		for j := 0; j < r; j++ {
-			g.block(x+i, y+j)
-		}
-	}
-}
-
-func (g *grid) dump() string {
-	var s = "\n"
-	for y := g.height - 1; y >= 0; y-- {
-		for x := 0; x < g.width; x++ {
-			if g.isBlocked(float64(x), float64(y)) {
-				s += "#"
-			} else {
-				s += "_"
-			}
-		}
-		s += "\n"
-	}
-	return s
-}
-
-/**
-Determine if a given point is within a static obstacle.
-*/
-func (g *grid) isBlocked(x float64, y float64) bool {
-	if x < 0 || x > float64(g.width) || y < 0 || y > float64(g.height) {
-		return true
-	}
-	return g.get(int(x), int(y)).isBlocked()
-}
-
-//endregion
-
-//region Obstacles
-
-/**
-Type alias for (dynamic) obstacle collection.
-*/
-type obstacles map[int]*State
-
-/**
-Add or update the obstacle collection with the new obstacle.
-*/
-func (o *obstacles) update(id int, newState *State) {
-	(*o)[id] = newState
-}
-
-func (o *obstacles) remove(id int) {
-	delete(*o, id)
-}
-
-/**
-Check if any of the obstacles collide with the given state.
-
-Returns a float64 probability of collision.
-*/
-func (o *obstacles) collisionExists(state *State) float64 {
-	for _, s := range *o {
-		if s.Collides(s.Project(s.TimeUntil(state))) {
-			return 1.0
-		}
-	}
-	return 0
-}
-
-//endregion
-
-//region State
-
-/**
-Represents a singular state in the world.
-*/
-type State struct {
-	x, y, heading, speed, time float64
-	collisionProbability       float64
-}
-
-/**
-Returns the time in seconds until state other.
-*/
-func (s *State) TimeUntil(other *State) float64 {
-	return other.time - s.time
-}
-
-/**
-Returns the Euclidean distance in two dimensions (x,y).
-*/
-func (s *State) DistanceTo(other *State) float64 {
-	return math.Sqrt(math.Pow(s.x-other.x, 2) + math.Pow(s.y-other.y, 2))
-}
-
-func (s *State) HeadingTo(other *State) float64 {
-	dx := s.x - other.x
-	dy := s.y - other.y
-	h := math.Atan2(dy, dx)
-	if h < 0 {
-		return h + (2 * math.Pi) // may not need this? I don't remember how tangents work
-	}
-	return h
-}
-
-/**
-True iff other is within 1.5m in the x and y directions.
-*/
-func (s *State) Collides(other *State) bool {
-	return s.time == other.time &&
-		(math.Abs(s.x-other.x) < 1.5) &&
-		(math.Abs(s.y-other.y) < 1.5)
-}
-
-/**
-Tests whether the states have same (x, y)
-*/
-func (s *State) IsSamePosition(other *State) bool {
-	return s.x == other.x && s.y == other.y
-}
-
-/**
-Convert this state to a 3D vector for Dubins functions.
-*/
-func (s *State) ToArrayPointer() *[3]float64 {
-	return &[3]float64{s.x, s.y, s.heading}
-}
-
-/**
-Create a string representation of the state.
-Angle is turned back into heading.
-*/
-func (s *State) String() string {
-	return fmt.Sprintf("%f %f %f %f %f", s.x, s.y, (-1*s.heading)+math.Pi/2, s.speed, s.time)
-}
-
-/**
-Projects a state to a specified time assuming constant speed and heading.
-Creates a new state.
-
-Meant to be used with future times but should work either way.
-*/
-func (s *State) Project(time float64) *State {
-	deltaT := time - s.time
-	magnitude := deltaT * s.speed
-	deltaX := math.Cos(s.heading) * magnitude
-	deltaY := math.Sin(s.heading) * magnitude
-	return &State{x: s.x + deltaX, y: s.y + deltaY, heading: s.heading, speed: s.speed, time: time}
-}
-
-/**
-Push a state at a given angle for a given distance.
-Mutates the current state.
-
-Written for ray-casting of sorts during collision checking.
-Probably should not use past version 0.
-*/
-func (s *State) Push(heading float64, distance float64) {
-	dx := distance * math.Cos(heading)
-	dy := distance * math.Sin(heading)
-	s.x += dx
-	s.y += dy
-}
-
-//endregion
-
-//region Path
-
-type path []State
-
-/**
-Remove the given state from the path. Modifies the original path.
-*/
-func (p *path) remove(s State) path {
-	b := (*p)[0:0]
-	for _, x := range *p {
-		if s != x {
-			b = append(b, x)
-		}
-	}
-	// p = &b // this was wrong... should fix in v1
-	return b
-}
-
-func (p path) maxDistanceFrom(s State) (max float64) {
-	for _, x := range p {
-		if d := s.DistanceTo(&x); d > max {
-			max = d
-		}
-	}
-	return
-}
-
-func (p path) newlyCovered(s State) (covered path) {
-	for _, x := range p {
-		if s.DistanceTo(&x) < 1.0 {
-			covered = append(covered, x)
-		}
-	}
-	return
-}
-
-//endregion
-
-//region Plan
-type Plan struct {
-	states []*State
-}
-
-func (p *Plan) String() string {
-	s := fmt.Sprintf("plan %d", len(p.states))
-	for _, state := range p.states {
-		s += "\n" + state.String()
-	}
-	return s
-}
-
-/**
-Append a state to the plan when the state is within the time horizon and either:
-	1. The plan is empty
-	2. There is a substantial distance gap between the last state and this one
-	3. There is a substantial time gap between the last state and this one
-*/
-func (p *Plan) appendState(s *State) {
-	if start.TimeUntil(p.states[len(p.states)-1]) > timeHorizon &&
-		(len(p.states) == 0 ||
-			!(p.states[len(p.states)-1].DistanceTo(s) < planDistanceDensity) ||
-			p.states[len(p.states)-1].TimeUntil(s) > planTimeDensity) {
-		p.states = append(p.states, s)
-	}
-}
-
-/**
-Concatenate two plans.
-*/
-func (p *Plan) appendPlan(other *Plan) {
-	for _, s := range other.states {
-		p.appendState(s)
-	}
-}
-
-/**
-Default do-nothing plan.
-*/
-func defaultPlan(start *State) *Plan {
-	plan := new(Plan)
-	s := State{x: start.x, y: start.y, heading: start.heading, speed: start.speed, time: start.time + 1.0}
-	plan.states = append(plan.states, &s)
-	return plan
-}
-
-// func makePlan(grid *grid, start *State, path path, o *obstacles) *Plan {
-// 	printLog("Starting to plan")
-//
-// 	if len(path) == 0 {
-// 		return defaultPlan(start)
-// 	}
-// 	// set goal as first item in path
-// 	goalCount := 0
-// 	goal := &path[goalCount]
-//
-// 	startTime := float64(time.Now().UnixNano()) / 10e9
-// 	var p = new(Plan)
-// 	for startTime+timeToPlan > now() {
-// 		newPlan := rrt(grid, start, goal, o, (startTime+timeToPlan)-now())
-// 		if newPlan == nil {
-// 			if len(p.states) == 0 {
-// 				printLog("Done planning")
-// 				return defaultPlan(start)
-// 			}
-// 		} else {
-// 			p.appendPlan(newPlan)
-// 			if goalCount++; len(path) > goalCount {
-// 				start = goal
-// 				goal = &path[goalCount]
-// 			} else {
-// 				return p
-// 			}
-// 		}
-// 	}
-//
-// 	printLog("Done planning")
-// 	return p
-// }
-
-//endregion
-
 //region BIT*
 
 //region BIT* globals
@@ -424,40 +74,40 @@ func defaultPlan(start *State) *Plan {
 // make sure to set these before you call bitStar()
 
 // these should be immutable so no pointers necessary
-var start State
-var g grid
-var o obstacles
-var toCover path
-var bestVertex *bitStarVertex
+var start common.State
+var grid common.Grid
+var o common.Obstacles
+var toCover common.Path
+var bestVertex *BitStarVertex
 
-func initGlobals(g1 grid, p path) {
-	g = g1
+func initGlobals(g1 common.Grid, p common.Path) {
+	grid = g1
 	toCover = p
 }
 
 //endregion
 
 type rrtNode struct {
-	state        *State
+	state        *common.State
 	parent       *rrtNode
 	pathToParent *dubins.Path
-	trajectory   *Plan // trajectory to parent
+	trajectory   *common.Plan // trajectory to parent
 }
 
 //region Vertex
 
-type bitStarVertex struct {
-	state            *State
+type BitStarVertex struct {
+	state            *common.State
 	approxCost       float64
 	currentCost      float64
 	currentCostIsSet bool
 	approxToGo       float64
-	parentEdge       *bitStarEdge
-	uncovered        path
+	parentEdge       *BitStarEdge
+	uncovered        common.Path
 }
 
 // accessor methods that should handle caching and stuff
-func (v *bitStarVertex) ApproxCost() float64 {
+func (v *BitStarVertex) ApproxCost() float64 {
 	if v.approxCost == 0 {
 		v.approxCost = start.DistanceTo(v.state) / maxSpeed * timePenalty
 	}
@@ -465,8 +115,8 @@ func (v *bitStarVertex) ApproxCost() float64 {
 	return v.approxCost
 }
 
-func (v *bitStarVertex) CurrentCost() float64 {
-	// updated in bitStarEdge.UpdateTrueCost()
+func (v *BitStarVertex) CurrentCost() float64 {
+	// updated in BitStarEdge.UpdateTrueCost()
 	if v.currentCostIsSet {
 		return v.currentCost
 	} else {
@@ -475,12 +125,12 @@ func (v *bitStarVertex) CurrentCost() float64 {
 }
 
 // get the cached heuristic value
-func (v *bitStarVertex) ApproxToGo() float64 {
+func (v *BitStarVertex) ApproxToGo() float64 {
 	return v.approxToGo
 }
 
 // update the cached heuristic value
-func (v *bitStarVertex) UpdateApproxToGo(parent *bitStarVertex) float64 {
+func (v *BitStarVertex) UpdateApproxToGo(parent *BitStarVertex) float64 {
 	// is the whole parent thing really necessary? Yeah it probably is. Damn.
 	if parent == nil {
 		parent = v.parentEdge.start
@@ -488,18 +138,18 @@ func (v *bitStarVertex) UpdateApproxToGo(parent *bitStarVertex) float64 {
 	// max euclidean distance to an uncovered point - coverage penalty for covering all of them
 	// This is actually accurate if they're all in a straight line from your current heading,
 	// which is not a super unlikely scenario, making this heuristic not as horrible as it may seem.
-	v.approxToGo = parent.uncovered.maxDistanceFrom(*v.state)/maxSpeed*timePenalty -
+	v.approxToGo = parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
 		float64(len(v.uncovered))*coveragePenalty
 	return v.approxToGo
 }
 
-func (v bitStarVertex) fValue() float64 {
+func (v BitStarVertex) fValue() float64 {
 	return v.ApproxCost() + v.UpdateApproxToGo(nil)
 }
 
 // contains function for convenience.
 // Should consider using maps instead for contains performance.
-func containsVertex(s []*bitStarVertex, e *bitStarVertex) bool {
+func containsVertex(s []*BitStarVertex, e *BitStarVertex) bool {
 	for _, a := range s {
 		if reflect.DeepEqual(e, a) {
 			return true
@@ -513,7 +163,7 @@ I know this has the name filter and mutates the collection but just let me be.
 It also may be dumb to do it this way; I'm just not confident enough with Go to
 be sure or do it better.
 */
-func verticesFilter(vertices *[]*bitStarVertex, f func(edge *bitStarVertex) bool) {
+func verticesFilter(vertices *[]*BitStarVertex, f func(edge *BitStarVertex) bool) {
 	if vertices == nil {
 		return
 	}
@@ -526,8 +176,8 @@ func verticesFilter(vertices *[]*bitStarVertex, f func(edge *bitStarVertex) bool
 	*vertices = b
 }
 
-func removeVertex(vertices *[]*bitStarVertex, v *bitStarVertex) {
-	verticesFilter(vertices, func(x *bitStarVertex) bool {
+func removeVertex(vertices *[]*BitStarVertex, v *BitStarVertex) {
+	verticesFilter(vertices, func(x *BitStarVertex) bool {
 		return v != x
 	})
 }
@@ -536,27 +186,27 @@ func removeVertex(vertices *[]*bitStarVertex, v *bitStarVertex) {
 
 //region Edge
 
-type bitStarEdge struct {
-	start, end           *bitStarVertex
+type BitStarEdge struct {
+	start, end           *BitStarVertex
 	approxCost, trueCost float64
 	dPath                *dubins.Path
-	plan                 *Plan // plan to traverse dPath
+	plan                 *common.Plan // plan to traverse dPath
 }
 
-func (e bitStarEdge) ApproxCost() float64 {
+func (e BitStarEdge) ApproxCost() float64 {
 	return e.approxCost
 }
 
 // get the cached true cost
-func (e bitStarEdge) TrueCost() float64 {
+func (e BitStarEdge) TrueCost() float64 {
 	return e.trueCost
 }
 
 // Updates the cached true cost of this edge.
 // This is expensive.
-func (e *bitStarEdge) UpdateTrueCost() float64 {
+func (e *BitStarEdge) UpdateTrueCost() float64 {
 	var collisionPenalty float64
-	var newlyCovered path
+	var newlyCovered common.Path
 	var err int
 	e.dPath, err = shortestPath(e.start.state, e.end.state)
 	if err != dubins.EDUBOK {
@@ -565,12 +215,12 @@ func (e *bitStarEdge) UpdateTrueCost() float64 {
 	}
 	// compute the plan along the dubins path, the collision penalty, and the ending time
 	// NOTE: this does a lot of work
-	e.plan, collisionPenalty, newlyCovered, e.end.state.time = getSamples(e.dPath, e.start.state.time, e.start.uncovered)
+	e.plan, collisionPenalty, newlyCovered, e.end.state.Time = getSamples(e.dPath, e.start.state.Time, e.start.uncovered)
 	// update the uncovered path in e.end
 	e.end.uncovered = e.start.uncovered
 	for _, c := range newlyCovered {
 		// TODO -- maybe make this more efficient... it shouldn't happen that much though
-		e.end.uncovered = e.end.uncovered.remove(c)
+		e.end.uncovered = e.end.uncovered.Remove(c)
 	}
 	// update e's true cost
 	e.trueCost = e.netTime()*timePenalty + collisionPenalty
@@ -580,13 +230,13 @@ func (e *bitStarEdge) UpdateTrueCost() float64 {
 	return e.trueCost
 }
 
-func (e bitStarEdge) netTime() float64 {
-	return e.end.state.time - e.start.state.time
+func (e BitStarEdge) netTime() float64 {
+	return e.end.state.Time - e.start.state.Time
 }
 
 // contains function for convenience.
 // Should consider using maps instead for contains performance.
-func containsEdge(s []*bitStarEdge, e *bitStarEdge) bool {
+func ContainsEdge(s []*BitStarEdge, e *BitStarEdge) bool {
 	for _, a := range s {
 		if reflect.DeepEqual(e, a) {
 			return true
@@ -600,7 +250,7 @@ I know this has the name filter and mutates the collection but just let me be.
 It also may be dumb to do it this way; I'm just not confident enough with Go to
 be sure or do it better.
 */
-func edgesFilter(edges *[]*bitStarEdge, f func(edge *bitStarEdge) bool) {
+func EdgesFilter(edges *[]*BitStarEdge, f func(edge *BitStarEdge) bool) {
 	if edges == nil {
 		return
 	}
@@ -616,8 +266,8 @@ func edgesFilter(edges *[]*bitStarEdge, f func(edge *bitStarEdge) bool) {
 /**
 Remove all the edges ending in a certain vertex (for line 18)
 */
-func removeEdgesEndingIn(edges *[]*bitStarEdge, v *bitStarVertex) {
-	edgesFilter(edges, func(e *bitStarEdge) bool {
+func RemoveEdgesEndingIn(edges *[]*BitStarEdge, v *BitStarVertex) {
+	EdgesFilter(edges, func(e *BitStarEdge) bool {
 		return e.end != v
 	})
 }
@@ -629,8 +279,8 @@ func removeEdgesEndingIn(edges *[]*bitStarEdge, v *bitStarVertex) {
 //region VertexQueue
 
 type VertexQueue struct {
-	nodes []*bitStarVertex
-	cost  func(node *bitStarVertex) float64
+	nodes []*BitStarVertex
+	cost  func(node *BitStarVertex) float64
 }
 
 func (h VertexQueue) Len() int { return len(h.nodes) }
@@ -640,7 +290,7 @@ func (h VertexQueue) Less(i, j int) bool {
 func (h VertexQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *VertexQueue) Push(x interface{}) {
-	h.nodes = append(h.nodes, x.(*bitStarVertex))
+	h.nodes = append(h.nodes, x.(*BitStarVertex))
 }
 
 func (h *VertexQueue) Pop() interface{} {
@@ -655,7 +305,7 @@ func (h *VertexQueue) Peek() interface{} {
 	return h.nodes[len(h.nodes)-1]
 }
 
-func makeVertexQueue(nodes []*bitStarVertex, cost func(node *bitStarVertex) float64) *VertexQueue {
+func makeVertexQueue(nodes []*BitStarVertex, cost func(node *BitStarVertex) float64) *VertexQueue {
 	var nodeHeap = VertexQueue{nodes: nodes, cost: cost}
 	for i, n := range nodes {
 		nodeHeap.nodes[i] = n
@@ -664,7 +314,7 @@ func makeVertexQueue(nodes []*bitStarVertex, cost func(node *bitStarVertex) floa
 	return &nodeHeap
 }
 
-func (h *VertexQueue) update(cost func(node *bitStarVertex) float64) {
+func (h *VertexQueue) update(cost func(node *BitStarVertex) float64) {
 	if cost != nil {
 		h.cost = cost
 	}
@@ -672,7 +322,7 @@ func (h *VertexQueue) update(cost func(node *bitStarVertex) float64) {
 }
 
 // func (h *VertexQueue) prune(cost float64) {
-// 	newNodes := make([]*bitStarVertex, len(h.nodes))
+// 	newNodes := make([]*BitStarVertex, len(h.nodes))
 // 	var j int
 // 	for i, j := 0, 0; i < len(h.nodes); i++ {
 // 		if n := h.nodes[i]; h.cost(n) < cost {
@@ -688,8 +338,8 @@ func (h *VertexQueue) update(cost func(node *bitStarVertex) float64) {
 //region EdgeQueue
 
 type EdgeQueue struct {
-	nodes []*bitStarEdge
-	cost  func(node *bitStarEdge) float64
+	nodes []*BitStarEdge
+	cost  func(node *BitStarEdge) float64
 }
 
 func (h EdgeQueue) Len() int { return len(h.nodes) }
@@ -699,7 +349,7 @@ func (h EdgeQueue) Less(i, j int) bool {
 func (h EdgeQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *EdgeQueue) Push(x interface{}) {
-	h.nodes = append(h.nodes, x.(*bitStarEdge))
+	h.nodes = append(h.nodes, x.(*BitStarEdge))
 }
 
 func (h *EdgeQueue) Pop() interface{} {
@@ -714,7 +364,7 @@ func (h *EdgeQueue) Peek() interface{} {
 	return h.nodes[len(h.nodes)-1]
 }
 
-func makeEdgeQueue(nodes []*bitStarEdge, cost func(node *bitStarEdge) float64) *EdgeQueue {
+func makeEdgeQueue(nodes []*BitStarEdge, cost func(node *BitStarEdge) float64) *EdgeQueue {
 	var nodeHeap = EdgeQueue{nodes: nodes, cost: cost}
 	for i, n := range nodes {
 		nodeHeap.nodes[i] = n
@@ -723,15 +373,15 @@ func makeEdgeQueue(nodes []*bitStarEdge, cost func(node *bitStarEdge) float64) *
 	return &nodeHeap
 }
 
-func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
+func (h *EdgeQueue) update(cost func(node *BitStarEdge) float64) {
 	if cost != nil {
 		h.cost = cost
 	}
 	heap.Init(h)
 }
 
-// func (h *EdgeQueue) prune(cost float64, vertexCost func(node *bitStarVertex) float64) {
-// 	newNodes := make([]*bitStarEdge, len(h.nodes))
+// func (h *EdgeQueue) prune(cost float64, vertexCost func(node *BitStarVertex) float64) {
+// 	newNodes := make([]*BitStarEdge, len(h.nodes))
 // 	var j int
 // 	for i, j := 0, 0; i < len(h.nodes); i++ {
 // 		if n := h.nodes[i]; vertexCost(n.start) < cost || vertexCost(n.end) < cost { // this might be right?
@@ -752,23 +402,23 @@ func (h *EdgeQueue) update(cost func(node *bitStarEdge) float64) {
 Create a new state with random values.
 Time is unset (zero).
 */
-func randomState(bounds *grid) *State {
-	s := new(State)
-	s.x = rand.Float64() * float64(bounds.width)
-	s.y = rand.Float64() * float64(bounds.height)
-	s.heading = rand.Float64() * math.Pi * 2
-	s.speed = rand.Float64() * maxSpeed
+func randomState(bounds *common.Grid) *common.State {
+	s := new(common.State)
+	s.X = rand.Float64() * float64(bounds.Width)
+	s.Y = rand.Float64() * float64(bounds.Height)
+	s.Heading = rand.Float64() * math.Pi * 2
+	s.Speed = rand.Float64() * maxSpeed
 	return s
 }
 
 /**
 Create a random sample using the biasing constants.
 */
-func biasedRandomState(bounds *grid, goal *State) *State {
+func biasedRandomState(bounds *common.Grid, goal *common.State) *common.State {
 	//verbose = false
 	s := randomState(bounds)
 	if r := rand.Float64(); r < maxSpeedBias {
-		s.speed = maxSpeed
+		s.Speed = maxSpeed
 	}
 	if r := rand.Float64(); r < goalBias {
 		//verbose = true
@@ -780,7 +430,7 @@ func biasedRandomState(bounds *grid, goal *State) *State {
 /**
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
-func boundedBiasedRandomState(bounds *grid, path path, start *State, distance float64) *State {
+func boundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
 	printLog(fmt.Sprintf("Sampling state with distance less than %f", distance))
 	s := biasedRandomState(bounds, nil) // TODO! -- path bias instead of goal bias
 	for ; start.DistanceTo(s) > distance; s = biasedRandomState(bounds, nil) {
@@ -788,7 +438,7 @@ func boundedBiasedRandomState(bounds *grid, path path, start *State, distance fl
 	return s
 }
 
-func randomNode(bounds *grid, goal *State) *rrtNode {
+func randomNode(bounds *common.Grid, goal *common.State) *rrtNode {
 	n := rrtNode{state: biasedRandomState(bounds, goal)}
 	return &n
 }
@@ -798,21 +448,21 @@ func randomNode(bounds *grid, goal *State) *rrtNode {
 /**
 Alg 3
 */
-func prune(samples *[]*bitStarVertex, vertices *[]*bitStarVertex, edges *[]*bitStarEdge, goalCost float64) {
+func prune(samples *[]*BitStarVertex, vertices *[]*BitStarVertex, edges *[]*BitStarEdge, goalCost float64) {
 	// line 1
-	verticesFilter(samples, func(v *bitStarVertex) bool {
+	verticesFilter(samples, func(v *BitStarVertex) bool {
 		return !(v.fValue() >= goalCost)
 	})
 	// line 2
-	verticesFilter(vertices, func(v *bitStarVertex) bool {
+	verticesFilter(vertices, func(v *BitStarVertex) bool {
 		return !(v.fValue() > goalCost)
 	})
 	// line 3
-	edgesFilter(edges, func(e *bitStarEdge) bool {
+	EdgesFilter(edges, func(e *BitStarEdge) bool {
 		return !(e.start.fValue() > goalCost || e.end.fValue() > goalCost)
 	})
 	// lines 4-5
-	verticesFilter(vertices, func(v *bitStarVertex) bool {
+	verticesFilter(vertices, func(v *BitStarVertex) bool {
 		if v.currentCostIsSet {
 			return true
 		} else {
@@ -825,9 +475,9 @@ func prune(samples *[]*bitStarVertex, vertices *[]*bitStarVertex, edges *[]*bitS
 /**
 Alg 2
 */
-func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
-	samples []*bitStarVertex, vertices []*bitStarVertex, edges []*bitStarEdge,
-	vOld []*bitStarVertex, goalCost float64) {
+func expandVertex(v *BitStarVertex, qV *VertexQueue, qE *EdgeQueue,
+	samples []*BitStarVertex, vertices []*BitStarVertex, edges []*BitStarEdge,
+	vOld []*BitStarVertex, goalCost float64) {
 
 	printLog(fmt.Sprintf("Expanding vertex %v", v.state.String()))
 	// already should have popped v from qV
@@ -840,7 +490,7 @@ func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
 	// find k nearest vertices already in the tree? (Alg 2 lines 4-6)
 	if !containsVertex(vOld, v) {
 		for _, e := range getKClosest(v, vertices, goalCost) {
-			if !containsEdge(edges, e) {
+			if !ContainsEdge(edges, e) {
 				if v.CurrentCost()+e.ApproxCost() < e.end.CurrentCost() {
 					// line 6.2 is in getKClosest
 					qE.Push(e)
@@ -853,10 +503,10 @@ func expandVertex(v *bitStarVertex, qV *VertexQueue, qE *EdgeQueue,
 /**
 samples doesn't have to be actual samples it can come from anywhere
 */
-func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (closest []*bitStarEdge) {
-	closest = make([]*bitStarEdge, K)
+func getKClosest(v *BitStarVertex, samples []*BitStarVertex, goalCost float64) (closest []*BitStarEdge) {
+	closest = make([]*BitStarEdge, K)
 	var i int
-	var x *bitStarVertex
+	var x *BitStarVertex
 	for i, x = range samples {
 		distance := v.state.DistanceTo(x.state)
 		// Can we assume that h has been calculated for all x we're being given?
@@ -869,7 +519,7 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
 			if edge == nil {
-				closest[j] = &bitStarEdge{start: v, end: x, approxCost: distance}
+				closest[j] = &BitStarEdge{start: v, end: x, approxCost: distance}
 				x.parentEdge = closest[j]
 				break
 			} else if distance < edge.ApproxCost() {
@@ -887,11 +537,11 @@ func getKClosest(v *bitStarVertex, samples []*bitStarVertex, goalCost float64) (
 }
 
 // functions for queueing vertices and edges
-func vertexCost(v *bitStarVertex) float64 {
+func vertexCost(v *BitStarVertex) float64 {
 	return v.CurrentCost() + v.UpdateApproxToGo(nil)
 }
 
-func edgeCost(edge *bitStarEdge) float64 {
+func edgeCost(edge *BitStarEdge) float64 {
 	// NOTE: when the heuristic function becomes more expensive this will need to get changed
 	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
 }
@@ -899,19 +549,19 @@ func edgeCost(edge *bitStarEdge) float64 {
 /**
 Alg 1 (obviously)
 */
-func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
+func bitStar(startState common.State, timeRemaining float64, o1 *common.Obstacles) *common.Plan {
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals
-	startV := &bitStarVertex{state: &start, currentCostIsSet: true, uncovered: toCover}
+	startV := &BitStarVertex{state: &start, currentCostIsSet: true, uncovered: toCover}
 	startV.currentCost = -float64(len(toCover)) * coveragePenalty
-	startV.parentEdge = &bitStarEdge{start: startV, end: startV}
+	startV.parentEdge = &BitStarEdge{start: startV, end: startV}
 	bestVertex = startV
-	samples := make([]*bitStarVertex, 0)
-	var vOld []*bitStarVertex
+	samples := make([]*BitStarVertex, 0)
+	var vOld []*BitStarVertex
 	// line 1
-	vertices := []*bitStarVertex{startV}
-	edges := make([]*bitStarEdge, 0)
+	vertices := []*BitStarVertex{startV}
+	edges := make([]*BitStarEdge, 0)
 	// line 2
 	qE := new(EdgeQueue)
 	qV := new(VertexQueue)
@@ -924,15 +574,15 @@ func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
 			// line 5
 			prune(&samples, &vertices, &edges, bestVertex.fValue())
 			// line 6
-			samples = make([]*bitStarVertex, bitStarSamples)
+			samples = make([]*BitStarVertex, bitStarSamples)
 			for m := 0; m < bitStarSamples; m++ {
-				samples[m] = &bitStarVertex{state: boundedBiasedRandomState(&g, toCover, &start, bestVertex.fValue())}
+				samples[m] = &BitStarVertex{state: boundedBiasedRandomState(&grid, toCover, &start, bestVertex.fValue())}
 			}
 			// line 7
 			// vOld is used in expandVertex to make sure we only add
-			vOld = append([]*bitStarVertex(nil), vertices...)
+			vOld = append([]*BitStarVertex(nil), vertices...)
 			// line 8
-			qV.nodes = make([]*bitStarVertex, len(vertices))
+			qV.nodes = make([]*BitStarVertex, len(vertices))
 			copy(qV.nodes, vertices)
 			qV.update(nil) // refactor?
 			// line 9 -- not doing that so shouldn't need to do anything
@@ -940,12 +590,12 @@ func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
 		// shouldn't need this but I added it for safety
 		if qV.Len() > 0 {
 			// lines 10, 11
-			for qV.cost(qV.Peek().(*bitStarVertex)) <= qE.cost(qE.Peek().(*bitStarEdge)) {
-				expandVertex(qV.Pop().(*bitStarVertex), qV, qE, samples, vertices, edges, vOld, bestVertex.fValue())
+			for qV.cost(qV.Peek().(*BitStarVertex)) <= qE.cost(qE.Peek().(*BitStarEdge)) {
+				expandVertex(qV.Pop().(*BitStarVertex), qV, qE, samples, vertices, edges, vOld, bestVertex.fValue())
 			}
 		}
 		// lines 12, 13
-		edge := qE.Pop().(*bitStarEdge)
+		edge := qE.Pop().(*BitStarEdge)
 		vM, xM := edge.start, edge.end
 		// line 14
 		// vM should  be fully up to date at this point, but xM likely is not
@@ -963,7 +613,7 @@ func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
 					if containsVertex(vertices, xM) {
 						// line 18
 						// remove edges ending in xM
-						removeEdgesEndingIn(&edges, xM)
+						RemoveEdgesEndingIn(&edges, xM)
 					} else {
 						// line 20
 						// remove xM from samples
@@ -978,7 +628,7 @@ func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
 					edges = append(edges, edge)
 					// line 23
 					// do some pruning on qE
-					edgesFilter(&qE.nodes, func(e *bitStarEdge) bool {
+					EdgesFilter(&qE.nodes, func(e *BitStarEdge) bool {
 						return !(e.end == xM && e.start.CurrentCost()+e.ApproxCost() >= xM.CurrentCost())
 					})
 					// Should probably try to remove items from the heap while maintaining the
@@ -994,13 +644,13 @@ func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
 			}
 		} else {
 			// line 25
-			qV.nodes = make([]*bitStarVertex, 0)
-			qE.nodes = make([]*bitStarEdge, 0)
+			qV.nodes = make([]*BitStarVertex, 0)
+			qE.nodes = make([]*BitStarEdge, 0)
 		}
 	}
 	// figure out the plan I guess
 	// turn tree into slice
-	branch := make([]*bitStarEdge, 0)
+	branch := make([]*BitStarEdge, 0)
 	for cur := bestVertex; cur != startV; cur = cur.parentEdge.start {
 		branch = append(branch, cur.parentEdge)
 	}
@@ -1012,14 +662,16 @@ func bitStar(startState State, timeRemaining float64, o1 *obstacles) *Plan {
 	}
 	branch = s
 
-	p := new(Plan)
-	p.appendState(&start)
+	p := new(common.Plan)
+	p.AppendState(&start)
 	for _, e := range branch {
-		p.appendState(e.end.state)
-		p.appendPlan(e.plan) // should be fully calculate by now
+		p.AppendState(e.end.state)
+		p.AppendPlan(e.plan) // should be fully calculate by now
 	}
 	return p
 }
+
+//region RRT
 
 /**
 Find the closest node in a list of nodes.
@@ -1175,45 +827,47 @@ O(n) time.
 
 //endregion
 
+//endregion
+
 //region NodeHeap
 
-type NodeHeap struct {
-	nodes      []*rrtNode
-	otherState *State
-}
-
-func (h NodeHeap) Len() int { return len(h.nodes) }
-func (h NodeHeap) Less(i, j int) bool {
-	return h.nodes[i].state.DistanceTo(h.otherState) <
-		h.nodes[j].state.DistanceTo(h.otherState)
-}
-func (h NodeHeap) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
-
-func (h *NodeHeap) Push(x interface{}) {
-	h.nodes = append(h.nodes, x.(*rrtNode))
-}
-
-func (h *NodeHeap) Pop() interface{} {
-	old := *h
-	n := len(old.nodes)
-	x := old.nodes[n-1]
-	h.nodes = old.nodes[0 : n-1]
-	return x
-}
-
-func heapify(nodes []*rrtNode, otherState *State) *NodeHeap {
-	var nodeHeap = NodeHeap{nodes: nodes, otherState: otherState}
-	for i, n := range nodes {
-		nodeHeap.nodes[i] = n
-	}
-	heap.Init(&nodeHeap)
-	return &nodeHeap
-}
-
-func (h *NodeHeap) update(otherState *State) {
-	h.otherState = otherState
-	heap.Init(h)
-}
+// type NodeHeap struct {
+// 	nodes      []*rrtNode
+// 	otherState *common.State
+// }
+//
+// func (h NodeHeap) Len() int { return len(h.nodes) }
+// func (h NodeHeap) Less(i, j int) bool {
+// 	return h.nodes[i].state.DistanceTo(h.otherState) <
+// 		h.nodes[j].state.DistanceTo(h.otherState)
+// }
+// func (h NodeHeap) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
+//
+// func (h *NodeHeap) Push(x interface{}) {
+// 	h.nodes = append(h.nodes, x.(*rrtNode))
+// }
+//
+// func (h *NodeHeap) Pop() interface{} {
+// 	old := *h
+// 	n := len(old.nodes)
+// 	x := old.nodes[n-1]
+// 	h.nodes = old.nodes[0 : n-1]
+// 	return x
+// }
+//
+// func heapify(nodes []*rrtNode, otherState *common.State) *NodeHeap {
+// 	var nodeHeap = NodeHeap{nodes: nodes, otherState: otherState}
+// 	for i, n := range nodes {
+// 		nodeHeap.nodes[i] = n
+// 	}
+// 	heap.Init(&nodeHeap)
+// 	return &nodeHeap
+// }
+//
+// func (h *NodeHeap) update(otherState *common.State) {
+// 	h.otherState = otherState
+// 	heap.Init(h)
+// }
 
 //endregion
 
@@ -1222,7 +876,7 @@ func (h *NodeHeap) update(otherState *State) {
 /**
 Find the shortest Dubins path between two states.
 */
-func shortestPath(s1 *State, s2 *State) (path *dubins.Path, err int) {
+func shortestPath(s1 *common.State, s2 *common.State) (path *dubins.Path, err int) {
 	if verbose {
 		printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
 	}
@@ -1231,53 +885,53 @@ func shortestPath(s1 *State, s2 *State) (path *dubins.Path, err int) {
 	return path, err
 }
 
-/**
-Convert the given path into a feasible plan.
-*/
-func getSamples2(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
-	plan = new(Plan)
-	var t float64
-	callback := func(q *[3]float64, inc float64) int {
-		//printLog(q)
-		//t += inc / maxSpeed
-		s := &State{x: q[0], y: q[1], heading: q[2], speed: maxSpeed, time: t} // t = 0 now
-		s.collisionProbability = o.collisionExists(s)
-		// collision probability is 0 or 1 for now
-		if g.isBlocked(s.x, s.y) || s.collisionProbability > 0 {
-			if verbose {
-				printLog(fmt.Sprintf("Blocked path: %f %f %f", s.x, s.y, s.collisionProbability))
-			}
-			return dubins.EDUBNOPATH
-		}
-		plan.appendState(s)
-		return 0
-	}
-	err := path.SampleMany(dubinsInc, callback)
-
-	if err != dubins.EDUBOK {
-		return nil
-	}
-
-	return plan
-}
+// /**
+// Convert the given path into a feasible plan.
+// */
+// func getSamples2(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
+// 	plan = new(Plan)
+// 	var t float64
+// 	callback := func(q *[3]float64, inc float64) int {
+// 		//printLog(q)
+// 		//t += inc / maxSpeed
+// 		s := &State{x: q[0], y: q[1], heading: q[2], speed: maxSpeed, time: t} // t = 0 now
+// 		s.collisionProbability = o.collisionExists(s)
+// 		// collision probability is 0 or 1 for now
+// 		if g.isBlocked(s.x, s.y) || s.collisionProbability > 0 {
+// 			if verbose {
+// 				printLog(fmt.Sprintf("Blocked path: %f %f %f", s.x, s.y, s.collisionProbability))
+// 			}
+// 			return dubins.EDUBNOPATH
+// 		}
+// 		plan.appendState(s)
+// 		return 0
+// 	}
+// 	err := path.SampleMany(dubinsInc, callback)
+//
+// 	if err != dubins.EDUBOK {
+// 		return nil
+// 	}
+//
+// 	return plan
+// }
 
 /**
 Convert the given path into a plan and compute the sum collision cost and the newly covered path.
 */
-func getSamples(path *dubins.Path, startTime float64, toCover path) (plan *Plan, penalty float64, newlyCovered path, finalTime float64) {
-	plan = new(Plan)
+func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
+	plan = new(common.Plan)
 	t := startTime
 	callback := func(q *[3]float64, inc float64) int {
 		t += inc / maxSpeed
-		s := &State{x: q[0], y: q[1], heading: q[2], speed: maxSpeed, time: t}
-		s.collisionProbability = o.collisionExists(s)
-		if g.isBlocked(s.x, s.y) {
+		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
+		s.CollisionProbability = o.CollisionExists(s)
+		if grid.IsBlocked(s.X, s.Y) {
 			penalty += collisionPenalty
-		} else if s.collisionProbability > 0 {
-			penalty += collisionPenalty * s.collisionProbability
+		} else if s.CollisionProbability > 0 {
+			penalty += collisionPenalty * s.CollisionProbability
 		}
-		newlyCovered = append(newlyCovered, toCover.newlyCovered(*s)...) // splash operator I guess
-		plan.appendState(s)
+		newlyCovered = append(newlyCovered, toCover.NewlyCovered(*s)...) // splash operator I guess
+		plan.AppendState(s)
 		return 0
 	}
 	err := path.SampleMany(dubinsInc, callback)
@@ -1297,18 +951,18 @@ func getSamples(path *dubins.Path, startTime float64, toCover path) (plan *Plan,
 /**
 Read the map from stdin and build the corresponding grid.
 */
-func buildGrid() *grid {
+func buildGrid() *common.Grid {
 	printLog("Reading map dimensions")
 	var width, height, resolution int
 	fmt.Sscanf(getLine(), "map %d %d %d", &resolution, &width, &height)
 	printLog("Building grid")
-	grid := newGrid(width*resolution, height*resolution)
+	grid := common.NewGrid(width*resolution, height*resolution)
 	for y := height - 1; y >= 0; y-- {
 		var line string
 		line = getLine()
 		for x, c := range line {
 			if c == '#' {
-				grid.blockRange(x*resolution, y*resolution, resolution)
+				grid.BlockRange(x*resolution, y*resolution, resolution)
 			}
 		}
 	}
@@ -1319,26 +973,26 @@ func buildGrid() *grid {
 Parse a state from a string in the format: x y heading speed time.
 Turns heading into angle.
 */
-func parseState(line string) *State {
+func parseState(line string) *common.State {
 	//fmt.Println("parsing line", line)
 	var x, y, heading, speed, t float64
 	fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
-	return &State{x: x, y: y, heading: (heading * -1) + math.Pi/2, speed: speed, time: t}
+	return &common.State{X: x, Y: y, Heading: (heading * -1) + math.Pi/2, Speed: speed, Time: t}
 }
 
-func readPath() *path {
-	p := new(path)
+func readPath() *common.Path {
+	p := new(common.Path)
 	var pathLength int
 	printLog("Reading path to cover")
 	fmt.Sscanf(getLine(), "path to cover %d", &pathLength)
 	var x, y float64
 	for l := 0; l < pathLength; l++ {
 		fmt.Sscanf(getLine(), "%f %f", &x, &y)
-		s := State{x: x, y: y, speed: maxSpeed}
+		s := common.State{X: x, Y: y, Speed: maxSpeed}
 		*p = append(*p, s)
 		if l > 0 {
 			sPrev := (*p)[l-1]
-			sPrev.heading = sPrev.HeadingTo(&s)
+			sPrev.Heading = sPrev.HeadingTo(&s)
 		}
 	}
 	return p
@@ -1348,14 +1002,14 @@ func readPath() *path {
 Update the given obstacle collection to account for n
 updated obstacles coming from stdin.
 */
-func updateObstacles(o *obstacles, n int) {
+func updateObstacles(o *common.Obstacles, n int) {
 	for i := 0; i < n; i++ {
 		var id int
 		var x, y, heading, speed, t float64
 		var line string = getLine()
 		fmt.Sscanf(line, "%d %f %f %f %f %f", &id, &x, &y, &heading, &speed, &t)
-		s := &State{x: x, y: y, heading: (heading * -1) + math.Pi/2, speed: speed, time: t}
-		o.update(id, s)
+		s := &common.State{X: x, Y: y, Heading: (heading * -1) + math.Pi/2, Speed: speed, Time: t}
+		o.Update(id, s)
 	}
 }
 
@@ -1405,14 +1059,14 @@ func main() {
 		var x, y int
 		for i := 0; i < covered; i++ {
 			fmt.Sscanf(getLine(), "%d %d", &x, &y)
-			path.remove(State{x: float64(x), y: float64(y)})
+			path.Remove(common.State{X: float64(x), Y: float64(y)})
 		}
 		line = getLine()
 		line = strings.TrimPrefix(line, "start state ")
 		start := parseState(line)
 
 		var nObstacles int
-		o := new(obstacles)
+		o := new(common.Obstacles)
 		fmt.Sscanf(getLine(), "dynamic obs %d", nObstacles)
 		updateObstacles(o, nObstacles)
 
