@@ -254,14 +254,14 @@ class PLOT:
     def draw_future(self):
         size = len(self.future_heading)
         if size > 0:
-            self.draw_vehicle(
-                self.future_heading[0], Color_CYAN, *self.scale_item(self.future_x[0], self.future_y[0]))
             if size > 1:
                 decay = (255 - 20) / (size - 1)
                 for i in range(1, size):
                     c = (255 - decay * i, 0, 255 - decay * i)
                     self.draw_vehicle(
                         self.future_heading[i], c, *self.scale_item(self.future_x[i], self.future_y[i]))
+            self.draw_vehicle(
+                self.future_heading[0], Color_CYAN, *self.scale_item(self.future_x[0], self.future_y[0]))
         x,y,heading = self.estimateStart
         self.draw_vehicle(
                         heading, Color_GREEN, *self.scale_item(x, y))

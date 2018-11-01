@@ -76,8 +76,6 @@ def open_executive(arguments):
     pread, cwrite = os.pipe()
     cread, pwrite = os.pipe()
     processid = os.fork()
-    for i in arguments:
-        sys.stderr.write(i)
     if processid == 0:
         os.dup2(pread, 0)
         os.dup2(pwrite, 1)

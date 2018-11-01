@@ -214,8 +214,8 @@ class DynamicObsSim:
             print("desired heading: %0.2f " % (self.desired_heading))
 
         #        Calculate rudder/throttle from desired heading and speed.
-        self.rudder = self.heading_to_rudder(self.desired_heading)
-        self.throttle = self.speed_to_throttle(self.desired_speed)
+        # self.rudder = self.heading_to_rudder(self.desired_heading)
+        # self.throttle = self.speed_to_throttle(self.desired_speed)
         if self.debug:
             print("rudder: %0.2f , throttle: %0.2f" %
                   (self.rudder, self.throttle))
@@ -248,12 +248,12 @@ class DynamicObsSim:
                 data1 = data.split(' ');
                 self.estimateStart = (float(data1[0]),float(data1[1]),float(data1[2]))
                 data = self.soc.recv(4096)
-                # print('***************', data, '*******************')
+                print('***************', data, '*******************')
                 dummy = data.decode('utf-8').split(",")
                 #self.wpt_x = float(dummy[0])
                 #self.wpt_y = float(dummy[1])
-                self.desired_heading = float(dummy[0])
-                self.desired_speed = float(dummy[1])
+                self.rudder = float(dummy[0])
+                self.throttle = float(dummy[1])
         except socket.timeout as e:
             pass
 
