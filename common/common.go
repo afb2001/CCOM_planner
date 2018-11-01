@@ -120,7 +120,7 @@ func (p *Path) Remove(s State) Path {
 			b = append(b, x)
 		}
 	}
-	// p = &b // this was wrong... should fix in v1
+	*p = b // this was wrong... should fix in v1
 	return b
 }
 
@@ -165,10 +165,10 @@ Append a state to the plan when the state is within the time horizon and either:
 	3. There is a substantial time gap between the last state and this one
 */
 func (p *Plan) AppendState(s *State) {
-	if p.Start.TimeUntil(p.States[len(p.States)-1]) > timeHorizon &&
-		(len(p.States) == 0 ||
-			!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
-			p.States[len(p.States)-1].TimeUntil(s) > planTimeDensity) {
+	if len(p.States) == 0 ||
+		(p.Start.TimeUntil(p.States[len(p.States)-1]) < timeHorizon &&
+			(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
+				p.States[len(p.States)-1].TimeUntil(s) > planTimeDensity)) {
 		p.States = append(p.States, s)
 	}
 }

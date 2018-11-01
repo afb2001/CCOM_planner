@@ -1,11 +1,11 @@
 package main
 
 import (
-	"./common"
-	"./dubins"
 	"bufio"
 	"container/heap"
 	"fmt"
+	"github.com/afb2001/CCOM_planner/common"
+	"github.com/afb2001/CCOM_planner/dubins"
 	"log"
 	"math"
 	"math/rand"
