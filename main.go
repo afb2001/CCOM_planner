@@ -25,8 +25,8 @@ const (
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	K              int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples int     = 200 // make this a parameter too
-	// BIT* penalties
+	bitStarSamples int     = 200 // (m in the paper) -- make this a parameter too
+	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
 	timePenalty      float64 = 1
@@ -67,6 +67,49 @@ func now() float64 {
 
 //endregion
 
+//region Dubins integration
+
+/**
+Find the shortest Dubins path between two states.
+*/
+func shortestPath(s1 *common.State, s2 *common.State) (path *dubins.Path, err int) {
+	if verbose {
+		printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
+	}
+	path = new(dubins.Path)
+	err = dubins.ShortestPath(path, s1.ToArrayPointer(), s2.ToArrayPointer(), maxTurningRadius)
+	return path, err
+}
+
+/**
+Convert the given path into a plan and compute the sum collision cost and the newly covered path.
+*/
+func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
+	plan = new(common.Plan)
+	t := startTime
+	callback := func(q *[3]float64, inc float64) int {
+		t += inc / maxSpeed
+		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
+		s.CollisionProbability = o.CollisionExists(s)
+		if grid.IsBlocked(s.X, s.Y) {
+			penalty += collisionPenalty
+		} else if s.CollisionProbability > 0 {
+			penalty += collisionPenalty * s.CollisionProbability
+		}
+		newlyCovered = append(newlyCovered, toCover.NewlyCovered(*s)...) // splash operator I guess
+		plan.AppendState(s)
+		return 0
+	}
+	err := path.SampleMany(dubinsInc, callback)
+
+	if err != dubins.EDUBOK {
+		return nil, math.MaxFloat64, newlyCovered, 0
+	}
+	return plan, penalty, newlyCovered, t
+}
+
+//endregion
+
 //region BIT*
 
 //region BIT* globals
@@ -86,13 +129,6 @@ func initGlobals(g1 common.Grid, p common.Path) {
 }
 
 //endregion
-
-type rrtNode struct {
-	state        *common.State
-	parent       *rrtNode
-	pathToParent *dubins.Path
-	trajectory   *common.Plan // trajectory to parent
-}
 
 //region Vertex
 
@@ -394,6 +430,16 @@ func (h *EdgeQueue) update(cost func(node *BitStarEdge) float64) {
 
 //endregion
 
+// functions for queueing vertices and edges
+func vertexCost(v *BitStarVertex) float64 {
+	return v.CurrentCost() + v.UpdateApproxToGo(nil)
+}
+
+func edgeCost(edge *BitStarEdge) float64 {
+	// NOTE: when the heuristic function becomes more expensive this will need to get changed
+	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
+}
+
 //endregion
 
 //region State generation
@@ -438,12 +484,9 @@ func boundedBiasedRandomState(bounds *common.Grid, path common.Path, start *comm
 	return s
 }
 
-func randomNode(bounds *common.Grid, goal *common.State) *rrtNode {
-	n := rrtNode{state: biasedRandomState(bounds, goal)}
-	return &n
-}
-
 //endregion
+
+//region Algorithm 3 (Prune)
 
 /**
 Alg 3
@@ -471,6 +514,10 @@ func prune(samples *[]*BitStarVertex, vertices *[]*BitStarVertex, edges *[]*BitS
 		}
 	})
 }
+
+//endregion
+
+//region Algorithm 2 (ExpandVertex)
 
 /**
 Alg 2
@@ -536,15 +583,9 @@ func getKClosest(v *BitStarVertex, samples []*BitStarVertex, goalCost float64) (
 	return
 }
 
-// functions for queueing vertices and edges
-func vertexCost(v *BitStarVertex) float64 {
-	return v.CurrentCost() + v.UpdateApproxToGo(nil)
-}
+//endregion
 
-func edgeCost(edge *BitStarEdge) float64 {
-	// NOTE: when the heuristic function becomes more expensive this will need to get changed
-	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
-}
+//region Algorithm 1 (BIT*)
 
 /**
 Alg 1 (obviously)
@@ -663,7 +704,8 @@ func bitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 	branch = s
 
 	p := new(common.Plan)
-	p.AppendState(&start)
+	p.Start = start
+	p.AppendState(&start) // yes this is necessary
 	for _, e := range branch {
 		p.AppendState(e.end.state)
 		p.AppendPlan(e.plan) // should be fully calculate by now
@@ -671,276 +713,7 @@ func bitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 	return p
 }
 
-//region RRT
-
-/**
-Find the closest node in a list of nodes.
-O(n) time.
-*/
-// func getClosest(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) {
-// 	return getClosestNoHeap(nodes, n)
-// 	//return getClosestWithHeap(nodes, n)
-// }
-
-// func getClosestNoHeap(nodes []*rrtNode, n *rrtNode) (*rrtNode, float64, *dubins.Path) {
-// 	var closest *rrtNode
-// 	minDistance := math.MaxFloat64
-// 	var bestPath dubins.Path
-// 	for _, node := range nodes {
-// 		//shortestPathCompCount++
-// 		dPath, err := shortestPath(node.state, n.state)
-// 		if err != dubins.EDUBOK {
-// 			if verbose {
-// 				printLog("Couldn't make dubins path")
-// 			}
-// 			continue
-// 		}
-// 		if d := dPath.Length(); d < minDistance {
-// 			minDistance = d
-// 			closest = node
-// 			bestPath = *dPath
-// 		}
-// 	}
-// 	//iterationCount++
-// 	return closest, minDistance, &bestPath
-// }
-
-// func rrt(g *grid, start *State, goal *State, o *obstacles, timeRemaining float64) *Plan {
-// 	if *start == *goal {
-// 		return defaultPlan(start)
-// 	}
-// 	startTime := float64(time.Now().UnixNano()) / 10e9
-// 	printLog(fmt.Sprintf("Start state is %s", start.String()))
-// 	p := new(Plan)
-// 	root := &rrtNode{state: start}
-// 	nodes := []*rrtNode{root}
-// 	var n *rrtNode
-// 	var sampleCount, blockedCount int
-// 	// RRT loop
-// 	for startTime+timeRemaining > now() {
-// 		//printLog("Starting RRT loop")
-// 		n = randomNode(g, goal)
-// 		sampleCount++
-// 		//printLog(fmt.Sprintf("Sampled state %s", n.state.String()))
-// 		closest, distance, dPath := getClosest(nodes, n)
-// 		if distance == math.MaxFloat64 {
-// 			blockedCount++
-// 			//printLog("Could not find state to connect to")
-// 			continue
-// 		}
-// 		n.trajectory = getSamples2(dPath, g, o)
-// 		if n.trajectory == nil {
-// 			blockedCount++
-// 			//printLog("Could not find state to connect to")
-// 			continue // no path so continue
-// 		}
-// 		//printLog(fmt.Sprintf("Found nearest state %s at distance %f", closest.state.String(), distance))
-//
-// 		n.parent = closest
-// 		n.pathToParent = dPath
-// 		nodes = append(nodes, n)
-// 		if n.state == goal {
-// 			break
-// 		}
-// 		//printLog((fmt.Sprintf("Current node count is now %d", len(nodes))))
-// 	}
-// 	printLog(fmt.Sprintf("Samples: %d, blocked: %d, ratio: %f", sampleCount, blockedCount, float64(blockedCount)/float64(sampleCount)))
-// 	//printLog("Samples on map:" + showSamples(nodes, g, start, goal))
-//
-// 	if !(startTime+timeToPlan > now()) {
-// 		printLog("Time elapsed before we found a plan")
-// 		return nil // calling function handles default plan
-// 	}
-//
-// 	// if we couldn't even start
-// 	if n == nil {
-// 		return nil
-// 	}
-//
-// 	// collect all nodes into slice
-// 	var branch []*rrtNode
-//
-// 	for cur := n; cur.state != start && cur.parent != nil; cur = cur.parent {
-// 		branch = append(branch, cur)
-// 	}
-//
-// 	// reverse the plan order (this might look dumb)
-// 	s := branch
-// 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-// 		s[i], s[j] = s[j], s[i]
-// 	}
-// 	branch = s
-//
-// 	// add states to plan and compute times
-// 	t := start.time
-// 	var prev *State = nil
-// 	var headingDelta float64
-// 	for _, n := range branch {
-// 		//printLog(fmt.Sprintf("Trajectory from %s has type %d", n.state.String(), n.pathToParent.GetPathType()))
-// 		t += dubinsInc / maxSpeed
-// 		cur := n.state
-// 		traj := n.trajectory // shorthand, I guess?
-// 		for _, s := range traj.states {
-// 			t += dubinsInc / maxSpeed
-// 			s.time += t
-// 			// filter which states to include in output plan
-// 			if prev == nil ||
-// 				(headingDelta != 0 &&
-// 					!prev.IsSamePosition(s) &&
-// 					// heading delta changes sign, i.e we moved to new dubins segment
-// 					headingDelta*(prev.heading-s.heading) <= 0) {
-// 				// so we want to include this state
-// 				p.appendState(s)
-// 			}
-// 			if prev != nil {
-// 				headingDelta = prev.heading - s.heading
-// 			}
-// 			prev = s
-// 		}
-// 		t += dubinsInc / maxSpeed
-// 		cur.time = t
-// 		p.appendState(cur)
-// 		prev = cur
-// 	}
-// 	//printLog(fmt.Sprintf("Found a plan for goal %s", goal.String()))
-// 	//printLog(p.String())
-//
-// 	return p
-// }
-
-// func showSamples(nodes []*rrtNode, g *grid, start *State, goal *State) string {
-// 	var bytes = []byte(g.dump())
-// 	var arrays [][]byte
-// 	for i := g.height - 1; i >= 0; i-- {
-// 		arrays = append(arrays, bytes[1+(i*(g.width+1)):1+(i+1)*(g.width+1)])
-// 	}
-// 	//printLog("All nodes sampled:")
-// 	for _, n := range nodes {
-// 		//printLog(n.state.String())
-// 		arrays[int(n.state.y)][int(n.state.x)] = 'o'
-// 	}
-// 	arrays[int(start.y)][int(start.x)] = '@'
-// 	arrays[int(goal.y)][int(goal.x)] = '*'
-// 	//printLog("Map:")
-// 	return string(bytes)
-// }
-
 //endregion
-
-//endregion
-
-//region NodeHeap
-
-// type NodeHeap struct {
-// 	nodes      []*rrtNode
-// 	otherState *common.State
-// }
-//
-// func (h NodeHeap) Len() int { return len(h.nodes) }
-// func (h NodeHeap) Less(i, j int) bool {
-// 	return h.nodes[i].state.DistanceTo(h.otherState) <
-// 		h.nodes[j].state.DistanceTo(h.otherState)
-// }
-// func (h NodeHeap) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
-//
-// func (h *NodeHeap) Push(x interface{}) {
-// 	h.nodes = append(h.nodes, x.(*rrtNode))
-// }
-//
-// func (h *NodeHeap) Pop() interface{} {
-// 	old := *h
-// 	n := len(old.nodes)
-// 	x := old.nodes[n-1]
-// 	h.nodes = old.nodes[0 : n-1]
-// 	return x
-// }
-//
-// func heapify(nodes []*rrtNode, otherState *common.State) *NodeHeap {
-// 	var nodeHeap = NodeHeap{nodes: nodes, otherState: otherState}
-// 	for i, n := range nodes {
-// 		nodeHeap.nodes[i] = n
-// 	}
-// 	heap.Init(&nodeHeap)
-// 	return &nodeHeap
-// }
-//
-// func (h *NodeHeap) update(otherState *common.State) {
-// 	h.otherState = otherState
-// 	heap.Init(h)
-// }
-
-//endregion
-
-//region Dubins integration
-
-/**
-Find the shortest Dubins path between two states.
-*/
-func shortestPath(s1 *common.State, s2 *common.State) (path *dubins.Path, err int) {
-	if verbose {
-		printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
-	}
-	path = new(dubins.Path)
-	err = dubins.ShortestPath(path, s1.ToArrayPointer(), s2.ToArrayPointer(), maxTurningRadius)
-	return path, err
-}
-
-// /**
-// Convert the given path into a feasible plan.
-// */
-// func getSamples2(path *dubins.Path, g *grid, o *obstacles) (plan *Plan) {
-// 	plan = new(Plan)
-// 	var t float64
-// 	callback := func(q *[3]float64, inc float64) int {
-// 		//printLog(q)
-// 		//t += inc / maxSpeed
-// 		s := &State{x: q[0], y: q[1], heading: q[2], speed: maxSpeed, time: t} // t = 0 now
-// 		s.collisionProbability = o.collisionExists(s)
-// 		// collision probability is 0 or 1 for now
-// 		if g.isBlocked(s.x, s.y) || s.collisionProbability > 0 {
-// 			if verbose {
-// 				printLog(fmt.Sprintf("Blocked path: %f %f %f", s.x, s.y, s.collisionProbability))
-// 			}
-// 			return dubins.EDUBNOPATH
-// 		}
-// 		plan.appendState(s)
-// 		return 0
-// 	}
-// 	err := path.SampleMany(dubinsInc, callback)
-//
-// 	if err != dubins.EDUBOK {
-// 		return nil
-// 	}
-//
-// 	return plan
-// }
-
-/**
-Convert the given path into a plan and compute the sum collision cost and the newly covered path.
-*/
-func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
-	plan = new(common.Plan)
-	t := startTime
-	callback := func(q *[3]float64, inc float64) int {
-		t += inc / maxSpeed
-		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
-		s.CollisionProbability = o.CollisionExists(s)
-		if grid.IsBlocked(s.X, s.Y) {
-			penalty += collisionPenalty
-		} else if s.CollisionProbability > 0 {
-			penalty += collisionPenalty * s.CollisionProbability
-		}
-		newlyCovered = append(newlyCovered, toCover.NewlyCovered(*s)...) // splash operator I guess
-		plan.AppendState(s)
-		return 0
-	}
-	err := path.SampleMany(dubinsInc, callback)
-
-	if err != dubins.EDUBOK {
-		return nil, math.MaxFloat64, newlyCovered, 0
-	}
-	return plan, penalty, newlyCovered, t
-}
 
 //endregion
 
@@ -1022,13 +795,8 @@ var maxSpeed, maxTurningRadius float64
 var reader = bufio.NewReader(os.Stdin)
 
 func main() {
-
-	//var startTime = float64(time.Now().UnixNano()) / 10e9
-	//printLog(fmt.Sprintf("Planner starting at %f", startTime))
-
 	rand.Seed(3) // set seed for now
 
-	// redoing the parsing stuff
 	var line string
 	getLine() // start
 
@@ -1073,10 +841,6 @@ func main() {
 		// plan := makePlan(grid, start, *path, o)
 		plan := bitStar(*start, timeToPlan, o)
 		fmt.Println(plan.String())
-
-		// show shortest path statistics
-		//printLog(fmt.Sprintf("Performed %d shortest path computations over %d iterations", shortestPathCompCount, iterationCount))
-		//printLog(fmt.Sprintf("That's on average %f per iteration", float64(shortestPathCompCount) / float64(iterationCount)))
 
 		printLog("ready to plan")
 	}
