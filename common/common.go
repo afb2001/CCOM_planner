@@ -9,6 +9,7 @@ const (
 	planDistanceDensity float64 = 1
 	planTimeDensity     float64 = 1
 	timeHorizon         float64 = 30 // not used as intended yet
+	coverageThreshold   float64 = 3
 )
 
 //region State
@@ -135,7 +136,7 @@ func (p Path) MaxDistanceFrom(s State) (max float64) {
 
 func (p Path) NewlyCovered(s State) (covered Path) {
 	for _, x := range p {
-		if s.DistanceTo(&x) < 1.0 {
+		if s.DistanceTo(&x) < coverageThreshold {
 			covered = append(covered, x)
 		}
 	}
@@ -167,8 +168,8 @@ Append a state to the plan when the state is within the time horizon and either:
 func (p *Plan) AppendState(s *State) {
 	if len(p.States) == 0 ||
 		(p.Start.TimeUntil(p.States[len(p.States)-1]) < timeHorizon &&
-			(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
-				p.States[len(p.States)-1].TimeUntil(s) > planTimeDensity)) {
+			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
+			p.States[len(p.States)-1].TimeUntil(s) > planTimeDensity) {
 		p.States = append(p.States, s)
 	}
 }
@@ -243,7 +244,7 @@ func NewGrid(width int, height int) Grid {
 /**
 Get the cell at x, y.
 */
-func (g *Grid) Get(x int, y int) *cell {
+func (g *Grid) get(x int, y int) *cell {
 	return &(g.cells[y][x])
 }
 
@@ -251,7 +252,7 @@ func (g *Grid) Get(x int, y int) *cell {
 Block the cell at x, y. For initialization only (probably).
 */
 func (g *Grid) block(x int, y int) {
-	g.Get(x, y).distanceToShore = 0
+	g.get(x, y).distanceToShore = 0
 }
 
 /**
@@ -287,7 +288,7 @@ func (g *Grid) IsBlocked(x float64, y float64) bool {
 	if x < 0 || x > float64(g.Width) || y < 0 || y > float64(g.Height) {
 		return true
 	}
-	return g.Get(int(x), int(y)).isBlocked()
+	return g.get(int(x), int(y)).isBlocked()
 }
 
 //endregion
