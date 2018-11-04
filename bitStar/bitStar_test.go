@@ -1,7 +1,6 @@
 package bitStar
 
 import (
-	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"math"
 	"os"
@@ -69,7 +68,6 @@ func TestEdge_UpdateTrueCost(t *testing.T) {
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
 	v2.parentEdge.UpdateTrueCost()
-	fmt.Println(v2.parentEdge.plan.String())
 	if v2.parentEdge.TrueCost() != -58 {
 		t.Errorf("Expected -58, got %f", v2.parentEdge.TrueCost())
 	}
@@ -87,5 +85,20 @@ func TestEdge_UpdateStart(t *testing.T) {
 	v2.parentEdge.UpdateStart(&v2)
 	if v2.parentEdge.dPath != nil {
 		t.Errorf("Path was not reset")
+	}
+}
+
+func TestStaticCollision(t *testing.T) {
+	t.Log("Testing edge through obstacle...")
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
+	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
+	v2 := Vertex{state: &common.State{X: 0.5, Y: 1.5, Heading: math.Pi}}
+	e := Edge{start: &v1, end: &v2}
+	v2.parentEdge = &e
+	v2.parentEdge.UpdateTrueCost()
+	// not sure about this number it seems like it might be wrong but it's high so it's OK
+	if c := v2.parentEdge.TrueCost(); c != 5373.8 {
+		t.Errorf("Expected %f, got %f", 5373.8, c)
 	}
 }

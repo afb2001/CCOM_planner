@@ -205,7 +205,6 @@ func (e *Edge) UpdateTrueCost() float64 {
 		// TODO -- maybe make this more efficient... it shouldn't happen that much though
 		e.end.uncovered = e.end.uncovered.Remove(c)
 	}
-	printLog(len(newlyCovered))
 	// update e's true cost
 	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*coveragePenalty
 	// update e.end's current cost
