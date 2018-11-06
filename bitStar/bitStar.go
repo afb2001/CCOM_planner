@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	verbose        bool    = false
+	verbose        bool    = true
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
 	K              int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples int     = 200 // (m in the paper) -- make this a parameter too
+	bitStarSamples int     = 20  // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -55,6 +55,14 @@ func printLog(v interface{}) {
 }
 
 /**
+Print a fatal error and die.
+This is a copy too.
+*/
+func printError(v interface{}) {
+	log.Fatal("Planner error:", v)
+}
+
+/**
 Returns the current time in seconds as a float
 */
 func now() float64 {
@@ -78,7 +86,12 @@ type Vertex struct {
 // accessor methods that should handle caching and stuff
 func (v *Vertex) ApproxCost() float64 {
 	if v.approxCost == 0 {
-		v.approxCost = start.DistanceTo(v.state) / maxSpeed * timePenalty
+		dPath, err := shortestPath(&start, v.state)
+		if err != dubins.EDUBOK {
+			v.approxCost = math.MaxFloat64
+		} else {
+			v.approxCost = dPath.Length() / maxSpeed * timePenalty
+		}
 	}
 	//printLog(fmt.Sprintf("Approx cost: %f", v.approxCost))
 	return v.approxCost
@@ -102,7 +115,13 @@ func (v *Vertex) ApproxToGo() float64 {
 func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	// is the whole parent thing really necessary? Yeah it probably is. Damn.
 	if parent == nil {
-		parent = v.parentEdge.start
+		if v.parentEdge == nil {
+			// TODO! -- !!
+			// assume we're a sample... hopefully we are
+			parent = &Vertex{state: &start} // why do this??? who knows
+		} else {
+			parent = v.parentEdge.start
+		}
 	}
 	// max euclidean distance to an uncovered point - coverage penalty for covering all of them
 	// This is actually accurate if they're all in a straight line from your current heading,
@@ -115,7 +134,7 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 }
 
 // This is really f_hat, which is g_hat + h_hat
-func (v Vertex) fValue() float64 {
+func (v *Vertex) fValue() float64 {
 	return v.ApproxCost() + v.UpdateApproxToGo(nil)
 }
 
@@ -179,8 +198,18 @@ func (e *Edge) ApproxCost() float64 {
 	return e.approxCost
 }
 
+// I think I actually wanted update end
 func (e *Edge) UpdateStart(newStart *Vertex) {
 	e.start = newStart
+	// zero out the path and plan so we don't use them out-of-date
+	e.dPath, e.plan = nil, nil
+}
+
+func (e *Edge) UpdateEnd(newEnd *Vertex) {
+	// TODO! -- make sure this is right
+	// printLog("Doing a questionable thing")
+	e.end.parentEdge = nil // I wanna know if someone tries to use the out of date edge
+	e.end = newEnd
 	// zero out the path and plan so we don't use them out-of-date
 	e.dPath, e.plan = nil, nil
 }
@@ -207,9 +236,12 @@ func (e *Edge) UpdateTrueCost() float64 {
 	}
 	// update e's true cost
 	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*coveragePenalty
+
 	// update e.end's current cost
-	e.end.currentCost = e.start.currentCost + e.trueCost
-	e.end.currentCostIsSet = true
+	// Not doing this anymore. Could be a mistake who knows
+	// e.end.currentCost = e.start.currentCost + e.trueCost
+	// e.end.currentCostIsSet = true
+
 	return e.trueCost
 }
 
@@ -273,6 +305,9 @@ func (h VertexQueue) Less(i, j int) bool {
 func (h VertexQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *VertexQueue) Push(x interface{}) {
+	if x.(*Vertex).parentEdge == nil {
+		printLog("We're doing a bad thing")
+	}
 	h.nodes = append(h.nodes, x.(*Vertex))
 }
 
@@ -332,10 +367,12 @@ func (h EdgeQueue) Less(i, j int) bool {
 func (h EdgeQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *EdgeQueue) Push(x interface{}) {
+	// printLog("Adding edge")
 	h.nodes = append(h.nodes, x.(*Edge))
 }
 
 func (h *EdgeQueue) Pop() interface{} {
+	// printLog("Popping edge")
 	old := *h
 	n := len(old.nodes)
 	x := old.nodes[n-1]
@@ -383,8 +420,11 @@ func vertexCost(v *Vertex) float64 {
 }
 
 func edgeCost(edge *Edge) float64 {
+	// printLog(*edge) //debug
 	// NOTE: when the heuristic function becomes more expensive this will need to get changed
-	return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
+	return edge.start.CurrentCost() +
+		edge.ApproxCost() +
+		edge.end.UpdateApproxToGo(edge.start)
 }
 
 //endregion
@@ -395,10 +435,10 @@ func edgeCost(edge *Edge) float64 {
 Create a new state with random values.
 Time is unset (zero).
 */
-func randomState(bounds *common.Grid) *common.State {
+func randomState(xMin, xMax, yMin, yMax float64) *common.State {
 	s := new(common.State)
-	s.X = rand.Float64() * float64(bounds.Width)
-	s.Y = rand.Float64() * float64(bounds.Height)
+	s.X = rand.Float64()*float64(xMax-xMin) + xMin
+	s.Y = rand.Float64()*float64(yMax-yMin) + yMin
 	s.Heading = rand.Float64() * math.Pi * 2
 	s.Speed = rand.Float64() * maxSpeed
 	return s
@@ -407,27 +447,31 @@ func randomState(bounds *common.Grid) *common.State {
 /**
 Create a random sample using the biasing constants.
 */
-func biasedRandomState(bounds *common.Grid, goal *common.State) *common.State {
+func biasedRandomState(xMin, xMax, yMin, yMax float64) *common.State {
 	//verbose = false
-	s := randomState(bounds)
+	s := randomState(xMin, xMax, yMin, yMax)
 	if r := rand.Float64(); r < maxSpeedBias {
 		s.Speed = maxSpeed
 	}
-	if r := rand.Float64(); r < goalBias {
-		//verbose = true
-		return goal
-	}
+	// if r := rand.Float64(); r < goalBias {
+	//verbose = true
+	// return goal
+	// }
 	return s
 }
 
 /**
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
-func boundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
+func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
 	printLog(fmt.Sprintf("Sampling state with distance less than %f", distance))
-	s := biasedRandomState(bounds, nil) // TODO! -- path bias instead of goal bias
-	for ; start.DistanceTo(s) > distance; s = biasedRandomState(bounds, nil) {
-	} // can this be O(1)?
+	if distance < 0 {
+		distance = 0
+	}
+	s := biasedRandomState(math.Max(0, start.X-distance),
+		math.Min(float64(bounds.Width), start.X+distance),
+		math.Max(0, start.Y-distance),
+		math.Min(float64(bounds.Height), start.Y+distance)) // TODO! -- path bias
 	return s
 }
 
@@ -439,9 +483,9 @@ func boundedBiasedRandomState(bounds *common.Grid, path common.Path, start *comm
 Find the shortest Dubins path between two states.
 */
 func shortestPath(s1 *common.State, s2 *common.State) (path *dubins.Path, err int) {
-	if verbose {
-		printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
-	}
+	// if verbose {
+	// 	printLog(fmt.Sprintf("Computing dubins path between %s, %s", s1.String(), s2.String()))
+	// }
 	path = new(dubins.Path)
 	err = dubins.ShortestPath(path, s1.ToArrayPointer(), s2.ToArrayPointer(), maxTurningRadius)
 	return path, err
@@ -529,25 +573,44 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 	samples []*Vertex, vertices []*Vertex, edges []*Edge,
 	vOld []*Vertex, goalCost float64) {
 
-	printLog(fmt.Sprintf("Expanding vertex %v", v.state.String()))
+	if verbose {
+		printLog(fmt.Sprintf("Expanding vertex %v", v.state.String()))
+	}
 	// already should have popped v from qV
-
+	// printLog(qV.nodes)
 	// find k nearest samples and make edges (Alg 2 lines 2-3)
 	for _, e := range getKClosest(v, samples, goalCost) {
+		if e == nil { // TODO -- fix bug in getKClosest that's letting nil values get put in
+			continue
+		}
+		// printLog("Line 2.2, 2.3")
+		// printLog(*e) //debug
 		qE.Push(e)
 	}
 
 	// find k nearest vertices already in the tree? (Alg 2 lines 4-6)
 	if !containsVertex(vOld, v) {
-		for _, e := range getKClosest(v, vertices, goalCost) {
+		closest := getKClosest(v, vertices, goalCost)
+		for _, e := range closest {
+			if e == nil {
+				// printError("Added nil edge to queue")
+				continue
+			}
 			if !ContainsEdge(edges, e) {
+				// printLog(e == nil)
 				if v.CurrentCost()+e.ApproxCost() < e.end.CurrentCost() {
+					if e.start == e.end {
+						printError("Adding cycle to edge queue!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+					}
 					// line 6.2 is in getKClosest
+					// printLog("Line 2.6.2")
 					qE.Push(e)
 				}
 			}
 		}
 	}
+
+	// printLog(qE.nodes) //debug
 }
 
 /**
@@ -557,9 +620,15 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 	closest = make([]*Edge, K) // TODO! -- use heap
 	var i int
 	var x *Vertex
+	// printLog(v.ApproxCost()) //debug
+	// printLog(goalCost) //debug
 	for i, x = range samples {
-		// TODO -- use dubins
-		distance := v.state.DistanceTo(x.state)
+		if x == v {
+			continue // skip edges to the same sample
+		}
+		newEdge := &Edge{start: v, end: x}
+		distance := newEdge.ApproxCost()
+		// printLog(v.ApproxCost()+distance+x.UpdateApproxToGo(v) < goalCost) //debug
 		// Can we assume that h has been calculated for all x we're being given?
 		// This seems like a problematic assumption because h may depend on the branch
 		// of the tree we're connecting to (path covered so far?)
@@ -569,18 +638,21 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 		}
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
+			// printLog("Here") //debug
 			if edge == nil {
-				closest[j] = &Edge{start: v, end: x, approxCost: distance}
-				x.parentEdge = closest[j]
+				// printLog("Edge was nil")
+				closest[j], x.parentEdge = newEdge, newEdge
 				break
 			} else if distance < edge.ApproxCost() {
-				edge.end = x
-				edge.approxCost = distance
-				x.parentEdge = edge
+				// printLog("Found a better sample")
+				// edge.UpdateEnd(x)
+				// x.parentEdge = edge
+				closest[j], x.parentEdge = newEdge, newEdge // just use the new one
 				break
 			}
 		}
 	}
+	// printLog(closest) //debug
 	if i < K {
 		return closest[0:i]
 	}
@@ -599,7 +671,9 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 	// setup
 	o, start = *o1, startState // assign globals
 	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: toCover}
-	startV.currentCost = -float64(len(toCover)) * coveragePenalty
+	// TODO! -- verify that startV.currentCost = 0
+	startV.currentCostIsSet = true
+	startV.currentCost = float64(len(toCover)) * coveragePenalty // changed this from - to +, which makes sense
 	startV.parentEdge = &Edge{start: startV, end: startV}
 	bestVertex = startV
 	samples := make([]*Vertex, 0)
@@ -617,11 +691,17 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 		// line 4
 		if qE.Len() == 0 && qV.Len() == 0 {
 			// line 5
-			Prune(&samples, &vertices, &edges, bestVertex.fValue())
+			Prune(&samples, &vertices, &edges, bestVertex.CurrentCost())
 			// line 6
+			if verbose {
+				printLog("Starting sampling")
+			}
 			samples = make([]*Vertex, bitStarSamples)
 			for m := 0; m < bitStarSamples; m++ {
-				samples[m] = &Vertex{state: boundedBiasedRandomState(&grid, toCover, &start, bestVertex.fValue())}
+				samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, toCover, &start, bestVertex.CurrentCost())}
+			}
+			if verbose {
+				printLog("Finished sampling")
 			}
 			// line 7
 			// vOld is used in ExpandVertex to make sure we only add
@@ -629,16 +709,19 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 			// line 8
 			qV.nodes = make([]*Vertex, len(vertices))
 			copy(qV.nodes, vertices)
-			qV.update(nil) // refactor?
+			qV.update(nil) // TODO -- refactor?
 			// line 9 -- not doing that so shouldn't need to do anything
 		}
 		// shouldn't need this but I added it for safety
 		if qV.Len() > 0 {
 			// lines 10, 11
-			for qV.cost(qV.Peek().(*Vertex)) <= qE.cost(qE.Peek().(*Edge)) {
-				ExpandVertex(qV.Pop().(*Vertex), qV, qE, samples, vertices, edges, vOld, bestVertex.fValue())
+			for qE.Len() == 0 || (
+			// TODO! -- investigate why it wasn't breaking without the Len() != 0 bit
+			qV.Len() != 0 && qV.cost(qV.Peek().(*Vertex)) <= qE.cost(qE.Peek().(*Edge))) { //qE should only be empty when we're just starting
+				ExpandVertex(qV.Pop().(*Vertex), qV, qE, samples, vertices, edges, vOld, bestVertex.CurrentCost())
 			}
 		}
+		// printLog("Starting meat of algorithm") //debug
 		// lines 12, 13
 		edge := qE.Pop().(*Edge)
 		vM, xM := edge.start, edge.end
@@ -648,12 +731,29 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 		// right but the paper is giving me pause...
 		// Yeah pretty sure it's right. This is one of those places we're going to
 		// do something different than the paper because of our path coverage goal.
-		if vM.CurrentCost()+edge.ApproxCost()+xM.UpdateApproxToGo(vM) < bestVertex.fValue() {
+		printLog(fmt.Sprintf("V_m current cost: %f", vM.CurrentCost())) //debug
+		printLog(fmt.Sprintf("Edge approx cost: %f", edge.ApproxCost()))
+		printLog(fmt.Sprintf("h(X_m): %f", xM.UpdateApproxToGo(vM)))
+		printLog(bestVertex.CurrentCost())
+		if vM.CurrentCost()+edge.ApproxCost()+xM.UpdateApproxToGo(vM) < bestVertex.CurrentCost() {
 			// line 15
-			if vM.ApproxCost()+edge.UpdateTrueCost()+xM.ApproxToGo() < bestVertex.fValue() {
+			printLog("made it through the first IF") //debug
+			printLog(fmt.Sprintf("g_hat(V_m) = %f", vM.ApproxCost()))
+			printLog(fmt.Sprintf("c(v_m, x_m) = %f", edge.UpdateTrueCost())) //REMOVE THIS! It's very inefficient
+			printLog(fmt.Sprintf("h(x_m) = %f", xM.ApproxToGo()))
+			printLog(fmt.Sprintf("g_T(x_goal) %f", bestVertex.CurrentCost()))
+			if vM.ApproxCost()+edge.UpdateTrueCost()+xM.ApproxToGo() < bestVertex.CurrentCost() {
 				// by now xM is fully up to date and we have a path
 				// line 16
-				if vM.CurrentCost()+edge.TrueCost() < xM.currentCost { // xM.currentCost is up to date
+				printLog("Made it through the second IF ---------------------------------------------------------")
+				printLog(fmt.Sprintf("g_T(V_m) = %f", vM.CurrentCost()))
+				printLog(fmt.Sprintf("c(v_m, x_m) = %f", edge.TrueCost()))
+				printLog(fmt.Sprintf("g_T(x_m) = %f", xM.CurrentCost()))
+				if vM.CurrentCost()+edge.TrueCost() < xM.CurrentCost() { // xM.currentCost is up to date
+					printLog("Made it through third IF ********************************")
+					// This is different:
+					// Update the cached current cost of xM
+					xM.currentCost, xM.currentCostIsSet = vM.CurrentCost()+edge.TrueCost(), true
 					// line 17
 					if containsVertex(vertices, xM) {
 						// line 18
@@ -683,16 +783,19 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 				}
 				// this is different:
 				// update best vertex (may not want to do it here but it seems convenient)
-				if bestVertex.fValue() > xM.fValue() {
+				if bestVertex.CurrentCost() > xM.CurrentCost() {
 					bestVertex = xM
 				}
 			}
 		} else {
+			printLog("Resetting queues")
 			// line 25
 			qV.nodes = make([]*Vertex, 0)
 			qE.nodes = make([]*Edge, 0)
 		}
+		printLog("Done iteration +++++++++++++++++++++++++++++++++++++++++++")
 	}
+	printLog("Done with the main loop. Now to trace the tree...")
 	// figure out the plan I guess
 	// turn tree into slice
 	branch := make([]*Edge, 0)

@@ -1,6 +1,7 @@
 package bitStar
 
 import (
+	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"math"
 	"os"
@@ -13,8 +14,65 @@ var p = common.Path{p1, p2}
 
 func setUp() {
 	g.BlockRange(1, 1, 1)
-	InitGlobals(g, p, 0.5, 0.25)
+	InitGlobals(g, p, 0.5, 0.20)
 	start = common.State{X: 2.5, Y: 1.25, Heading: 3 * math.Pi / 2}
+}
+
+func bigGrid() common.Grid {
+	g1 := common.NewGrid(100, 100)
+	g1.BlockRange(10, 20, 10)
+	g1.BlockRange(20, 20, 10)
+	g1.BlockRange(30, 20, 10)
+	g1.BlockRange(40, 20, 10)
+	g1.BlockRange(50, 20, 10)
+	g1.BlockRange(60, 20, 10)
+	g1.BlockRange(70, 20, 10)
+	g1.BlockRange(80, 20, 10)
+	g1.BlockRange(90, 20, 10)
+	g1.BlockRange(0, 40, 10)
+	g1.BlockRange(10, 40, 10)
+	g1.BlockRange(20, 40, 10)
+	g1.BlockRange(30, 40, 10)
+	g1.BlockRange(40, 40, 10)
+	g1.BlockRange(50, 40, 10)
+	g1.BlockRange(60, 40, 10)
+	g1.BlockRange(70, 40, 10)
+	g1.BlockRange(80, 40, 10)
+	g1.BlockRange(10, 60, 10)
+	g1.BlockRange(20, 60, 10)
+	g1.BlockRange(30, 60, 10)
+	g1.BlockRange(40, 60, 10)
+	g1.BlockRange(50, 60, 10)
+	g1.BlockRange(60, 60, 10)
+	g1.BlockRange(70, 60, 10)
+	g1.BlockRange(80, 60, 10)
+	g1.BlockRange(90, 60, 10)
+	g1.BlockRange(0, 80, 10)
+	g1.BlockRange(10, 80, 10)
+	g1.BlockRange(20, 80, 10)
+	g1.BlockRange(30, 80, 10)
+	g1.BlockRange(40, 80, 10)
+	g1.BlockRange(50, 80, 10)
+	g1.BlockRange(60, 80, 10)
+	g1.BlockRange(70, 80, 10)
+	g1.BlockRange(80, 80, 10)
+	return g1
+}
+
+func bigPath() common.Path {
+	path1 := common.Path{
+		common.State{X: 90, Y: 6},
+		common.State{X: 85, Y: 7},
+		common.State{X: 80, Y: 8},
+		common.State{X: 75, Y: 9},
+		common.State{X: 70, Y: 10},
+		common.State{X: 65, Y: 11},
+		common.State{X: 60, Y: 12},
+		common.State{X: 55, Y: 13},
+		common.State{X: 50, Y: 14},
+		common.State{X: 45, Y: 15},
+	}
+	return path1
 }
 
 func TestMain(m *testing.M) {
@@ -90,6 +148,7 @@ func TestEdge_UpdateStart(t *testing.T) {
 
 func TestStaticCollision(t *testing.T) {
 	t.Log("Testing edge through obstacle...")
+	toCover = toCover.Remove(p2) // so we can have just one point to cover
 	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
 	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
 	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
@@ -98,7 +157,85 @@ func TestStaticCollision(t *testing.T) {
 	v2.parentEdge = &e
 	v2.parentEdge.UpdateTrueCost()
 	// not sure about this number it seems like it might be wrong but it's high so it's OK
-	if c := v2.parentEdge.TrueCost(); c != 5373.8 {
-		t.Errorf("Expected %f, got %f", 5373.8, c)
+	if c := v2.parentEdge.TrueCost(); c != 5403.8 {
+		t.Errorf("Expected %f, got %f", 5403.8, c)
+	}
+}
+
+func TestBoundedBiasedRandomState(t *testing.T) {
+	t.Log("Testing random state generation...")
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
+	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
+	s := BoundedBiasedRandomState(&g, p, &start, -60)
+	if s == nil || s.X < 0 || s.Y < 0 {
+		if s != nil {
+			t.Errorf("Generated invalid state: %s", s.String())
+		}
+		t.Errorf("State generation failed")
+	}
+}
+
+func TestEdgeQueue_PushPop(t *testing.T) {
+	t.Log("Testing edge queue push/pop")
+	qE := new(EdgeQueue)
+	qE.cost = func(edge *Edge) float64 {
+		return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
+	}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
+	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
+	e := Edge{start: &v1, end: &v2}
+	qE.Push(&e)
+	if qE.Len() != 1 {
+		t.Errorf("Edge was not added correctly to queue")
+	}
+	if qE.Pop() != &e {
+		t.Errorf("Edge on the queue was not the right edge")
+	}
+	if qE.Len() != 0 {
+		t.Errorf("Edge did not pop correctly from the queue")
+	}
+}
+
+func TestVertexQueue_PushPop(t *testing.T) {
+	t.Log("Testing vertex queue push/pop")
+	qV := new(VertexQueue)
+	qV.cost = func(v *Vertex) float64 {
+		return v.CurrentCost() + v.UpdateApproxToGo(nil)
+	}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
+	// v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
+	// e := Edge{start: &v1, end: &v2}
+	qV.Push(&v1)
+	if qV.Len() != 1 {
+		t.Errorf("Vertex was not added correctly to queue")
+	}
+	if qV.Pop() != &v1 {
+		t.Errorf("Vertex on the queue was not the right edge")
+	}
+	if qV.Len() != 0 {
+		t.Errorf("Vertex did not pop correctly from the queue")
+	}
+}
+
+func TestBitStar(t *testing.T) {
+	t.Log("Testing BIT* in a small world")
+	o1 := new(common.Obstacles)
+	plan := BitStar(start, 0.09, o1)
+	fmt.Println(plan.String())
+	if len(plan.States) == 1 {
+		t.Errorf("Plan was only length 1")
+	}
+}
+
+func TestBitStar2(t *testing.T) {
+	t.Log("Testing BIT* on a larger world")
+	// redo setup
+	InitGlobals(bigGrid(), bigPath(), 2.5, 0.75)
+	o1 := new(common.Obstacles)
+	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, 0.09, o1)
+	fmt.Println(plan.String())
+	if len(plan.States) == 1 {
+		t.Errorf("Plan was only length 1")
 	}
 }
