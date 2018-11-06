@@ -23,12 +23,13 @@ mutex mtx_path;
 mutex mtx_obs;
 mutex mtx_cover;
 
-int pathindex = 0;
 int running = 1;
+int pathindex = 0;
 int request_start = 0;
 int request_start1 = 0;
 int countn = 0;
 int send = 1;
+bool newPath = 0;
 double difx = 0, dify = 0;
 double previousheading = 0;
 
@@ -40,6 +41,7 @@ ObjectPar action;
 
 vector<ObjectPar> dyamic_obstacles;
 vector<ObjectPar> path;
+vector<ObjectPar> newpath;
 
 list<point> cover;
 list<point> newcover;
@@ -68,17 +70,18 @@ void findStart()
 {
     mtx_path.lock();
     int path_size = path.size();
-    bool find = false,visit = true;
+    bool find = false, visit = true;
     if (path_size > 0 && pathindex < path_size)
     {
         ObjectPar current = current_location;
         double otime = current_location.otime + 4;
-        
+
         for (int i = pathindex; i < path_size; i++)
         {
-            if(path[i].otime > otime - 3 && i != 0 && visit)
+
+            if (path[i].otime > otime - 3 && i != 0 && visit)
             {
-                estimateStart = ObjectPar(path[i].x, path[i].y, current.heading, path[i].speed, otime - 3);
+                estimateStart = ObjectPar(path[i].x, path[i].y, path[i].heading, path[i].speed, otime - 3);
                 visit = false;
             }
             else if (path[i].otime > otime && i != 0)
@@ -88,43 +91,7 @@ void findStart()
                 while (predictHead < 0)
                     predictHead += 2 * M_PI;
                 predictHead = fmod(predictHead, 2 * M_PI);
-                // cerr << "FIRST " << h1 << " " <<  h2 << " " << heading  << endl;
-
-                // double angle = atan2(path[i].y - current.y, path[i].x - current.x);
-
-                // while(angle < 0)
-                //     angle += 2 * M_PI;
-                // angle = fmod(angle,2*M_PI);
-                // double anglediff = atan2(cos(current.heading-angle), sin(current.heading-angle));
-                // if(fabs(anglediff) > 0.5)
-                //     anglediff = (anglediff > 0) ? 0.5 : -0.5;
-                // double heading;
-
-                // if(M_PI - abs(abs(current.heading -angle) - M_PI) > 0.5)
-                // {
-                //     if(angle > current.heading)
-                //     {
-                //         if(angle - M_PI > current.heading)
-                //             heading= current.heading - 0.5; 
-                //         else
-                //             heading = current.heading + 0.5; 
-                //     }
-                //     else
-                //     {
-                //         if(current.heading - M_PI > angle)
-                //             heading = current.heading + 0.5; 
-                //         else
-                //             heading = current.heading - 0.5; 
-                //     }
-                // }
-                
-                //cerr << heading<< endl;
-                //cerr << "ANGLE " << anglediff << " " << current.heading << " " << angle << " " << current.heading + anglediff<< endl;;
-                //angle = current.heading + anglediff;
-                //cerr << "difx " << timeiterval * current.speed * cos(angle) << " diffy " << timeiterval * current.speed * sin(angle) << endl;
-                //cerr << "ANGLE " << angle << " "<<path[i].y << " " << current.y << " " << path[i].x << " " << current.x <<" " <<cos(angle) << sin(angle)<<endl;
                 action = ObjectPar(path[i].x, path[i].y, predictHead, path[i].speed, path[i].otime); //chage to relative heading
-                //estimateStart = ObjectPar(current.x + timeiterval * current.speed * cos(angle), current.y + timeiterval * current.speed * sin(angle), current.heading, path[i].speed, otime - 3);
                 find = true;
                 break;
             }
@@ -138,7 +105,7 @@ void findStart()
         double timeiterval = 1;
         //double heading = atan2(previousAction.x - pstart.x, previousAction.y - pstart.y);
         //estimateStart = ObjectPar(current.x + timeiterval * previousAction.speed * cos(heading), current.y + timeiterval * previousAction.speed * sin(heading), current.heading, current.speed, current.otime + 1);
-        if(visit)
+        if (visit)
             estimateStart = ObjectPar(current.x + timeiterval * cos(current.heading) * current.speed, current.y + timeiterval * sin(current.heading) * current.speed, current.heading, current.speed, current.otime + 1);
         action = ObjectPar(-1, -1, -1, -1, -1);
         // if (path.size() > pathindex && path[pathindex].speed == 0)
@@ -209,14 +176,13 @@ void requestPath()
         }
 
         sscanf(response, "plan %d\n", &numberOfState);
-        if(numberOfState == 0)
+        if (numberOfState == 0)
         {
             this_thread::sleep_for(chrono::milliseconds(50));
             checkTerminate();
             continue;
         }
         mtx_path.lock();
-
 
         double time_bound = current_location.otime;
         ObjectPar current = current_location;
@@ -270,10 +236,15 @@ void requestPath()
                 }
                 else
                 {
-                    double timeiterval = p.otime - estimateStart.otime;
-                    double angle = atan2(p.y - current.y, p.x - current.x);
+                    double timeiterval = current.otime - estimateStart.otime;
+                    double angle = atan2(current.y - estimateStart.y, current.x - estimateStart.x);
                     diffx = current.x + timeiterval * current.speed * cos(angle) - estimateStart.x;
                     diffy = current.y + timeiterval * current.speed * sin(angle) - estimateStart.y;
+
+                    //heading
+
+                    //cerr << "DIFFX " << diffx << " " << current.x << " " << estimateStart.x << endl;
+                    //cerr << "DIFFY " << diffy << " " << current.y << " " << estimateStart.y << endl;
                 }
                 unvisit = false;
             }
@@ -313,7 +284,7 @@ void requestWorldInformation()
             {
                 float x = it->x - current_location.x;
                 float y = it->y - current_location.y;
-                if (x * x + y * y <= 25)
+                if (x * x + y * y <= 10)
                 {
                     auto it1 = it;
                     newcover.push_back(*it);
@@ -421,7 +392,10 @@ void sendAction()
             string s = "";
             pstart = current_location;
             s += pstart.toString() + "\n";
-            s += ObjectPar(-1, -1, -1, -1, -1).toString() + "\n";
+            if(!send || cover.size() != 0)
+                s += ObjectPar(-1, -1, -1, -1, -1).toString() + "\n";
+            else
+                s += ObjectPar(-2, -2, -2, -2, -2).toString() + "\n";
             s += "path 0";
             s += "\n" + estimateStart.toString(); //for estimate start
             s += '\0';
@@ -496,7 +470,7 @@ int main(int argc, char *argv[])
     thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
 
     communication_With_Planner.cwrite("Start");
-    communication_With_Planner.cwrite("max speed 2.75");
+    communication_With_Planner.cwrite("max speed 2.5");
     communication_With_Planner.cwrite("max turning radius 8");
     bool map = false, goal = false;
 

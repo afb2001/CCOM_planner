@@ -12,5 +12,10 @@ controler: controler.cpp communication.o
 communication.o: communication.cpp communication.h
 	$(CXX) -c communication.cpp -std=c++11 -O2
 
+path:path.cpp
+	$(CXX)  path.cpp -O2 -std=c++11 -o planner
+
+
+
 clean :
 	-rm executive controler communication.o 

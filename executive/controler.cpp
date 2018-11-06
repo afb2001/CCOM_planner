@@ -47,6 +47,7 @@ double currenttime_for_action = -1;
 string pheading = "0";
 string previousrequestString;
 string default_Command = "0,0";
+string previous_Command = "0,0";
 int sendPipeToParent, receivePipeFromParent;
 
 void readpath(FILE *readstream)
@@ -157,10 +158,12 @@ void MPC(double &r, double &t)
 
     //cerr << "START " << endl;
 
-    for (rudder = -1; rudder <= 1; rudder += 0.01)
+    for (int i = -10; i <=10; ++i)
     {
-        for (throttle = 1; throttle >= 1; throttle -= 0.01)
+        rudder = i / 10.0;
+        for (int j = 10; j >=0; --j)
         {
+            throttle = j / 10.0;
             double x1 = x, y1 = y, heading1 = heading, speed1 = speed, starttime = 0, rpm1 = rpm;
             while (starttime + duration < d_time)
             {
@@ -171,7 +174,7 @@ void MPC(double &r, double &t)
             if (starttime != d_time)
             {
                 estimate(rpm1, throttle, d_time - starttime, speed1, rudder, heading1, x1, y1);
-                // cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
+                //cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
             }
             double temp = sqrt(pow(x1 - action.x, 2) + pow(y1 - action.y, 2));
             if (coefficient > temp)
@@ -180,7 +183,7 @@ void MPC(double &r, double &t)
                 t = (int)(throttle * 1000.0) / 1000.0;
                 coefficient = temp;
             }
-            //cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
+          //  cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
         }
     }
 
@@ -211,12 +214,20 @@ void sendAction()
             {
                 command = "0,0";
             }
+            else if (action.speed == -2)
+            {
+                command = "1,0.1";
+            }
             else
             {
                 MPC(rudder, throttle);
                 //command = "0,0";
                 command = to_string(rudder) + "," + to_string(throttle);
             }
+            // if(previous_Command == command)
+            //      command = "";
+            //  else 
+            //      previous_Command = command;
 
             if (command.size() != 0)
             {

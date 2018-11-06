@@ -60,6 +60,7 @@ class PLOT:
         self.future_x = []
         self.future_y = []
         self.goal_location = []
+        self.F_goal_location = []
         self.future_heading = []
         self.estimateStart = (0,0,0)
         self.triangleX = (0, -5, 5)
@@ -285,8 +286,20 @@ class PLOT:
         for obs in self.static_obs:
             self.draw_static_obs((0,0,0),*obs)
         
+        for i in range(len(self.goal_location)):
+            if(self.distSquare(self.curr_x,self.curr_y,*self.goal_location[i]) <= 10):
+                self.F_goal_location.append(self.goal_location.pop(i))
+                break;
+            
+
         for goal in self.goal_location:
             self.draw_static_obs((0,255,0),*goal)
+
+        for goal in self.F_goal_location:
+            self.draw_static_obs((0,255,255),*goal)
+
+    def distSquare(self,x1,y1,x2,y2):
+        return ( x1 - x2 ) * ( x1 - x2 ) + ( y1 - y2 ) * ( y1 - y2 )
 
     def draw_static_obs(self, color,x, y):
         pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(

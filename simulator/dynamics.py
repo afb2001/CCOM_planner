@@ -52,6 +52,7 @@ class Dynamics:
     def update(self,throttle, rudder, timestamp):
         
         throttle = min(1.0,max(0.0,throttle))
+
         
         if self.last_update is None:
             delta_t = None
