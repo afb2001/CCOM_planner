@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	verbose        bool    = true
+	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
@@ -69,6 +69,32 @@ func now() float64 {
 	return float64(time.Now().UnixNano()) / 10e9
 }
 
+func showSamples(nodes, allSamples []*Vertex, g *common.Grid, start *common.State, path common.Path) string {
+	var bytes = []byte(g.Dump())
+	var arrays [][]byte
+	for i := g.Height - 1; i >= 0; i-- {
+		arrays = append(arrays, bytes[1+(i*(g.Width+1)):1+(i+1)*(g.Width+1)])
+	}
+	for _, s := range allSamples {
+		if arrays[int(s.state.Y)][int(s.state.X)] == '_' {
+			arrays[int(s.state.Y)][int(s.state.X)] = '.'
+		}
+	}
+	//printLog("All nodes sampled:")
+	for _, n := range nodes {
+		//printLog(n.state.String())
+		arrays[int(n.state.Y)][int(n.state.X)] = 'o'
+	}
+	arrays[int(start.Y)][int(start.X)] = '@'
+	for _, p := range path {
+		//printLog(p.X)
+		arrays[int(p.Y)][int(p.X)] = '*'
+	}
+	//arrays[int(goal.y)][int(goal.x)] = '*'
+	//printLog("Map:")
+	return string(bytes)
+}
+
 //endregion
 
 //region Vertex
@@ -114,11 +140,12 @@ func (v *Vertex) ApproxToGo() float64 {
 // update the cached heuristic value
 func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	// is the whole parent thing really necessary? Yeah it probably is. Damn.
+	parentNil := parent == nil
 	if parent == nil {
 		if v.parentEdge == nil {
 			// TODO! -- !!
 			// assume we're a sample... hopefully we are
-			parent = &Vertex{state: &start} // why do this??? who knows
+			parent = &Vertex{state: &start} // this is correct, right?
 		} else {
 			parent = v.parentEdge.start
 		}
@@ -128,9 +155,13 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	// which is not a super unlikely scenario, making this heuristic not as horrible as it may seem.
 	// The parent's uncovered path is used because we probably don't know ours yet,
 	// and if we do it could be wrong.
-	v.approxToGo = parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
+	approxToGo := parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
 		float64(len(parent.uncovered))*coveragePenalty
-	return v.approxToGo
+	// if we're updating without specifying a parent we can cache it, but not otherwise
+	if parentNil {
+		v.approxToGo = approxToGo
+	}
+	return approxToGo
 }
 
 // This is really f_hat, which is g_hat + h_hat
@@ -232,7 +263,7 @@ func (e *Edge) UpdateTrueCost() float64 {
 	e.end.uncovered = e.start.uncovered
 	for _, c := range newlyCovered {
 		// TODO -- maybe make this more efficient... it shouldn't happen that much though
-		e.end.uncovered = e.end.uncovered.Remove(c)
+		e.end.uncovered = *(e.end.uncovered.Without(c))
 	}
 	// update e's true cost
 	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*coveragePenalty
@@ -464,7 +495,6 @@ func biasedRandomState(xMin, xMax, yMin, yMax float64) *common.State {
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
 func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
-	printLog(fmt.Sprintf("Sampling state with distance less than %f", distance))
 	if distance < 0 {
 		distance = 0
 	}
@@ -677,6 +707,8 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 	startV.parentEdge = &Edge{start: startV, end: startV}
 	bestVertex = startV
 	samples := make([]*Vertex, 0)
+	allSamples := make([]*Vertex, 0)
+	var totalSampleCount int
 	var vOld []*Vertex
 	// line 1
 	vertices := []*Vertex{startV}
@@ -697,9 +729,12 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 				printLog("Starting sampling")
 			}
 			samples = make([]*Vertex, bitStarSamples)
+			printLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
 			for m := 0; m < bitStarSamples; m++ {
 				samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, toCover, &start, bestVertex.CurrentCost())}
 			}
+			totalSampleCount += bitStarSamples
+			allSamples = append(allSamples, samples...)
 			if verbose {
 				printLog("Finished sampling")
 			}
@@ -731,26 +766,34 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 		// right but the paper is giving me pause...
 		// Yeah pretty sure it's right. This is one of those places we're going to
 		// do something different than the paper because of our path coverage goal.
-		printLog(fmt.Sprintf("V_m current cost: %f", vM.CurrentCost())) //debug
-		printLog(fmt.Sprintf("Edge approx cost: %f", edge.ApproxCost()))
-		printLog(fmt.Sprintf("h(X_m): %f", xM.UpdateApproxToGo(vM)))
-		printLog(bestVertex.CurrentCost())
+		if verbose {
+			printLog(fmt.Sprintf("V_m current cost: %f", vM.CurrentCost())) //debug
+			printLog(fmt.Sprintf("Edge approx cost: %f", edge.ApproxCost()))
+			printLog(fmt.Sprintf("h(X_m): %f", xM.UpdateApproxToGo(vM)))
+			printLog(fmt.Sprintf("g_T(x_goal): %f", bestVertex.CurrentCost()))
+		}
 		if vM.CurrentCost()+edge.ApproxCost()+xM.UpdateApproxToGo(vM) < bestVertex.CurrentCost() {
 			// line 15
-			printLog("made it through the first IF") //debug
-			printLog(fmt.Sprintf("g_hat(V_m) = %f", vM.ApproxCost()))
-			printLog(fmt.Sprintf("c(v_m, x_m) = %f", edge.UpdateTrueCost())) //REMOVE THIS! It's very inefficient
-			printLog(fmt.Sprintf("h(x_m) = %f", xM.ApproxToGo()))
-			printLog(fmt.Sprintf("g_T(x_goal) %f", bestVertex.CurrentCost()))
+			if verbose {
+				printLog("made it through the first IF") //debug
+				printLog(fmt.Sprintf("g_hat(V_m) = %f", vM.ApproxCost()))
+				printLog(fmt.Sprintf("c(v_m, x_m) = %f", edge.UpdateTrueCost())) //REMOVE THIS! It's very inefficient
+				printLog(fmt.Sprintf("h(x_m) = %f", xM.ApproxToGo()))
+				printLog(fmt.Sprintf("g_T(x_goal) %f", bestVertex.CurrentCost()))
+			}
 			if vM.ApproxCost()+edge.UpdateTrueCost()+xM.ApproxToGo() < bestVertex.CurrentCost() {
 				// by now xM is fully up to date and we have a path
 				// line 16
-				printLog("Made it through the second IF ---------------------------------------------------------")
-				printLog(fmt.Sprintf("g_T(V_m) = %f", vM.CurrentCost()))
-				printLog(fmt.Sprintf("c(v_m, x_m) = %f", edge.TrueCost()))
-				printLog(fmt.Sprintf("g_T(x_m) = %f", xM.CurrentCost()))
+				if verbose {
+					printLog("Made it through the second IF ---------------------------------------------------------")
+					printLog(fmt.Sprintf("g_T(V_m) = %f", vM.CurrentCost()))
+					printLog(fmt.Sprintf("c(v_m, x_m) = %f", edge.TrueCost()))
+					printLog(fmt.Sprintf("g_T(x_m) = %f", xM.CurrentCost()))
+				}
 				if vM.CurrentCost()+edge.TrueCost() < xM.CurrentCost() { // xM.currentCost is up to date
-					printLog("Made it through third IF ********************************")
+					if verbose {
+						printLog("Made it through third IF ********************************")
+					}
 					// This is different:
 					// Update the cached current cost of xM
 					xM.currentCost, xM.currentCostIsSet = vM.CurrentCost()+edge.TrueCost(), true
@@ -788,14 +831,22 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 				}
 			}
 		} else {
-			printLog("Resetting queues")
+			if verbose {
+				printLog("Resetting queues")
+			}
 			// line 25
 			qV.nodes = make([]*Vertex, 0)
 			qE.nodes = make([]*Edge, 0)
 		}
-		printLog("Done iteration +++++++++++++++++++++++++++++++++++++++++++")
+		if verbose {
+			printLog("Done iteration +++++++++++++++++++++++++++++++++++++++++++")
+		}
 	}
 	printLog("Done with the main loop. Now to trace the tree...")
+	printLog("But first: samples!")
+	printLog(showSamples(vertices, allSamples, &grid, &start, toCover))
+	printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, len(vertices)))
+
 	// figure out the plan I guess
 	// turn tree into slice
 	branch := make([]*Edge, 0)

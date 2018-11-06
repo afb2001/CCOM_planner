@@ -114,15 +114,15 @@ type Path []State
 /**
 Remove the given state from the Path. Modifies the original Path.
 */
-func (p *Path) Remove(s State) Path {
-	b := (*p)[0:0]
-	for _, x := range *p {
+func (p Path) Without(s State) *Path {
+	b := Path{}
+	for _, x := range p {
 		if s != x {
 			b = append(b, x)
 		}
 	}
-	*p = b // this was wrong... should fix in v1
-	return b
+	//*p = b
+	return &b
 }
 
 func (p Path) MaxDistanceFrom(s State) (max float64) {
