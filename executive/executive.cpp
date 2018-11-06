@@ -29,7 +29,6 @@ int request_start = 0;
 int request_start1 = 0;
 int countn = 0;
 int send = 1;
-bool newPath = 0;
 double difx = 0, dify = 0;
 double previousheading = 0;
 
@@ -41,7 +40,6 @@ ObjectPar action;
 
 vector<ObjectPar> dyamic_obstacles;
 vector<ObjectPar> path;
-vector<ObjectPar> newpath;
 
 list<point> cover;
 list<point> newcover;
