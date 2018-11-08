@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	verbose        bool    = false
+	verbose        bool    = true
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1  // this might be low
 	K              int     = 5    // number of closest states to consider for BIT*
-	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
+	bitStarSamples int     = 2000 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -491,10 +491,24 @@ func biasedRandomState(xMin, xMax, yMin, yMax float64) *common.State {
 	return s
 }
 
+func b(bounds common.Grid, point common.State, distance float64) *common.State {
+	s := randomState(math.Max(0, point.X-distance),
+		math.Min(float64(bounds.Width), point.X+distance),
+		math.Max(0, point.Y-distance),
+		math.Min(float64(bounds.Height), point.Y+distance))
+	if r := rand.Float64(); r < maxSpeedBias {
+		s.Speed = maxSpeed
+	}
+	if r := rand.Float64(); r < goalBias {
+		return &point
+	}
+	return s
+}
+
 /**
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
-func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
+func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, cost float64) *common.State {
 	//if distance < 0 {
 	//	distance = 0
 	//}
@@ -503,6 +517,7 @@ func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *comm
 	//	math.Max(0, start.Y-distance),
 	//	math.Min(float64(bounds.Height), start.Y+distance)) // TODO! -- path bias
 
+	distance := cost * maxSpeed
 	var s *common.State
 	var l int32 = int32(len(path))
 	if i := rand.Int31n(l + 1); i == l {
@@ -884,6 +899,105 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 		p.AppendPlan(e.plan) // should be fully calculate by now
 	}
 	return p
+}
+
+//endregion
+
+//region A*
+
+func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
+	for _, e := range getKClosest(v, *samples, math.MaxFloat64) {
+		if e == nil { // TODO -- fix bug in getKClosest that's letting nil values get put in
+			continue
+		}
+		// remove the sample from the list (could be more efficient)
+		verticesFilter(samples, func(x *Vertex) bool {
+			return e.end != x
+		})
+		e.UpdateTrueCost()
+		qV.Push(e.end)
+	}
+}
+
+func AStar(qV *VertexQueue, samples *[]*Vertex) (bestVertex *Vertex) {
+	printLog("Starting A*")
+	for bestVertex = qV.Pop().(*Vertex); bestVertex.state.Time < 30; {
+		printLog(qV.Len())
+		Expand(bestVertex, qV, samples)
+		if qV.Len() == 0 {
+			return
+		}
+		bestVertex = qV.Pop().(*Vertex)
+	}
+	return
+}
+
+func TracePlan(v *Vertex) *common.Plan {
+	branch := make([]*Edge, 0)
+	// only cycle should be in start vertex
+	for cur := v; cur.parentEdge.start != cur; cur = cur.parentEdge.start {
+		branch = append(branch, cur.parentEdge)
+	}
+
+	// reverse the plan order (this might look dumb)
+	s := branch
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+	branch = s
+
+	p := new(common.Plan)
+	p.Start = start
+	p.AppendState(&start) // yes this is necessary
+	for _, e := range branch {
+		p.AppendState(e.end.state)
+		p.AppendPlan(e.plan) // should be fully calculate by now
+	}
+	return p
+}
+
+func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Obstacles) (bestPlan *common.Plan) {
+	endTime := timeRemaining + now()
+	// setup
+	o, start = *o1, startState // assign globals
+	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: toCover}
+	startV.currentCostIsSet = true
+	startV.currentCost = float64(len(toCover)) * coveragePenalty // changed this from - to +, which makes sense
+	startV.parentEdge = &Edge{start: startV, end: startV}
+	samples := make([]*Vertex, 0)
+	allSamples := make([]*Vertex, 0)
+	var totalSampleCount int
+	qV := new(VertexQueue)
+	qV.cost = func(v *Vertex) float64 {
+		return v.currentCost + v.UpdateApproxToGo(nil)
+	}
+	for now() < endTime {
+		qV.nodes = make([]*Vertex, 0) // wipe out old nodes
+		qV.Push(startV)
+		if verbose {
+			printLog("Starting sampling")
+		}
+		samples = make([]*Vertex, bitStarSamples)
+		//printLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
+		for m := 0; m < bitStarSamples; m++ {
+			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, toCover, &start, math.MaxFloat64)}
+		}
+		totalSampleCount += bitStarSamples
+		allSamples = append(allSamples, samples...)
+		if verbose {
+			printLog("Finished sampling")
+		}
+		if v := AStar(qV, &samples); bestVertex == nil || v.currentCost < bestVertex.currentCost {
+			bestVertex = v
+			bestPlan = TracePlan(bestVertex)
+		}
+		if verbose {
+			printLog("Done iteration +++++++++++++++++++++++++++++++++++++++++++")
+		}
+	}
+	printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, toCover))
+	printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, 0))
+	return
 }
 
 //endregion
