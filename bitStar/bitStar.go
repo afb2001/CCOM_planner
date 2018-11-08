@@ -16,9 +16,9 @@ const (
 	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
-	dubinsInc      float64 = 0.1 // this might be low
-	K              int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples int     = 20  // (m in the paper) -- make this a parameter too
+	dubinsInc      float64 = 0.1  // this might be low
+	K              int     = 5    // number of closest states to consider for BIT*
+	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -495,13 +495,28 @@ func biasedRandomState(xMin, xMax, yMin, yMax float64) *common.State {
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
 func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
-	if distance < 0 {
-		distance = 0
+	//if distance < 0 {
+	//	distance = 0
+	//}
+	//s := biasedRandomState(math.Max(0, start.X-distance),
+	//	math.Min(float64(bounds.Width), start.X+distance),
+	//	math.Max(0, start.Y-distance),
+	//	math.Min(float64(bounds.Height), start.Y+distance)) // TODO! -- path bias
+
+	var s *common.State
+	var l int32 = int32(len(path))
+	if i := rand.Int31n(l + 1); i == l {
+		s = biasedRandomState(math.Max(0, start.X-distance),
+			math.Min(float64(bounds.Width), start.X+distance),
+			math.Max(0, start.Y-distance),
+			math.Min(float64(bounds.Height), start.Y+distance))
+	} else {
+		point := path[i]
+		s = biasedRandomState(math.Max(0, point.X-distance),
+			math.Min(float64(bounds.Width), point.X+distance),
+			math.Max(0, point.Y-distance),
+			math.Min(float64(bounds.Height), point.Y+distance))
 	}
-	s := biasedRandomState(math.Max(0, start.X-distance),
-		math.Min(float64(bounds.Width), start.X+distance),
-		math.Max(0, start.Y-distance),
-		math.Min(float64(bounds.Height), start.Y+distance)) // TODO! -- path bias
 	return s
 }
 

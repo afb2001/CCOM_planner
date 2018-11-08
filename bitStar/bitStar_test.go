@@ -167,7 +167,7 @@ func TestBoundedBiasedRandomState(t *testing.T) {
 	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
 	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
 	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
-	s := BoundedBiasedRandomState(&g, p, &start, -60)
+	s := BoundedBiasedRandomState(&g, p, &start, 60)
 	if s == nil || s.X < 0 || s.Y < 0 {
 		if s != nil {
 			t.Errorf("Generated invalid state: %s", s.String())

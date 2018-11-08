@@ -134,6 +134,16 @@ func (p Path) MaxDistanceFrom(s State) (max float64) {
 	return
 }
 
+func (p Path) MinDistanceFrom(s State) (min float64) {
+	min = math.MaxFloat64
+	for _, x := range p {
+		if d := s.DistanceTo(&x); d < min {
+			min = d
+		}
+	}
+	return
+}
+
 func (p Path) NewlyCovered(s State) (covered Path) {
 	for _, x := range p {
 		if s.DistanceTo(&x) < coverageThreshold {
