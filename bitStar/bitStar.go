@@ -13,12 +13,12 @@ import (
 )
 
 const (
-	verbose        bool    = true
+	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
-	dubinsInc      float64 = 0.1 // this might be low
-	K              int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples int     = 100 // (m in the paper) -- make this a parameter too
+	dubinsInc      float64 = 0.1  // this might be low
+	K              int     = 5    // number of closest states to consider for BIT*
+	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -259,6 +259,7 @@ func (e *Edge) UpdateTrueCost() float64 {
 	// compute the plan along the dubins path, the collision penalty, and the ending time
 	// NOTE: this does a lot of work
 	e.plan, collisionPenalty, newlyCovered, e.end.state.Time = getSamples(e.dPath, e.start.state.Time, e.start.uncovered)
+	// e.end.state.Time += e.start.state.Time // think I fixed that
 	// update the uncovered path in e.end
 	e.end.uncovered = e.start.uncovered
 	for _, c := range newlyCovered {
@@ -277,6 +278,9 @@ func (e *Edge) UpdateTrueCost() float64 {
 }
 
 func (e Edge) netTime() float64 {
+	if e.end.state.Time < e.start.state.Time {
+		printError(fmt.Sprintf("Found backwards edge: %s to %s", e.start.state.String(), e.end.state.String()))
+	}
 	return e.end.state.Time - e.start.state.Time
 }
 
@@ -556,9 +560,9 @@ Convert the given path into a plan and compute the sum collision cost and the ne
 */
 func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
 	plan = new(common.Plan)
-	t := startTime
+	t := startTime // unused?
 	callback := func(q *[3]float64, inc float64) int {
-		t = inc / maxSpeed
+		t = inc/maxSpeed + startTime
 		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
 		s.CollisionProbability = o.CollisionExists(s)
 		if grid.IsBlocked(s.X, s.Y) {
@@ -914,25 +918,34 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		verticesFilter(samples, func(x *Vertex) bool {
 			return e.end != x
 		})
-		printLog(fmt.Sprintf("Connected to vertex at %s", e.end.state.String()))
+		if verbose {
+			printLog(fmt.Sprintf("Connected to vertex at %s", e.end.state.String()))
+		}
 		e.UpdateTrueCost()
-		printLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
+		if verbose {
+			printLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
+		}
 		// used to do these in UpdateTrueCost...
 		e.end.currentCost = e.start.currentCost + e.trueCost
 		e.end.currentCostIsSet = true
 		// if bestVertex == nil || e.end.CurrentCost() + e.end.UpdateApproxToGo(nil) < bestVertex.CurrentCost(){
 		heap.Push(qV, e.end)
+		// TracePlan(e.end)
 		// }
 	}
 }
 
 func AStar(qV *VertexQueue, samples *[]*Vertex) (vertex *Vertex) {
-	printLog("Starting A*")
+	if verbose {
+		printLog("Starting A*")
+	}
 	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < 30; {
-		printLog("Popping vertex at " + vertex.state.String())
-		printLog(fmt.Sprintf("g = f + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
+		if verbose {
+			printLog("Popping vertex at " + vertex.state.String())
+			printLog(fmt.Sprintf("f = g + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
+		}
 		Expand(vertex, qV, samples)
-		if qV.Len() == 0 {
+		if qV.Len() == 0 || vertex.state.Time > 30 {
 			return
 		}
 		vertex = heap.Pop(qV).(*Vertex)
@@ -954,12 +967,21 @@ func TracePlan(v *Vertex) *common.Plan {
 	}
 	branch = s
 
+	if verbose {
+		printLog("Current tree: ")
+		printLog(branch[0].start.state.String())
+		for _, x := range branch {
+			printLog(x.end.state.String())
+		}
+		printLog("Done printing tree.")
+	}
+
 	p := new(common.Plan)
 	p.Start = start
-	p.AppendState(&start) // yes this is necessary
+	// p.AppendState(&start) // yes this is necessary
 	for _, e := range branch {
-		p.AppendState(e.end.state)
 		p.AppendPlan(e.plan) // should be fully calculated by now
+		p.AppendState(e.end.state)
 	}
 	return p
 }
@@ -998,15 +1020,20 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if v := AStar(qV, &samples); bestVertex == nil || v.currentCost < bestVertex.currentCost {
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex)
-			printLog("Current best plan:")
-			printLog(bestPlan.String())
+			if verbose {
+				printLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
+				printLog("Current best plan:")
+				printLog(bestPlan.String())
+			}
 		}
 		if verbose {
 			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
 	}
-	printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, toCover))
-	printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, 0))
+	if verbose {
+		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, toCover))
+		printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, 0))
+	}
 	return
 }
 

@@ -271,7 +271,7 @@ func TestFindAStarPlan(t *testing.T) {
 	// redo setup
 	InitGlobals(bigGrid(), bigPath(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, 0.09, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 0}, 0.09, o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
