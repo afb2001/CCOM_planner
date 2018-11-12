@@ -16,9 +16,9 @@ const (
 	verbose        bool    = true
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
-	dubinsInc      float64 = 0.1  // this might be low
-	K              int     = 5    // number of closest states to consider for BIT*
-	bitStarSamples int     = 2000 // (m in the paper) -- make this a parameter too
+	dubinsInc      float64 = 0.1 // this might be low
+	K              int     = 5   // number of closest states to consider for BIT*
+	bitStarSamples int     = 100 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -337,7 +337,7 @@ func (h VertexQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nod
 
 func (h *VertexQueue) Push(x interface{}) {
 	if x.(*Vertex).parentEdge == nil {
-		printLog("We're doing a bad thing")
+		printLog("Added a vertex to qV with no parent edge!")
 	}
 	h.nodes = append(h.nodes, x.(*Vertex))
 }
@@ -783,7 +783,7 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 			for qE.Len() == 0 || (
 			// TODO! -- investigate why it wasn't breaking without the Len() != 0 bit
 			qV.Len() != 0 && qV.cost(qV.Peek().(*Vertex)) <= qE.cost(qE.Peek().(*Edge))) { //qE should only be empty when we're just starting
-				ExpandVertex(qV.Pop().(*Vertex), qV, qE, samples, vertices, edges, vOld, bestVertex.CurrentCost())
+				ExpandVertex(heap.Pop(qV).(*Vertex), qV, qE, samples, vertices, edges, vOld, bestVertex.CurrentCost())
 			}
 		}
 		// printLog("Starting meat of algorithm") //debug
@@ -840,7 +840,7 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 						// add xM to vertices
 						vertices = append(vertices, xM)
 						// add xM to vertex queue
-						qV.Push(xM)
+						heap.Push(qV, xM)
 					}
 					// line 22
 					edges = append(edges, edge)
@@ -869,7 +869,7 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 			qE.nodes = make([]*Edge, 0)
 		}
 		if verbose {
-			printLog("Done iteration +++++++++++++++++++++++++++++++++++++++++++")
+			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
 	}
 	printLog("Done with the main loop. Now to trace the tree...")
@@ -914,20 +914,28 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		verticesFilter(samples, func(x *Vertex) bool {
 			return e.end != x
 		})
+		printLog(fmt.Sprintf("Connected to vertex at %s", e.end.state.String()))
 		e.UpdateTrueCost()
-		qV.Push(e.end)
+		printLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
+		// used to do these in UpdateTrueCost...
+		e.end.currentCost = e.start.currentCost + e.trueCost
+		e.end.currentCostIsSet = true
+		// if bestVertex == nil || e.end.CurrentCost() + e.end.UpdateApproxToGo(nil) < bestVertex.CurrentCost(){
+		heap.Push(qV, e.end)
+		// }
 	}
 }
 
-func AStar(qV *VertexQueue, samples *[]*Vertex) (bestVertex *Vertex) {
+func AStar(qV *VertexQueue, samples *[]*Vertex) (vertex *Vertex) {
 	printLog("Starting A*")
-	for bestVertex = qV.Pop().(*Vertex); bestVertex.state.Time < 30; {
-		printLog(qV.Len())
-		Expand(bestVertex, qV, samples)
+	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < 30; {
+		printLog("Popping vertex at " + vertex.state.String())
+		printLog(fmt.Sprintf("g = f + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
+		Expand(vertex, qV, samples)
 		if qV.Len() == 0 {
 			return
 		}
-		bestVertex = qV.Pop().(*Vertex)
+		vertex = heap.Pop(qV).(*Vertex)
 	}
 	return
 }
@@ -951,7 +959,7 @@ func TracePlan(v *Vertex) *common.Plan {
 	p.AppendState(&start) // yes this is necessary
 	for _, e := range branch {
 		p.AppendState(e.end.state)
-		p.AppendPlan(e.plan) // should be fully calculate by now
+		p.AppendPlan(e.plan) // should be fully calculated by now
 	}
 	return p
 }
@@ -973,7 +981,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	}
 	for now() < endTime {
 		qV.nodes = make([]*Vertex, 0) // wipe out old nodes
-		qV.Push(startV)
+		heap.Push(qV, startV)
 		if verbose {
 			printLog("Starting sampling")
 		}
@@ -990,9 +998,11 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if v := AStar(qV, &samples); bestVertex == nil || v.currentCost < bestVertex.currentCost {
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex)
+			printLog("Current best plan:")
+			printLog(bestPlan.String())
 		}
 		if verbose {
-			printLog("Done iteration +++++++++++++++++++++++++++++++++++++++++++")
+			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
 	}
 	printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, toCover))

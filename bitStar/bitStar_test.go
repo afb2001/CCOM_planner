@@ -1,9 +1,11 @@
 package bitStar
 
 import (
+	"container/heap"
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"math"
+	"math/rand"
 	"os"
 	"testing"
 )
@@ -206,15 +208,38 @@ func TestVertexQueue_PushPop(t *testing.T) {
 	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
 	// v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	// e := Edge{start: &v1, end: &v2}
-	qV.Push(&v1)
+	heap.Push(qV, &v1)
 	if qV.Len() != 1 {
 		t.Errorf("Vertex was not added correctly to queue")
 	}
-	if qV.Pop() != &v1 {
+	if heap.Pop(qV) != &v1 {
 		t.Errorf("Vertex on the queue was not the right edge")
 	}
 	if qV.Len() != 0 {
 		t.Errorf("Vertex did not pop correctly from the queue")
+	}
+}
+
+func TestVertexQueue_PushPopMany(t *testing.T) {
+	t.Log("Testing vertex queue push/pop multiple times")
+	qV := new(VertexQueue)
+	qV.cost = func(v *Vertex) float64 {
+		return v.state.X
+	}
+	v1 := &Vertex{state: &common.State{X: 0.5}}
+	v2 := &Vertex{state: &common.State{X: 0.6}}
+	v3 := &Vertex{state: &common.State{X: 0.7}}
+	v4 := &Vertex{state: &common.State{X: 0.8}}
+	v5 := &Vertex{state: &common.State{X: 0.9}}
+	heap.Push(qV, v3)
+	heap.Push(qV, v1)
+	heap.Push(qV, v4)
+	heap.Push(qV, v2)
+	heap.Push(qV, v5)
+	v := heap.Pop(qV).(*Vertex)
+	printLog(v.state)
+	if v != v1 {
+		t.Errorf("Wrong order popping from queue")
 	}
 }
 
@@ -242,6 +267,7 @@ func TestBitStar2(t *testing.T) {
 
 func TestFindAStarPlan(t *testing.T) {
 	t.Log("Testing A* on a large world")
+	rand.Seed(17)
 	// redo setup
 	InitGlobals(bigGrid(), bigPath(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
