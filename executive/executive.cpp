@@ -123,7 +123,7 @@ void requestPath()
     double x, y, heading, speed, otime;
     FILE *readstream = fdopen(communication_With_Planner.getWpipe(), "r");
     char response[1024];
-    while (!request_start || !request_start1)
+    while (!request_start)
         this_thread::sleep_for(std::chrono::milliseconds(50));
 
     previousAction = current_location;
@@ -164,15 +164,12 @@ void requestPath()
         }
 
         mtx_obs.unlock();
-
         fgets(response, sizeof response, readstream);
-
         if (!strncmp(response, "done", 4))
         {
             running = 0;
             break;
         }
-
         sscanf(response, "plan %d\n", &numberOfState);
         if (numberOfState == 0)
         {
@@ -204,7 +201,7 @@ void requestPath()
             if (time_bound > otime)
                 continue;
 
-            // cerr << ObjectPar(x,y,heading,speed,otime).toString()<< endl;
+            //  cerr << ObjectPar(x,y,heading,speed,otime).toString()<< endl;
 
             if (unvisit)
             {
@@ -296,7 +293,6 @@ void requestWorldInformation()
         }
         else if (!strncmp(locationString, "Obstacle", 8))
         {
-            request_start1 = 1;
             bytesRead = 9;
             oldbytesRead = bytesRead;
             mtx_obs.lock();
@@ -444,6 +440,7 @@ void read_goal(string goal)
         for (int i = 0; i < numofgoal; i++)
         {
             f >> x >> y;
+            cerr << "cover "<< x << " " << y<< endl;
             cover.push_back(point(x, y));
         }
         f.close();
