@@ -7,8 +7,8 @@
 
 
 class Environment:
-    def __init__(self):
-        self.current = {"speed": 1.0, "direction": 90.0}
+    def __init__(self,speed = 1.0,direction = 90.0):
+        self.current = {"speed": speed, "direction": direction}
         
     def getCurrent(self, lat, long):
         # plan to allow current to differ with location, uniform for now.

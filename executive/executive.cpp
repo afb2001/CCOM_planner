@@ -16,6 +16,7 @@
 #include "communication.h"
 #include <fstream>
 #include <list>
+#include <unordered_set>
 
 using namespace std;
 
@@ -41,6 +42,8 @@ ObjectPar action;
 vector<ObjectPar> dyamic_obstacles;
 vector<ObjectPar> path;
 
+unordered_set<point> Obstacles;
+
 list<point> cover;
 list<point> newcover;
 
@@ -64,6 +67,49 @@ void checkTerminate()
     }
 }
 
+bool checkCollision(double cx, double cy, double ex, double ey)
+{
+    double slope =(ey-cy)/(ex-cx);
+    
+    if( ((int)ex) == ((int)cx) )
+    {
+        int cux = cx;
+        int starty = cy, endy = ey;
+        int increment = (ey > cy) ? 1: -1;
+        while(starty != endy)
+        {
+            if(Obstacles.find(point(cux,starty)) != Obstacles.end())
+                return true;
+            starty += increment;
+        }
+    }
+    else if(fabs(slope) > 1)
+    {
+        int increment = (ey > cy) ? 1: -1;
+        int starty = cy, endy = ey;
+        double b = (cx*cy - ex*cy)/(cx-ex);
+        while(starty != endy)
+        {
+            if(Obstacles.find(point((int)( (starty-b) / slope ),starty)) != Obstacles.end())
+                return true;
+            starty += increment;
+        }
+    }
+    else
+    {
+        int increment = (ex > cx) ? 1: -1;
+        int startx = cx, endx = ex;
+        double b = (cx*cy - ex*cy)/(cx-ex);
+        while(startx != endx)
+        {
+            if(Obstacles.find(point(startx,slope*startx+b)) != Obstacles.end())
+                return true;
+            startx += increment;
+        }
+    }
+    return false;
+}
+
 void findStart()
 {
     mtx_path.lock();
@@ -80,6 +126,16 @@ void findStart()
             if (path[i].otime > otime - 3 && i != 0 && visit)
             {
                 estimateStart = ObjectPar(path[i].x, path[i].y, path[i].heading, path[i].speed, otime - 3);
+                // if(checkCollision(current.x,current.y,estimateStart.x,estimateStart.y))
+                // {
+                //     double speed = (current.speed >= 0.2) ? current.speed - 0.1: 0.1;
+                //     estimateStart = ObjectPar(current.x + sin(current.heading) * speed, current.y + cos(current.heading) * speed, current.heading, speed, current.otime + 1);
+                //     action = ObjectPar(-2,-2,-2,-2,-2);
+                //     visit = false;
+                //     find = true;
+                //     break;
+                // }
+
                 visit = false;
             }
             else if (path[i].otime > otime && i != 0)
@@ -90,6 +146,7 @@ void findStart()
                     predictHead += 2 * M_PI;
                 predictHead = fmod(predictHead, 2 * M_PI);
                 action = ObjectPar(path[i].x, path[i].y, predictHead, path[i].speed, path[i].otime); //chage to relative heading
+                
                 find = true;
                 break;
             }
@@ -104,7 +161,7 @@ void findStart()
         //double heading = atan2(previousAction.x - pstart.x, previousAction.y - pstart.y);
         //estimateStart = ObjectPar(current.x + timeiterval * previousAction.speed * cos(heading), current.y + timeiterval * previousAction.speed * sin(heading), current.heading, current.speed, current.otime + 1);
         if (visit)
-            estimateStart = ObjectPar(current.x + timeiterval * cos(current.heading) * current.speed, current.y + timeiterval * sin(current.heading) * current.speed, current.heading, current.speed, current.otime + 1);
+            estimateStart = ObjectPar(current.x + timeiterval * sin(current.heading) * current.speed, current.y + timeiterval * cos(current.heading) * current.speed, current.heading, current.speed, current.otime + 1);
         action = ObjectPar(-1, -1, -1, -1, -1);
         // if (path.size() > pathindex && path[pathindex].speed == 0)
         //     action = ObjectPar(-1, -1, -1, -1, -1);
@@ -238,15 +295,15 @@ void requestPath()
                 }
                 else
                 {
+                    //change estimate to front;
                     double timeiterval = current.otime - estimateStart.otime;
                     double angle = atan2(current.y - estimateStart.y, current.x - estimateStart.x);
                     diffx = current.x + timeiterval * current.speed * cos(angle) - estimateStart.x;
                     diffy = current.y + timeiterval * current.speed * sin(angle) - estimateStart.y;
-
                     //heading
 
-                    //cerr << "DIFFX " << diffx << " " << current.x << " " << estimateStart.x << endl;
-                    //cerr << "DIFFY " << diffy << " " << current.y << " " << estimateStart.y << endl;
+                    // cerr << "DIFFX " << diffx << " " << current.x << " " << estimateStart.x << endl;
+                    // cerr << "DIFFY " << diffy << " " << current.y << " " << estimateStart.y << endl;
                 }
                 unvisit = false;
             }
@@ -422,9 +479,22 @@ void print_map(string file)
             string h = line;
             cerr << "EXEUTIVE::START " << w << " " << h << endl;
             cerr << "EXECUTIVE::MAP::" + w + " " + h << endl;
+            int width = stoi(w), height = stoi(h);
+            int hcount = 0;
             communication_With_Planner.cwrite("map 1 " + w + " " + h);
             while (getline(f, line))
+            {
+                ++hcount;
                 communication_With_Planner.cwrite(line);
+                for(int i = 0; i < line.size(); i++)
+                {
+                    if(line[i] == '#')
+                    {
+                        Obstacles.insert(point(i,height-hcount));
+                    }
+                }
+                
+            }
 
             f.close();
             return;

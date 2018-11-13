@@ -28,6 +28,11 @@ using namespace std;
 #define max_power 8948.4
 #define max_speed 2.75
 
+struct pointc
+{
+    double x, y, time;
+};
+
 double max_prop_speed;
 double max_force;
 double prop_coefficient;
@@ -49,6 +54,10 @@ string previousrequestString;
 string default_Command = "0,0";
 string previous_Command = "0,0";
 int sendPipeToParent, receivePipeFromParent;
+double estimate_effect_speed = 0, estimate_effect_direction = 0;
+double ptime = 0;
+int iteration = 0;
+vector<pointc> future;
 
 void readpath(FILE *readstream)
 {
@@ -99,6 +108,18 @@ double radians(double rudder_angle)
     return (rudder_angle * M_PI) / 180;
 }
 
+double radians_diff(double a)
+{
+    double b = estimate_effect_direction;
+    if (a < 0)
+        a = fmod(a + M_PI * 10000, M_PI * 2);
+    if (b < 0)
+        b = fmod(b + M_PI * 10000, M_PI * 2);
+    double diff = a - b;
+    diff = fmod((diff + M_PI), M_PI * 2) - M_PI;
+    return diff;
+}
+
 void estimate(double &rpm, double throttle, double d_time, double &speed, double rudder, double &heading, double &x, double &y)
 {
     double target_rpm = idle_rpm + throttle * (max_rpm - idle_rpm);
@@ -134,14 +155,11 @@ void estimate(double &rpm, double throttle, double d_time, double &speed, double
         heading += radians(360);
 
     double drag = pow(speed, 3) * drag_coefficient;
-    //drag = random.gauss(drag,drag*0.1)
-    //a = (thrust_fwd-drag)/mass;
     speed += ((thrust_fwd - drag) / mass) * d_time;
-    // if (speed > 0)
-    //     (prop_rpm/prop_pitch)/speed;
     double delta = speed * d_time;
-    x = x + delta * sin(heading);
-    y = y + delta * cos(heading);
+    double deltaEV = estimate_effect_speed * d_time;
+    x += delta * sin(heading) + deltaEV * sin(estimate_effect_direction);
+    y += delta * cos(heading) + deltaEV * cos(estimate_effect_direction);
 }
 //take condisder of speed & rmp & heading!!!!! currently do nothing
 void MPC(double &r, double &t)
@@ -154,21 +172,60 @@ void MPC(double &r, double &t)
     double duration = 0.05;
     double d_time = action.otime - start.otime;
     double coefficient = DBL_MAX;
+
     // cerr << d_time << endl;
 
     //cerr << "START " << endl;
+    if (ptime != start.otime && future.size() != 0)
+    {
+        if(iteration < 20)
+            ++iteration;
+        ptime = start.otime;
+        double cx = start.x;
+        double cy = start.y;
+        int index = 0;
+        for (int i = 1; i < future.size(); i++)
+        {
+            if (ptime <= future[i].time)
+            {
+                index = (fabs(future[i].time - ptime) < fabs(future[i - 1].time - ptime)) ? i : i -1;
+                break;
+            }
+        }
+        double diffx = start.x - future[index].x;
+        double diffy = start.y - future[index].y;
+        double new_effect_speed = sqrt(diffx*diffx + diffy*diffy)/(future[index].time-(future[0].time - 0.05));
+        estimate_effect_speed += (new_effect_speed - estimate_effect_speed) / iteration;
+        double new_effect_angle = atan2(diffx,diffy);
+        estimate_effect_direction += radians_diff(new_effect_angle) / iteration;
+        if (estimate_effect_direction < 0)
+            estimate_effect_direction = fmod(estimate_effect_direction + M_PI * 10000, M_PI * 2);
+        else if (estimate_effect_direction > 2 * M_PI)
+            estimate_effect_direction = fmod(estimate_effect_direction, M_PI * 2);
+    }
+    cerr << "current estimate " << estimate_effect_speed << " " << estimate_effect_direction << endl;
 
-    for (int i = -10; i <=10; ++i)
+    for (int i = -10; i <= 10; ++i)
     {
         rudder = i / 10.0;
-        for (int j = 10; j >=0; --j)
+        for (int j = 10; j >= 0; --j)
         {
             throttle = j / 10.0;
             double x1 = x, y1 = y, heading1 = heading, speed1 = speed, starttime = 0, rpm1 = rpm;
+            vector<pointc> tempfuture;
             while (starttime + duration < d_time)
             {
                 starttime += duration;
                 estimate(rpm1, throttle, duration, speed1, rudder, heading1, x1, y1);
+                if (tempfuture.size() < 10)
+                {
+                    pointc p;
+                    p.x = x1;
+                    p.y = y1;
+                    p.time = start.otime + starttime;
+                    tempfuture.emplace_back(p);
+                }
+
                 // cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
             }
             if (starttime != d_time)
@@ -182,8 +239,9 @@ void MPC(double &r, double &t)
                 r = (int)(rudder * 1000.0) / 1000.0;
                 t = (int)(throttle * 1000.0) / 1000.0;
                 coefficient = temp;
+                future = tempfuture;
             }
-          //  cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
+            //  cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
         }
     }
 
@@ -226,7 +284,7 @@ void sendAction()
             }
             // if(previous_Command == command)
             //      command = "";
-            //  else 
+            //  else
             //      previous_Command = command;
 
             if (command.size() != 0)

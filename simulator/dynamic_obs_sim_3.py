@@ -6,10 +6,12 @@
 import argparse
 import dynamics
 import cw4
+import coastal_surveyor
 import numpy as np
 import threading
 import time
 import environment as ev
+import depth_map
 # import matplotlib
 import test
 # matplotlib.use("TkAgg")
@@ -21,14 +23,15 @@ import datetime
 
 
 class DynamicObsSim:
-    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None):
+    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None, geotiff = None,boat_model = cw4.cw4):
         self.debug = False
         self.throttle = 0.0
         self.rudder = 0.0
         # Create an instance of the asv_sim model
         # Set parameters for the model.
         self.environment = environment
-        self.boat_dynamics = dynamics.Dynamics(cw4.cw4, start_x, start_y,self.environment)
+        self.boat_model = boat_model
+        self.boat_dynamics = dynamics.Dynamics(self.boat_model, start_x, start_y,self.environment)
 
         # Set the starting state
         self.start_lat = 43.0
@@ -83,7 +86,7 @@ class DynamicObsSim:
         # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
         self.static_obs = []
         self.goal_location = []
-        self.read_world(file_world, goal_location)
+        self.read_world(file_world,geotiff, goal_location)
 
         # Initializing obstacles:
         self.nobs = nobs  # number of obstacles
@@ -130,10 +133,27 @@ class DynamicObsSim:
         self.plotaxes_obs = list(range(self.nobs))
 
     # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
-    def read_world(self,file_world,goal_location):
+    def read_world(self,file_world,geotiff,goal_location):
         maxx = 0
         maxy = 0
-        if file_world != '':
+        if  geotiff != '':
+            geotiff = depth_map.BathyGrid(geotiff)
+            x1,x2,y1,y2 = geotiff.getBound()
+            dividfactor = 70
+            maxx = np.abs(x2-x1)/dividfactor
+            maxy = np.abs(y2-y1)/dividfactor
+            self.xlim = maxx
+            self.ylim = maxy
+            
+            
+            for i in range(0,maxx):
+                for j in range(0,maxy):
+                    data = geotiff.getDepth(i*dividfactor+x1,j*dividfactor+y1)
+                    if data != None:   
+                        if data < 2:
+                            self.static_obs.append((i ,j))
+            self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
+        elif file_world != '':
             f=open(file_world, "r")
             f1 = f.readlines()
             for i in range(0, len(f1)):
@@ -150,7 +170,7 @@ class DynamicObsSim:
                                 self.curr_y = self.wpt_y = ( maxy - i + 1 )
                             if f1[i][j] == '#':
                                 self.static_obs.append((j ,( maxy - i + 1 )))
-            self.boat_dynamics = dynamics.Dynamics(cw4.cw4, self.curr_x, self.curr_y,self.environment)
+            self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
         if goal_location != '':
             f=open(goal_location, "r")
             f1 = f.readlines()
@@ -506,7 +526,13 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
                         help='File for goal location')
     parser.add_argument('-e', '--environment', dest='environment', action='store', default='False',
-                        help='File for goal location')
+                        help='File for enviroment affect, either true with defalt 1,90 or true,[speed],[direction]')
+
+    parser.add_argument('-model', '--boatmodel', dest='model', action='store', default='cw4',
+                        help='File for name for model')
+
+    parser.add_argument('-tiff', '--geotiff', dest='geotiff', action='store', default='',
+                        help='File for geo tiff')
 
     # Handle arguments
     args = parser.parse_args()
@@ -526,14 +552,32 @@ if __name__ == '__main__':
     ylim = float(limits[1])
 
     environment = None
-    if args.environment.lower() != 'false' :
-        environment = ev.Environment()
+    if args.environment.lower() != 'false':
+        data = args.environment.lower().split(',')
+        if(len(data) > 1):
+            print data[2]
+            try:
+                environment = ev.Environment(float(data[1]),float(data[2]))
+            except:
+                print "WRONG argument, No current affect is given"
+        else:
+            environment = ev.Environment()
+        
+
+    boat_model = args.model
+
+    if boat_model.lower() == "coastal_surveyor" :
+        boat_model = coastal_surveyor.coastal_surveyor
+    else:
+        boat_model = cw4.cw4
 
 
 
     plot_bool = args.plot
 
     file_world = args.file
+
+    geotiff = args.geotiff
 
     goal_location = args.goal
     '''
@@ -542,7 +586,7 @@ if __name__ == '__main__':
 	'''
     # Setup simulation
     sim = DynamicObsSim(start_x, start_y, start_heading,
-                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location,environment)
+                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location,environment,geotiff,boat_model)
     '''
 	# Example - Con'd:
 	sim.curr_x = float(fields[0])

@@ -13,12 +13,17 @@ class BathyGrid:
 
         self.data = self.band.ReadAsArray()
         ulx, xres, xskew, uly, yskew, yres  = self.dataset.GetGeoTransform()
-        lrx = ulx + (src.RasterXSize * xres)
-        lry = uly + (src.RasterYSize * yres)
-        print self.dataset.GetCoordinates()
+        lrx = ulx + (self.dataset.RasterXSize * xres)
+        lry = uly + (self.dataset.RasterYSize * yres)
+        self.x1 = ulx;
+        self.x2 = lrx;
+        self.y1 = lry;
+        self.y2 = uly;
+        print ulx,lrx,lry,uly
         
 
-
+    def getBound(self):
+        return int(self.x1),int(self.x2),int(self.y1),int(self.y2)
     def getDepth(self,x,y):
         xi = self.inverseGeoTransorm[0]+x*self.inverseGeoTransorm[1]+y*self.inverseGeoTransorm[2]
         yi = self.inverseGeoTransorm[3]+x*self.inverseGeoTransorm[4]+y*self.inverseGeoTransorm[5]

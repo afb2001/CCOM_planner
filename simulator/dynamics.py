@@ -121,7 +121,6 @@ class Dynamics:
                 if c is not None:
                     current_speed = random.gauss(c['speed'],c['speed']*0.1)
                     current_direction = math.radians(c['direction']) + random.gauss(0.0,0.25)
-                    
                     self.x = self.x + current_speed*delta_t*math.sin(current_direction)  
                     self.y = self.y + current_speed*delta_t*math.cos(current_direction)
                     self.longitude,self.latitude = geodesic.direct(self.longitude,self.latitude,current_direction,current_speed*delta_t)
