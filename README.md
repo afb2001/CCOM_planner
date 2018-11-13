@@ -1,14 +1,37 @@
-# CCOM_planner
+# CCOM_planner<
 Go planner for CCOM ASV
 
 ## Requirements
 I'm using go version <a href="https://golang.org/dl/">go1.10.3</a> and gccgo (GCC) 8.2.1, so those (or newer) should work for you.
 The Python files can run under python 2.7.
 
-## Instructions
-To use, clone the repository and change directories to the root of the project. 
-There are scripts to build and run the planner but they just call <code>go build main.go</code> and <code>./main</code> respectively.
-</br></br>
-There are also a script locates at the root dirctory which can build and run the whole system include simulator, executive and planner. To build, run the build.sh script <code>./build.sh</code>. And to run, run the run.sh script with optional flags -map with grid map file, -goal with goal file and -nobs with number indicates the number of dynamic obstacles. <code>./run.sh [-map gridmap] [-goal goalfile] [-nobs number_of_dobs]</code></br></br>
-The simulator and plannar could also run seperately by running shim.py at excutive foder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py at simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> </br></br>
-The sample files of gridmap and goalfile can be found under the sample directory locate at root dirctory, an example running script will be <code> ./run.sh -map sample/test1.map -goal sample/goal.goal -nobs 50 </code>
+## Installation
+You can directly use the <code>go</code> tool to download the project into your <code>GOPATH</code>:
+```
+  $ go get github.com/afb2001/CCOM_planner
+```
+You can also clone the respository yourself:
+```
+  $ mkdir -p $GOPATH/src/github.com/afb2001/CCOM_planner
+  $ cd $GOPATH/src/github.com/afb2001/CCOM_planner
+  $ git clone https://github.com/afb2001/CCOM_planner.git
+```
+Once you've downloaded the project you can build the source files:
+```
+  $ cd $GOPATH/src/github.com/afb2001/CCOM_planner
+  $ ./build.sh
+```
+
+## Running the system
+To run the system (executive, controller, planner, shim, and simulator), call the <code>run.sh</code> script, which accepts the following flags:
+<ul>
+  <li><code>-map &lt;grid map file&gt;</code></li>
+  <li><code>-goal &lt;goal file&gt;</code></li>
+  <li><code>-nobs &ltnumber of dynamic obstacles&gt;</code></li>
+</ul>
+For example, using sample map and goal files:
+```
+./run.sh -map sample/test1.map -goal sample/goal.goal -nobs 50
+```
+The simulator and planner could also run separately by running <code>shim.py</code> at executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py at simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> </br></br>
+The sample directory contains examples of grid map and goal files.
