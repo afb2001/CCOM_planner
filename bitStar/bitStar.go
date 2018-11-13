@@ -495,6 +495,7 @@ func biasedRandomState(xMin, xMax, yMin, yMax float64) *common.State {
 	return s
 }
 
+// unused
 func b(bounds common.Grid, point common.State, distance float64) *common.State {
 	s := randomState(math.Max(0, point.X-distance),
 		math.Min(float64(bounds.Width), point.X+distance),
@@ -522,6 +523,8 @@ func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *comm
 	//	math.Min(float64(bounds.Height), start.Y+distance)) // TODO! -- path bias
 
 	distance := cost * maxSpeed
+	horizon := (common.TimeHorizon + 1) * maxSpeed
+	distance = math.Min(distance, horizon)
 	var s *common.State
 	var l int32 = int32(len(path))
 	if i := rand.Int31n(l + 1); i == l {
@@ -1034,8 +1037,8 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	}
 	if verbose {
 		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))
-		printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, 0))
 	}
+	printLog(fmt.Sprintf("%d total samples", totalSampleCount))
 	return
 }
 

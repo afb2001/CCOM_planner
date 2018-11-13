@@ -8,7 +8,7 @@ import (
 const (
 	planDistanceDensity float64 = 1
 	planTimeDensity     float64 = 0.5
-	timeHorizon         float64 = 30 // not used as intended yet
+	TimeHorizon         float64 = 30 // not used as intended yet
 	coverageThreshold   float64 = 3
 )
 
@@ -177,7 +177,7 @@ Append a state to the plan when the state is within the time horizon and either:
 */
 func (p *Plan) AppendState(s *State) {
 	if len(p.States) == 0 ||
-		(p.Start.TimeUntil(p.States[len(p.States)-1]) < timeHorizon &&
+		(p.Start.TimeUntil(p.States[len(p.States)-1]) < TimeHorizon &&
 			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
 			p.States[len(p.States)-1].TimeUntil(s) >= planTimeDensity) {
 		p.States = append(p.States, s)

@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"testing"
+	"time"
 )
 
 var g common.Grid = common.NewGrid(3, 3)
@@ -270,12 +271,12 @@ func TestBitStar2(t *testing.T) {
 
 func TestFindAStarPlan(t *testing.T) {
 	t.Log("Testing A* on a large world")
-	rand.Seed(17)
+	rand.Seed(time.Now().UnixNano())
 	// redo setup
 	var p = bigPath()
 	InitGlobals(bigGrid(), &p, 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.09, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.08, o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
