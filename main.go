@@ -171,8 +171,13 @@ func main() {
 		updateObstacles(o, nObstacles)
 
 		// plan := makePlan(grid, start, *path, o)
-		plan := bitStar.BitStar(*start, timeToPlan, o)
-		fmt.Println(plan.String())
+		// plan := bitStar.BitStar(*start, timeToPlan, o)
+		plan := bitStar.FindAStarPlan(*start, timeToPlan, o)
+		if plan == nil {
+			fmt.Println(common.DefaultPlan(start))
+		} else {
+			fmt.Println(plan.String())
+		}
 
 		printLog("ready to plan")
 	}

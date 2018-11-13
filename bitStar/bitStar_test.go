@@ -244,6 +244,7 @@ func TestVertexQueue_PushPopMany(t *testing.T) {
 }
 
 func TestBitStar(t *testing.T) {
+	t.SkipNow()
 	t.Log("Testing BIT* in a small world")
 	o1 := new(common.Obstacles)
 	plan := BitStar(start, 0.09, o1)
@@ -254,6 +255,7 @@ func TestBitStar(t *testing.T) {
 }
 
 func TestBitStar2(t *testing.T) {
+	t.SkipNow()
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
 	InitGlobals(bigGrid(), bigPath(), 2.5, 0.75)
