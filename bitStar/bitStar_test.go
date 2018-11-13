@@ -276,7 +276,7 @@ func TestFindAStarPlan(t *testing.T) {
 	var p = bigPath()
 	InitGlobals(bigGrid(), &p, 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.08, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.095, o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -289,7 +289,7 @@ func TestFindAStarPlan2(t *testing.T) {
 	var p = new(common.Path)
 	InitGlobals(bigGrid(), p, 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.08, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.095, o1)
 	if plan != nil {
 		t.Errorf("Plan was too long")
 	}

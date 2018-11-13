@@ -16,9 +16,9 @@ const (
 	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
-	dubinsInc      float64 = 0.1  // this might be low
-	K              int     = 5    // number of closest states to consider for BIT*
-	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
+	dubinsInc      float64 = 0.1 // this might be low
+	K              int     = 5   // number of closest states to consider for BIT*
+	bitStarSamples int     = 256 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -943,11 +943,14 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 	}
 }
 
-func AStar(qV *VertexQueue, samples *[]*Vertex) (vertex *Vertex) {
+func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex) {
 	if verbose {
 		printLog("Starting A*")
 	}
 	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < 30+start.Time; {
+		if now() > endTime {
+			return nil
+		}
 		if verbose {
 			printLog("Popping vertex at " + vertex.state.String())
 			printLog(fmt.Sprintf("f = g + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
@@ -1005,6 +1008,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	bestVertex = startV
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
+	currentSampleCount := bitStarSamples
 	var totalSampleCount int
 	qV := new(VertexQueue)
 	qV.cost = func(v *Vertex) float64 {
@@ -1016,9 +1020,10 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if verbose {
 			printLog("Starting sampling")
 		}
-		samples = make([]*Vertex, bitStarSamples)
+		samples = make([]*Vertex, len(allSamples)+currentSampleCount)
+		copy(samples, allSamples)
 		//printLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
-		for m := 0; m < bitStarSamples; m++ {
+		for m := len(allSamples); m < len(allSamples)+currentSampleCount; m++ {
 			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, math.MaxFloat64)}
 		}
 		totalSampleCount += bitStarSamples
@@ -1026,7 +1031,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if verbose {
 			printLog("Finished sampling")
 		}
-		if v := AStar(qV, &samples); bestVertex == nil || v.currentCost < bestVertex.currentCost {
+		if v := AStar(qV, &samples, endTime); bestVertex == nil || (v != nil && v.currentCost < bestVertex.currentCost) {
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex)
 			if verbose {
@@ -1038,6 +1043,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if verbose {
 			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
+		currentSampleCount *= 2
 	}
 	if verbose {
 		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))

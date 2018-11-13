@@ -16,8 +16,8 @@ import (
 const (
 	verbose               = true
 	rrtInc        float64 = 0.5
-	timeToPlan    float64 = 0.08 // make parameter (why is it off by a factor of 10??)
-	dubinsDensity float64 = 1    // factor of dubinsInc
+	timeToPlan    float64 = 0.095 // make parameter (why is it off by a factor of 10??)
+	dubinsDensity float64 = 1     // factor of dubinsInc
 
 )
 
