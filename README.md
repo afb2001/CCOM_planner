@@ -17,6 +17,7 @@ You can also clone the respository yourself:
   $ git clone https://github.com/afb2001/CCOM_planner.git
 ```
 Once you've downloaded the project you can build the source files:
+
 ```
   $ cd $GOPATH/src/github.com/afb2001/CCOM_planner
   $ ./build.sh
@@ -30,8 +31,10 @@ To run the system (executive, controller, planner, shim, and simulator), call th
   <li><code>-nobs &ltnumber of dynamic obstacles&gt;</code></li>
 </ul>
 For example, using sample map and goal files:
+
 ```
 ./run.sh -map sample/test1.map -goal sample/goal.goal -nobs 50
 ```
+
 The simulator and planner could also run separately by running <code>shim.py</code> at executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py at simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> </br></br>
 The sample directory contains examples of grid map and goal files.
