@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	verbose        bool    = false
+	verbose        bool    = true
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
@@ -939,13 +939,13 @@ func AStar(qV *VertexQueue, samples *[]*Vertex) (vertex *Vertex) {
 	if verbose {
 		printLog("Starting A*")
 	}
-	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < 30; {
+	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < 30+start.Time; {
 		if verbose {
 			printLog("Popping vertex at " + vertex.state.String())
 			printLog(fmt.Sprintf("f = g + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
 		}
 		Expand(vertex, qV, samples)
-		if qV.Len() == 0 || vertex.state.Time > 30 {
+		if qV.Len() == 0 || vertex.state.Time > 30+start.Time {
 			return
 		}
 		vertex = heap.Pop(qV).(*Vertex)
@@ -1021,11 +1021,11 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if v := AStar(qV, &samples); bestVertex == nil || v.currentCost < bestVertex.currentCost {
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex)
-			// if verbose {
-			printLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
-			printLog("Current best plan:")
-			printLog(bestPlan.String())
-			// }
+			if verbose {
+				printLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
+				printLog("Current best plan:")
+				printLog(bestPlan.String())
+			}
 		}
 		if verbose {
 			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
