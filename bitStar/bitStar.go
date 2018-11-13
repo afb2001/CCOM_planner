@@ -33,11 +33,11 @@ const (
 var start common.State
 var grid common.Grid
 var o common.Obstacles
-var toCover common.Path
+var toCover *common.Path
 var bestVertex *Vertex
 var maxSpeed, maxTurningRadius float64
 
-func InitGlobals(g1 common.Grid, p common.Path, speed, radius float64) {
+func InitGlobals(g1 common.Grid, p *common.Path, speed, radius float64) {
 	grid, toCover, maxSpeed, maxTurningRadius = g1, p, speed, radius
 }
 
@@ -734,10 +734,10 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals
-	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: toCover}
+	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: *toCover}
 	// TODO! -- verify that startV.currentCost = 0
 	startV.currentCostIsSet = true
-	startV.currentCost = float64(len(toCover)) * coveragePenalty // changed this from - to +, which makes sense
+	startV.currentCost = float64(len(*toCover)) * coveragePenalty // changed this from - to +, which makes sense
 	startV.parentEdge = &Edge{start: startV, end: startV}
 	bestVertex = startV
 	samples := make([]*Vertex, 0)
@@ -765,7 +765,7 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 			samples = make([]*Vertex, bitStarSamples)
 			printLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
 			for m := 0; m < bitStarSamples; m++ {
-				samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, toCover, &start, bestVertex.CurrentCost())}
+				samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, bestVertex.CurrentCost())}
 			}
 			totalSampleCount += bitStarSamples
 			allSamples = append(allSamples, samples...)
@@ -878,7 +878,7 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 	}
 	printLog("Done with the main loop. Now to trace the tree...")
 	printLog("But first: samples!")
-	printLog(showSamples(vertices, allSamples, &grid, &start, toCover))
+	printLog(showSamples(vertices, allSamples, &grid, &start, *toCover))
 	printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, len(vertices)))
 
 	// figure out the plan I guess
@@ -990,9 +990,10 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals
-	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: toCover}
+	bestVertex = nil
+	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: *toCover}
 	startV.currentCostIsSet = true
-	startV.currentCost = float64(len(toCover)) * coveragePenalty // changed this from - to +, which makes sense
+	startV.currentCost = float64(len(*toCover)) * coveragePenalty // changed this from - to +, which makes sense
 	startV.parentEdge = &Edge{start: startV, end: startV}
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
@@ -1010,7 +1011,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		samples = make([]*Vertex, bitStarSamples)
 		//printLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
 		for m := 0; m < bitStarSamples; m++ {
-			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, toCover, &start, math.MaxFloat64)}
+			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, math.MaxFloat64)}
 		}
 		totalSampleCount += bitStarSamples
 		allSamples = append(allSamples, samples...)
@@ -1020,18 +1021,18 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if v := AStar(qV, &samples); bestVertex == nil || v.currentCost < bestVertex.currentCost {
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex)
-			if verbose {
-				printLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
-				printLog("Current best plan:")
-				printLog(bestPlan.String())
-			}
+			// if verbose {
+			printLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
+			printLog("Current best plan:")
+			printLog(bestPlan.String())
+			// }
 		}
 		if verbose {
 			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
 	}
 	if verbose {
-		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, toCover))
+		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))
 		printLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, 0))
 	}
 	return

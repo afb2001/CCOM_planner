@@ -141,7 +141,7 @@ func main() {
 
 	var path = readPath()
 
-	bitStar.InitGlobals(*grid, *path, maxSpeed, maxTurningRadius)
+	bitStar.InitGlobals(*grid, path, maxSpeed, maxTurningRadius)
 
 	fmt.Println("ready")
 
@@ -165,6 +165,12 @@ func main() {
 		line = strings.TrimPrefix(line, "start state ")
 		start := parseState(line)
 
+		if grid.IsBlocked(start.X, start.Y) {
+			printLog("Start location is blocked. Returning default plan.")
+			fmt.Println(common.DefaultPlan(start))
+			continue
+		}
+
 		var nObstacles int
 		o := new(common.Obstacles)
 		fmt.Sscanf(getLine(), "dynamic obs %d", nObstacles)
@@ -172,8 +178,10 @@ func main() {
 
 		// plan := makePlan(grid, start, *path, o)
 		// plan := bitStar.BitStar(*start, timeToPlan, o)
+		printLog("Planning...")
 		plan := bitStar.FindAStarPlan(*start, timeToPlan, o)
 		if plan == nil {
+			printLog("Couldn't find a plan.")
 			fmt.Println(common.DefaultPlan(start))
 		} else {
 			fmt.Println(plan.String())

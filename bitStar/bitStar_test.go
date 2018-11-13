@@ -16,7 +16,7 @@ var p = common.Path{p1, p2}
 
 func setUp() {
 	g.BlockRange(1, 1, 1)
-	InitGlobals(g, p, 0.5, 0.20)
+	InitGlobals(g, &p, 0.5, 0.20)
 	start = common.State{X: 2.5, Y: 1.25, Heading: 3 * math.Pi / 2}
 }
 
@@ -94,7 +94,7 @@ func TestVertex_ApproxCost(t *testing.T) {
 
 func TestVertex_UpdateApproxToGo(t *testing.T) {
 	t.Log("Testing vertex update approx to go...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.25, Heading: math.Pi}, uncovered: toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.25, Heading: math.Pi}, uncovered: *toCover}
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -109,7 +109,7 @@ func TestVertex_UpdateApproxToGo(t *testing.T) {
 
 func TestEdge_ApproxCost(t *testing.T) {
 	t.Log("Testing edge approx cost...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	// if there's a dPath it's probably right so don't worry about it
@@ -121,9 +121,9 @@ func TestEdge_ApproxCost(t *testing.T) {
 
 func TestEdge_UpdateTrueCost(t *testing.T) {
 	t.Log("Testing edge true cost...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
-	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
+	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -135,9 +135,9 @@ func TestEdge_UpdateTrueCost(t *testing.T) {
 
 func TestEdge_UpdateStart(t *testing.T) {
 	t.Log("Testing edge update start...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
-	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
+	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -150,10 +150,10 @@ func TestEdge_UpdateStart(t *testing.T) {
 
 func TestStaticCollision(t *testing.T) {
 	t.Log("Testing edge through obstacle...")
-	toCover = *toCover.Without(p2) // so we can have just one point to cover
-	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
-	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
+	toCover = toCover.Without(p2) // so we can have just one point to cover
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: *toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
+	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 1.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -166,9 +166,9 @@ func TestStaticCollision(t *testing.T) {
 
 func TestBoundedBiasedRandomState(t *testing.T) {
 	t.Log("Testing random state generation...")
-	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
-	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: *toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
+	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
 	s := BoundedBiasedRandomState(&g, p, &start, 60)
 	if s == nil || s.X < 0 || s.Y < 0 {
 		if s != nil {
@@ -184,7 +184,7 @@ func TestEdgeQueue_PushPop(t *testing.T) {
 	qE.cost = func(edge *Edge) float64 {
 		return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
 	}
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	qE.Push(&e)
@@ -205,7 +205,7 @@ func TestVertexQueue_PushPop(t *testing.T) {
 	qV.cost = func(v *Vertex) float64 {
 		return v.CurrentCost() + v.UpdateApproxToGo(nil)
 	}
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
 	// v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	// e := Edge{start: &v1, end: &v2}
 	heap.Push(qV, &v1)
@@ -258,7 +258,8 @@ func TestBitStar2(t *testing.T) {
 	t.SkipNow()
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
-	InitGlobals(bigGrid(), bigPath(), 2.5, 0.75)
+	var p = bigPath()
+	InitGlobals(bigGrid(), &p, 2.5, 0.75)
 	o1 := new(common.Obstacles)
 	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, 0.09, o1)
 	fmt.Println(plan.String())
@@ -271,7 +272,8 @@ func TestFindAStarPlan(t *testing.T) {
 	t.Log("Testing A* on a large world")
 	rand.Seed(17)
 	// redo setup
-	InitGlobals(bigGrid(), bigPath(), 2.5, 0.75)
+	var p = bigPath()
+	InitGlobals(bigGrid(), &p, 2.5, 0.75)
 	o1 := new(common.Obstacles)
 	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 0}, 0.09, o1)
 	fmt.Println(plan.String())
