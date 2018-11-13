@@ -998,11 +998,11 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals
-	bestVertex = nil
 	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: *toCover}
 	startV.currentCostIsSet = true
 	startV.currentCost = float64(len(*toCover)) * coveragePenalty // changed this from - to +, which makes sense
 	startV.parentEdge = &Edge{start: startV, end: startV}
+	bestVertex = startV
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
 	var totalSampleCount int
@@ -1041,6 +1041,9 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	}
 	if verbose {
 		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))
+	}
+	if bestVertex == startV {
+		printLog("Couldn't find a plan any better than staying put.")
 	}
 	printLog(fmt.Sprintf("%d total samples", totalSampleCount))
 	return
