@@ -41,6 +41,10 @@ func InitGlobals(g1 common.Grid, p *common.Path, speed, radius float64) {
 	grid, toCover, maxSpeed, maxTurningRadius = g1, p, speed, radius
 }
 
+func UpdatePath(newPath *common.Path) {
+	toCover = newPath
+}
+
 //endregion
 
 //region Util
