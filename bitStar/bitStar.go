@@ -16,9 +16,9 @@ const (
 	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
-	dubinsInc      float64 = 0.1  // this might be low
-	K              int     = 5    // number of closest states to consider for BIT*
-	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
+	dubinsInc      float64 = 0.1 // this might be low
+	K              int     = 5   // number of closest states to consider for BIT*
+	bitStarSamples int     = 500 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -967,7 +967,7 @@ func TracePlan(v *Vertex) *common.Plan {
 	}
 	branch = s
 
-	if verbose {
+	if verbose && len(branch) > 0 {
 		printLog("Current tree: ")
 		printLog(branch[0].start.state.String())
 		for _, x := range branch {
