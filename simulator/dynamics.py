@@ -15,10 +15,11 @@ start_lon = -70.7105114
 
 
 class Dynamics:
-    def __init__(self,model,init_x=0.0,init_y=0.0):
+    def __init__(self,model,init_x=0.0,init_y=0.0, environment=None):
         self.model = model
         self.x_o = init_x
         self.y_o = init_y
+        self.environment = environment
         
         self.reset()
 
@@ -108,16 +109,26 @@ class Dynamics:
         if self.speed > 0:
             (prop_rpm/self.model['prop_pitch'])/self.speed
 
-
+        
         if delta_t is not None:
+           
             delta = self.speed*delta_t
             self.longitude,self.latitude = geodesic.direct(self.longitude,self.latitude,self.heading,delta)
+            self.x = self.x + delta*math.sin(self.heading)  
+            self.y = self.y + delta*math.cos(self.heading)
+            if self.environment is not None:
+                c = self.environment.getCurrent(self.latitude, self.longitude)
+                if c is not None:
+                    current_speed = random.gauss(c['speed'],c['speed']*0.1)
+                    current_direction = math.radians(c['direction']) + random.gauss(0.0,0.25)
+                    
+                    self.x = self.x + current_speed*delta_t*math.sin(current_direction)  
+                    self.y = self.y + current_speed*delta_t*math.cos(current_direction)
+                    self.longitude,self.latitude = geodesic.direct(self.longitude,self.latitude,current_direction,current_speed*delta_t)
 			#ADDED - CM -
 			#ADDED FOR DEBUGGING
             #print("delta: %0.3f" % (delta))
             #print("delta_t: %0.3f , speed: %0.2f" % (delta_t,self.speed))
-            self.x = self.x + delta*math.sin(self.heading)  
-            self.y = self.y + delta*math.cos(self.heading)
 
         #self.roll = math.radians(math.sin(time.time()) * 2.5)
         #self.pitch = math.radians(math.sin(time.time()/2.1) * 5.0)

@@ -9,6 +9,7 @@ import cw4
 import numpy as np
 import threading
 import time
+import environment as ev
 # import matplotlib
 import test
 # matplotlib.use("TkAgg")
@@ -20,13 +21,14 @@ import datetime
 
 
 class DynamicObsSim:
-    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = ''):
+    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None):
         self.debug = False
         self.throttle = 0.0
         self.rudder = 0.0
         # Create an instance of the asv_sim model
         # Set parameters for the model.
-        self.boat_dynamics = dynamics.Dynamics(cw4.cw4, start_x, start_y)
+        self.environment = environment
+        self.boat_dynamics = dynamics.Dynamics(cw4.cw4, start_x, start_y,self.environment)
 
         # Set the starting state
         self.start_lat = 43.0
@@ -148,7 +150,7 @@ class DynamicObsSim:
                                 self.curr_y = self.wpt_y = ( maxy - i + 1 )
                             if f1[i][j] == '#':
                                 self.static_obs.append((j ,( maxy - i + 1 )))
-            self.boat_dynamics = dynamics.Dynamics(cw4.cw4, self.curr_x, self.curr_y)
+            self.boat_dynamics = dynamics.Dynamics(cw4.cw4, self.curr_x, self.curr_y,self.environment)
         if goal_location != '':
             f=open(goal_location, "r")
             f1 = f.readlines()
@@ -503,6 +505,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
                         help='File for goal location')
+    parser.add_argument('-e', '--environment', dest='environment', action='store', default='False',
+                        help='File for goal location')
 
     # Handle arguments
     args = parser.parse_args()
@@ -521,6 +525,12 @@ if __name__ == '__main__':
     xlim = float(limits[0])
     ylim = float(limits[1])
 
+    environment = None
+    if args.environment.lower() != 'false' :
+        environment = ev.Environment()
+
+
+
     plot_bool = args.plot
 
     file_world = args.file
@@ -532,7 +542,7 @@ if __name__ == '__main__':
 	'''
     # Setup simulation
     sim = DynamicObsSim(start_x, start_y, start_heading,
-                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location)
+                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location,environment)
     '''
 	# Example - Con'd:
 	sim.curr_x = float(fields[0])

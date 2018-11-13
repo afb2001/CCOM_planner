@@ -160,7 +160,7 @@ void MPC(double &r, double &t)
 
     for (int i = -10; i <=10; ++i)
     {
-        rudder = i / 100.0;
+        rudder = i / 10.0;
         for (int j = 10; j >=0; --j)
         {
             throttle = j / 10.0;
