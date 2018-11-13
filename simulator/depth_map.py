@@ -12,6 +12,9 @@ class BathyGrid:
         self.inverseGeoTransorm = gdal.InvGeoTransform(self.geoTransform)
 
         self.data = self.band.ReadAsArray()
+        ulx, xres, xskew, uly, yskew, yres  = self.dataset.GetGeoTransform()
+        lrx = ulx + (src.RasterXSize * xres)
+        lry = uly + (src.RasterYSize * yres)
         print self.dataset.GetCoordinates()
         
 

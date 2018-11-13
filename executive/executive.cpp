@@ -133,7 +133,14 @@ void requestPath()
     estimateStart.otime += 1;
     while (running)
     {
-
+        if(cover.size() == 0)
+        {
+            
+            action = ObjectPar(-2,-2,-2,-2,-2);
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            running = 0;
+            break;
+        }   
         vector<ObjectPar> newpath;
         communication_With_Planner.cwrite("plan");
         mtx_cover.lock();
