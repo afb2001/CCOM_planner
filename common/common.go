@@ -117,7 +117,7 @@ Remove the given state from the Path. Modifies the original Path.
 func (p Path) Without(s State) *Path {
 	b := Path{}
 	for _, x := range p {
-		if s != x {
+		if s.X != x.X || s.Y != x.Y {
 			b = append(b, x)
 		}
 	}

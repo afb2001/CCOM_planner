@@ -160,8 +160,8 @@ func main() {
 		for i := 0; i < covered; i++ {
 			fmt.Sscanf(getLine(), "%d %d", &x, &y)
 			path = path.Without(common.State{X: float64(x), Y: float64(y)})
-			bitStar.UpdatePath(path)
 		}
+		bitStar.UpdatePath(path)
 		line = getLine()
 		line = strings.TrimPrefix(line, "start state ")
 		start := parseState(line)
