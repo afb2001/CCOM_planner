@@ -12,8 +12,8 @@ You can directly use the <code>go</code> tool to download the project into your 
 ```
 You can also clone the respository yourself:
 ```
-  $ mkdir -p $GOPATH/src/github.com/afb2001/CCOM_planner
-  $ cd $GOPATH/src/github.com/afb2001/CCOM_planner
+  $ mkdir -p $GOPATH/src/github.com/afb2001
+  $ cd $GOPATH/src/github.com/afb2001
   $ git clone https://github.com/afb2001/CCOM_planner.git
 ```
 Once you've downloaded the project you can build the source files:
@@ -35,6 +35,6 @@ For example, using sample map and goal files:
 ```
 ./run.sh -map sample/test1.map -goal sample/goal.goal -nobs 50
 ```
+The simulator and planner could also run separately by running <code>shim.py</code> in the executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py in the simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> 
 
-The simulator and planner could also run separately by running <code>shim.py</code> in the executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py in the simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> </br></br>
 The sample directory contains examples of grid map and goal files.
