@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	verbose        bool    = true
+	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
@@ -560,6 +560,7 @@ Convert the given path into a plan and compute the sum collision cost and the ne
 */
 func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
 	plan = new(common.Plan)
+	plan.Start.Time = startTime
 	t := startTime // unused?
 	callback := func(q *[3]float64, inc float64) int {
 		t = inc/maxSpeed + startTime

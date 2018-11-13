@@ -157,7 +157,7 @@ func (p Path) NewlyCovered(s State) (covered Path) {
 
 //region Plan
 type Plan struct {
-	Start  State
+	Start  State // be careful using this because it isn't always fully set...
 	States []*State
 }
 
@@ -177,9 +177,9 @@ Append a state to the plan when the state is within the time horizon and either:
 */
 func (p *Plan) AppendState(s *State) {
 	if len(p.States) == 0 ||
-		(p.Start.TimeUntil(p.States[len(p.States)-1]) < p.Start.Time+timeHorizon &&
+		(p.Start.TimeUntil(p.States[len(p.States)-1]) < timeHorizon &&
 			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
-			p.States[len(p.States)-1].TimeUntil(s) > planTimeDensity) {
+			p.States[len(p.States)-1].TimeUntil(s) >= planTimeDensity) {
 		p.States = append(p.States, s)
 	}
 }
