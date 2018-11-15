@@ -20,7 +20,7 @@ const (
 	K              int     = 5    // number of closest states to consider for BIT*
 	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
-	coveragePenalty  float64 = 30
+	coveragePenalty  float64 = 60
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
 	timePenalty      float64 = 1
 )
