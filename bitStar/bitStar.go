@@ -16,9 +16,9 @@ const (
 	verbose        bool    = false
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
-	dubinsInc      float64 = 0.1 // this might be low
-	K              int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples int     = 256 // (m in the paper) -- make this a parameter too
+	dubinsInc      float64 = 0.1  // this might be low
+	K              int     = 5    // number of closest states to consider for BIT*
+	bitStarSamples int     = 1000 // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 30
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -1008,7 +1008,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	bestVertex = startV
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
-	currentSampleCount := bitStarSamples
+	// currentSampleCount := bitStarSamples
 	var totalSampleCount int
 	qV := new(VertexQueue)
 	qV.cost = func(v *Vertex) float64 {
@@ -1020,10 +1020,12 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if verbose {
 			printLog("Starting sampling")
 		}
-		samples = make([]*Vertex, len(allSamples)+currentSampleCount)
+		// samples = make([]*Vertex, len(allSamples)+currentSampleCount)
+		samples = make([]*Vertex, bitStarSamples)
 		copy(samples, allSamples)
 		//printLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
-		for m := len(allSamples); m < len(allSamples)+currentSampleCount; m++ {
+		// for m := len(allSamples); m < len(allSamples)+currentSampleCount; m++ {
+		for m := 0; m < bitStarSamples; m++ {
 			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, math.MaxFloat64)}
 		}
 		totalSampleCount += bitStarSamples
@@ -1043,7 +1045,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if verbose {
 			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
-		currentSampleCount *= 2
+		// currentSampleCount *= 2
 	}
 	if verbose {
 		printLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))
