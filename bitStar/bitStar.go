@@ -14,6 +14,7 @@ import (
 
 const (
 	verbose        bool    = false
+	debugVis       bool    = true
 	goalBias       float64 = 0
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1  // this might be low
@@ -56,6 +57,10 @@ Definitely bad practice but here we are.
 */
 func printLog(v interface{}) {
 	log.Println("Planner message:", v)
+}
+
+func printDebug(v ...interface{}) {
+	log.Println(append([]interface{}{"Planner visualization:"}, v...)...)
 }
 
 /**
@@ -940,6 +945,7 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		heap.Push(qV, e.end)
 		// TracePlan(e.end)
 		// }
+		printDebug(e.end.state, "cost =", e.end.CurrentCost())
 	}
 }
 
