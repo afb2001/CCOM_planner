@@ -194,7 +194,7 @@ void MPC(double &r, double &t)
         }
         double diffx = start.x - future[index].x;
         double diffy = start.y - future[index].y;
-        double new_effect_speed = sqrt(diffx*diffx + diffy*diffy)/(future[index].time-(future[0].time - 0.05));
+        double new_effect_speed =0; //sqrt(diffx*diffx + diffy*diffy)/(future[index].time-(future[0].time - 0.05));
         estimate_effect_speed += (new_effect_speed - estimate_effect_speed) / iteration;
         double new_effect_angle = atan2(diffx,diffy);
         estimate_effect_direction += radians_diff(new_effect_angle) / iteration;

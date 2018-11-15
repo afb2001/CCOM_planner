@@ -134,6 +134,7 @@ bool checkCollision(double cx, double cy, double ex, double ey)
 void findStart()
 {
     mtx_path.lock();
+    cerr << path.size() << " test " << pathindex << endl;
     int path_size = path.size();
     bool find = false, visit = true;
     if (path_size > 0 && pathindex < path_size)
