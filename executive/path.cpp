@@ -63,6 +63,7 @@ int main()
         double addy = 0.702;
         double h = -0.8;
         double h1 = 1.57;
+        double h2 = 0;
         double ot = getCurrentTime();
         int count = 0;
         double s = 0;
@@ -84,6 +85,15 @@ int main()
             //     h1 = 0;
             // }
             //heading = h1;
+
+            // if(n % 40 == 0)
+            // {
+            //     h2 += M_PI/2;
+            //     h2 = fmod(h2,M_PI*2);
+            // }
+            // heading = h2;
+
+
             ++n;
             
             otime += 0.5;

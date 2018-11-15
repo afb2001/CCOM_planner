@@ -109,6 +109,27 @@ bool checkCollision(double cx, double cy, double ex, double ey)
     }
     return false;
 }
+// void replacePath(ObjectPar &current)
+// {
+//     if (newpath.size() > 1)
+//     {
+//         path.clear();
+//         pathindex = 0;
+//         double diffx, diffy;
+//         double timeiterval = current.otime - estimateStart.otime;
+//         double angle = atan2(current.y - estimateStart.y, current.x - estimateStart.x);
+//         diffx = current.x + timeiterval * current.speed * cos(angle) - estimateStart.x;
+//         diffy = current.y + timeiterval * current.speed * sin(angle) - estimateStart.y;
+//         for(auto i: newpath)
+//         {
+//             if(i.otime > current.otime)
+//             {
+//                 path.push_back( (ObjectPar(i.x+diffx,i.y+diffy,i.heading,i.speed,i.otime)) );
+//             }
+//         }
+//         newpath.clear();
+//     }
+// }
 
 void findStart()
 {
@@ -155,18 +176,12 @@ void findStart()
 
     if (!find)
     {
-        //cerr << "SECOND" << endl;
         ObjectPar current = current_location;
         double timeiterval = 1;
-        //double heading = atan2(previousAction.x - pstart.x, previousAction.y - pstart.y);
-        //estimateStart = ObjectPar(current.x + timeiterval * previousAction.speed * cos(heading), current.y + timeiterval * previousAction.speed * sin(heading), current.heading, current.speed, current.otime + 1);
         if (visit)
             estimateStart = ObjectPar(current.x + timeiterval * sin(current.heading) * current.speed, current.y + timeiterval * cos(current.heading) * current.speed, current.heading, current.speed, current.otime + 1);
         action = ObjectPar(-1, -1, -1, -1, -1);
-        // if (path.size() > pathindex && path[pathindex].speed == 0)
-        //     action = ObjectPar(-1, -1, -1, -1, -1);
-        // else
-        //     action = ObjectPar(current.x + timeiterval * previousAction.speed * cos(heading), current.y + timeiterval * previousAction.speed * sin(heading), current.heading, current.speed, current.otime + 1);
+        
     }
 
     mtx_path.unlock();

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-import gdal
+# import gdal
 
 class BathyGrid:
     def __init__(self, fname):

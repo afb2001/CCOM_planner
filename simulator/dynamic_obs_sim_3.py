@@ -142,8 +142,8 @@ class DynamicObsSim:
             dividfactor = 70
             maxx = np.abs(x2-x1)/dividfactor
             maxy = np.abs(y2-y1)/dividfactor
-            self.xlim = maxx
-            self.ylim = maxy
+            self.xlim = max(maxx,maxy)
+            self.ylim = self.xlim
             
             
             for i in range(0,maxx):
