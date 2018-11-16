@@ -137,7 +137,7 @@ void findStart()
     cerr << path.size() << " test " << pathindex << endl;
     int path_size = path.size();
     bool find = false, visit = true;
-    if (path_size > 0 && pathindex < path_size)
+    if (path_size > 1 && pathindex < path_size)
     {
         ObjectPar current = current_location;
         double otime = current_location.otime + 4;

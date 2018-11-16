@@ -57,6 +57,7 @@ int sendPipeToParent, receivePipeFromParent;
 double estimate_effect_speed = 0, estimate_effect_direction = 0;
 double ptime = 0;
 int iteration = 0;
+bool update = true;
 vector<pointc> future;
 
 void readpath(FILE *readstream)
@@ -176,7 +177,7 @@ void MPC(double &r, double &t)
     // cerr << d_time << endl;
 
     //cerr << "START " << endl;
-    if (ptime != start.otime && future.size() != 0)
+    if (ptime != start.otime && future.size() != 0 && update)
     {
         if(iteration < 20)
             ++iteration;
@@ -194,7 +195,7 @@ void MPC(double &r, double &t)
         }
         double diffx = start.x - future[index].x;
         double diffy = start.y - future[index].y;
-        double new_effect_speed =0; //sqrt(diffx*diffx + diffy*diffy)/(future[index].time-(future[0].time - 0.05));
+        double new_effect_speed =sqrt(diffx*diffx + diffy*diffy)/(future[index].time-(future[0].time - 0.05));
         estimate_effect_speed += (new_effect_speed - estimate_effect_speed) / iteration;
         double new_effect_angle = atan2(diffx,diffy);
         estimate_effect_direction += radians_diff(new_effect_angle) / iteration;
@@ -271,14 +272,17 @@ void sendAction()
             if (action.speed == -1)
             {
                 command = "0,0";
+                update = false;
             }
             else if (action.speed == -2)
             {
                 command = "1,0.1";
+                update = false;
             }
             else
             {
                 MPC(rudder, throttle);
+                update = true;
                 //command = "0,0";
                 command = to_string(rudder) + "," + to_string(throttle);
             }
