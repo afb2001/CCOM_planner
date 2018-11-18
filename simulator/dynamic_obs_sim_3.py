@@ -254,6 +254,7 @@ class DynamicObsSim:
         ''' Monitor for updates to wpts/speed '''
 
         try:
+            
             data = self.soc.recv(4096)
             if(data[:4]== 'path'):
                 n = int(data.split(' ')[1])
@@ -272,8 +273,6 @@ class DynamicObsSim:
                 data = self.soc.recv(4096)
                 print('***************', data, '*******************')
                 dummy = data.decode('utf-8').split(",")
-                #self.wpt_x = float(dummy[0])
-                #self.wpt_y = float(dummy[1])
                 self.rudder = float(dummy[0])
                 self.throttle = float(dummy[1])
         except socket.timeout as e:

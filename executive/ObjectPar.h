@@ -18,6 +18,11 @@ struct point{
             return true;
         return false;
     }
+
+    std::string toString()
+    {
+        return std::to_string(x) + " " + std::to_string(y);
+    }
 };
 
 namespace std
@@ -59,10 +64,12 @@ class ObjectPar
     double x, y, heading, speed, otime;
     ObjectPar(double x, double y, double heading, double speed, double otime)
         : x(x), y(y), heading(heading), speed(speed), otime(otime){};
+    ObjectPar(int value)
+        : x(value), y(value), heading(value), speed(value), otime(value){};
     ObjectPar()
         : x(-1), y(-1), heading(-1), speed(-1), otime(-1){};
 
-    void set(double newx, double newy, double newheading, double newspeed, double newtime)
+    void set(double &newx, double &newy, double &newheading, double &newspeed, double &newtime)
     {
         x = newx;
         y = newy;
@@ -71,7 +78,23 @@ class ObjectPar
         otime = newtime;
     }
 
+    void setEstimate(double timeinterval, ObjectPar &object)
+    {
+        double displacement = timeinterval * object.speed;
+        x = object.x + sin(object.heading) * displacement;
+        y = object.y + cos(object.heading) * displacement;
+        heading = object.heading;
+        speed = object.speed;
+        otime = object.otime + 1;
+         
+    }
+
     std::string toString()
+    {
+        return std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(heading) + " " + std::to_string(speed) + " " + std::to_string(otime);
+    }
+
+    std::string toString() const
     {
         return std::to_string(x) + " " + std::to_string(y) + " " + std::to_string(heading) + " " + std::to_string(speed) + " " + std::to_string(otime);
     }
