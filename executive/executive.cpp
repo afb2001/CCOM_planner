@@ -156,7 +156,6 @@ void requestWorldInformation()
         else if (!strncmp(locationString, "Obstacle", 8))
         {
             oldbytesRead = bytesRead = 9;
-            
             count = 0;
             path.lock_obs();
             do

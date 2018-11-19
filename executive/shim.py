@@ -111,6 +111,9 @@ if __name__ == "__main__":
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
                         help='File for goal location')
 
+    parser.add_argument('-tiff', '--tiffmap', dest='tiffmap', action='store', default='',
+                        help='File for tiffmap')
+
     args = parser.parse_args()
 
     gridmap = args.map

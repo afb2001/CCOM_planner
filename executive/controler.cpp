@@ -91,6 +91,7 @@ void requestAction()
        
         plan = 1;
         mtx.unlock();
+        cerr << "MTX" << endl;
     }
 }
 
