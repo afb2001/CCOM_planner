@@ -373,14 +373,23 @@ def update():
                 shapeobs.append(0)
             else:
                 shapeobs.append(1)
-            
+
+            mutex.acquire(True)
+            try:
+                theApp.updateInformation(
+                    nobs, xobs, yobs, hobs, costobs, colorsobs, shapeobs)
+            finally:
+                mutex.release()
+
         mutex.acquire(True)
         try:
             theApp.updateInformation(
-                nobs, xobs, yobs, hobs, costobs, colorsobs, shapeobs)
+                0, [], [], [], [], [], [])
         finally:
             mutex.release()
 
+            
+        
     
 
 
@@ -436,3 +445,20 @@ if __name__ == "__main__":
         theApp.stop()
         run = False
         os._exit(0)
+
+    # try:
+    #     while True:
+    #         mutex.acquire(True)
+    #         try:
+    #             theApp.update()
+    #         finally:
+    #             mutex.release()
+    #         time.sleep(0.1)
+    # except Exception as e: 
+    #     print "ERROR"
+    #     print(e)
+    # finally:
+    #     print "TERMINATE"
+    #     theApp.stop()
+    #     run = False
+    #     os._exit(0)
