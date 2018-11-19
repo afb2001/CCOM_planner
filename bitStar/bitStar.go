@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"github.com/afb2001/CCOM_planner/dubins"
+	"github.com/pkg/profile"
 	"log"
 	"math"
 	"math/rand"
@@ -14,8 +15,8 @@ import (
 
 const (
 	verbose        bool    = false
-	debugVis       bool    = true
-	goalBias       float64 = 0
+	debugVis       bool    = false
+	goalBias       float64 = 0.05
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1  // this might be low
 	K              int     = 5    // number of closest states to consider for BIT*
@@ -60,7 +61,9 @@ func printLog(v interface{}) {
 }
 
 func printDebug(v ...interface{}) {
-	log.Println(append([]interface{}{"Planner visualization:"}, v...)...)
+	if debugVis {
+		log.Println(append([]interface{}{"Planner visualization:"}, v...)...)
+	}
 }
 
 /**
@@ -583,6 +586,7 @@ func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan
 		} else if s.CollisionProbability > 0 {
 			penalty += collisionPenalty * s.CollisionProbability
 		}
+		printDebug(s.String(), "cost =", penalty, "color = 1 shape = dot")
 		newlyCovered = append(newlyCovered, toCover.NewlyCovered(*s)...) // splash operator I guess
 		plan.AppendState(s)
 		return 0
@@ -942,10 +946,14 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		e.end.currentCost = e.start.currentCost + e.trueCost
 		e.end.currentCostIsSet = true
 		// if bestVertex == nil || e.end.CurrentCost() + e.end.UpdateApproxToGo(nil) < bestVertex.CurrentCost(){
+
+		printDebug(e.end.state, "cost =", e.end.CurrentCost(), "color = 1 shape = boat")
+		// printDebug("done")
+
 		heap.Push(qV, e.end)
 		// TracePlan(e.end)
 		// }
-		printDebug(e.end.state, "cost =", e.end.CurrentCost())
+
 	}
 }
 
@@ -1004,6 +1012,7 @@ func TracePlan(v *Vertex) *common.Plan {
 }
 
 func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Obstacles) (bestPlan *common.Plan) {
+	defer profile.Start().Stop()
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals
