@@ -13,9 +13,9 @@ using namespace std;
 class Path
 {
 
+
   public:
     // Default constructor
-
     Path()
     {
         pathindex = 0;
