@@ -194,8 +194,8 @@ class PLOT:
     def on_render(self):
         self.display.blit(self.background, (0, 0))
         self.draw_line()
-        self.draw_obs()
         self.draw_text()
+        self.draw_obs()
         sprites.draw(self.display)
         sprites.update()
         pygame.display.flip()
@@ -241,6 +241,8 @@ class PLOT:
         self.shapeobs = shapeobs
 
     def draw_obs(self):
+        for obs in self.static_obs:
+            self.draw_static_obs(Color_Red, *obs)
         for index in range(self.nobs):
             if self.shapeobs[index] == 1:
                 self.draw_vehicle(
@@ -249,10 +251,6 @@ class PLOT:
             else:
                 self.drawCircle(colors[self.colorsobs[index]],*self.scale_item(self.xobs[index], self.yobs[index]))
                 # self.draw_dot(colors[self.colorsobs[index]],self.xobs[index], self.yobs[index])
-
-        for obs in self.static_obs:
-            self.draw_static_obs((0, 0, 0), *obs)
-
         for i in range(len(self.goal_location)):
             if(self.distSquare(self.curr_x, self.curr_y, *self.goal_location[i]) <= 10):
                 self.F_goal_location.append(self.goal_location.pop(i))
