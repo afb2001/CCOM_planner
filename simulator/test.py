@@ -41,7 +41,7 @@ sprites = pygame.sprite.Group()
 
 
 class PLOT:
-    def __init__(self, static_obs, xlim, ylim):
+    def __init__(self, static_obs, xlim, ylim, factor):
         self._running = True
         self.display = None
         self._image_surf = None
@@ -62,17 +62,16 @@ class PLOT:
         self.goal_location = []
         self.F_goal_location = []
         self.future_heading = []
-        self.estimateStart = (0,0,0)
+        self.estimateStart = (0, 0, 0)
         self.triangleX = (0, -5, 5)
         self.triangleY = (-10, 10, 10)
         self.static_obs = static_obs
+        self.factor = factor
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
         except:
             self.myfont = pygame.font.SysFont(None, 20)
-        
-            
 
     def on_init(self):
         pygame.init()
@@ -199,16 +198,14 @@ class PLOT:
         # self.stop()
         self.pathList = [(curr_x, curr_y)]
         self.updateInformation(
-            curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [],self.estimateStart,[])
+            curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [], self.estimateStart, [])
         self.update()
 
     def checkCollision(self):
-        for i in self.static_obs:
-            x, y = i
-            if x <= self.curr_x < x + 1 and y <= self.curr_y < y + 1:
-                sprites.add(Explosion(self.scale_item(
-                    self.curr_x, self.curr_y), self.exp_img))
-                return
+        if self.static_obs.get((int(self.curr_x), int(self.curr_y))):
+            sprites.add(Explosion(self.scale_item(
+                self.curr_x, self.curr_y), self.exp_img))
+            return
         for i in range(0, self.nobs):
             if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
                 sprites.add(Explosion(self.scale_item(
@@ -236,21 +233,21 @@ class PLOT:
                 i * scalew, 0), self.scale_xy(i*scalew, self.scaleh))
             # self.draw_text(self.scalew,i * scaleh, i * self.maxX/(self.lines + 1) )
 
-    def updateInformation(self, curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, future_x, future_y, future_heading,estimateStart,goal_location):
-            if self.pathList[-1] != (curr_x, curr_y):
-                self.pathList.append((curr_x, curr_y))
-            self.curr_x = curr_x
-            self.curr_y = curr_y
-            self.start_heading = start_heading
-            self.nobs = nobs
-            self.xobs = xobs
-            self.yobs = yobs
-            self.hobs = hobs
-            self.future_heading = future_heading
-            self.future_x = future_x
-            self.future_y = future_y
-            self.estimateStart = estimateStart
-            self.goal_location = goal_location
+    def updateInformation(self, curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, future_x, future_y, future_heading, estimateStart, goal_location):
+        if self.pathList[-1] != (curr_x, curr_y):
+            self.pathList.append((curr_x, curr_y))
+        self.curr_x = curr_x
+        self.curr_y = curr_y
+        self.start_heading = start_heading
+        self.nobs = nobs
+        self.xobs = xobs
+        self.yobs = yobs
+        self.hobs = hobs
+        self.future_heading = future_heading
+        self.future_x = future_x
+        self.future_y = future_y
+        self.estimateStart = estimateStart
+        self.goal_location = goal_location
 
     def draw_future(self):
         size = len(self.future_heading)
@@ -263,9 +260,9 @@ class PLOT:
                         self.future_heading[i], c, *self.scale_item(self.future_x[i], self.future_y[i]))
             self.draw_vehicle(
                 self.future_heading[0], Color_CYAN, *self.scale_item(self.future_x[0], self.future_y[0]))
-        x,y,heading = self.estimateStart
+        x, y, heading = self.estimateStart
         self.draw_vehicle(
-                        heading, Color_GREEN, *self.scale_item(x, y))
+            heading, Color_GREEN, *self.scale_item(x, y))
 
     def draw_current(self):
         self.draw_vehicle(self.start_heading, Color_BLUE, *
@@ -284,26 +281,28 @@ class PLOT:
                 self.hobs[index], Color_Red, *self.scale_item(self.xobs[index], self.yobs[index]))
 
         for obs in self.static_obs:
-            self.draw_static_obs((0,0,0),*obs)
-        
+            self.draw_static_obs((0, 0, 0), *obs)
+
         for i in range(len(self.goal_location)):
-            if(self.distSquare(self.curr_x,self.curr_y,*self.goal_location[i]) <= 10):
+            if(self.distSquare(self.curr_x, self.curr_y, *self.goal_location[i]) <= 10):
                 self.F_goal_location.append(self.goal_location.pop(i))
-                break;
-            
+                break
 
         for goal in self.goal_location:
-            self.draw_static_obs((0,255,0),*goal)
+            self.draw_static_obs((0, 255, 0), *goal)
 
         for goal in self.F_goal_location:
-            self.draw_static_obs((0,255,255),*goal)
+            self.draw_static_obs((0, 255, 255), *goal)
 
-    def distSquare(self,x1,y1,x2,y2):
-        return ( x1 - x2 ) * ( x1 - x2 ) + ( y1 - y2 ) * ( y1 - y2 )
+    def distSquare(self, x1, y1, x2, y2):
+        return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)
 
-    def draw_static_obs(self, color,x, y):
-        pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
-            x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
+    def draw_static_obs(self, color, x, y):
+        x1,y1 = self.scale_item(x, y)
+        x2 ,y2 = self.scale_item(x+1, y+1)
+        pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
+        # pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
+        #     x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
 
     def draw_vehicle(self, angle, color, x, y):
         tX = []
@@ -320,15 +319,15 @@ class PLOT:
         scaleh = self.scaleh/(self.lines+1)
         scalew = self.scalew/(self.lines+1)
         for i in range(0, self.lines+2):
-            text = str(int(self.moveY+(self.lines - i + 1)
-                           * self.maxY/(self.lines + 1)))
+            text = str(int(self.factor*(self.moveY+(self.lines - i + 1)
+                                        * self.maxY/(self.lines + 1))))
             textsurface = self.myfont.render(text, True, (0, 0, 0))
             x, y = self.scale_xy(0, (i) * scaleh)
             x -= textsurface.get_width() + 10
             y -= textsurface.get_height()/2
             self.display.blit(textsurface, (x, y))
-            text = str(int(self.moveX+(self.lines - i + 1)
-                           * self.maxX/(self.lines + 1)))
+            text = str(int(self.factor*(self.moveX+(self.lines - i + 1)
+                           * self.maxX/(self.lines + 1))))
             textsurface = self.myfont.render(text, True, (0, 0, 0))
             x, y = self.scale_xy((self.lines - i + 1)*scalew, self.scaleh)
             x -= textsurface.get_width() / 2

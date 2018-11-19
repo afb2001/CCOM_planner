@@ -23,7 +23,7 @@ import datetime
 
 
 class DynamicObsSim:
-    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None, geotiff = None,boat_model = cw4.cw4):
+    def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None, geotiff = None,boat_model = cw4.cw4,dynamic_obs=''):
         self.debug = False
         self.throttle = 0.0
         self.rudder = 0.0
@@ -84,29 +84,35 @@ class DynamicObsSim:
         self.ylim = np.abs(ylim)
 
         # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
-        self.static_obs = []
+        self.static_obs = {}
+        self.static_draw = []
         self.goal_location = []
+        self.factor = 1
         self.read_world(file_world,geotiff, goal_location)
 
-        # Initializing obstacles:
-        self.nobs = nobs  # number of obstacles
+        
+        if dynamic_obs:
+            self.read_dynamic(dynamic_obs)
+        else:
+            # Initializing obstacles:
+            self.nobs = nobs  # number of obstacles
 
-        self.xobs = np.random.uniform(-self.xlim, self.xlim, self.nobs)
-        self.yobs = np.random.uniform(-self.ylim, self.ylim, self.nobs)
-        # speed of obstacles [m/sec]
-        self.vobs = np.random.uniform(2.57, 7.72, self.nobs)
-        # heading of obstacles [rad]
-        self.hobs = np.random.uniform(0, 2*np.pi, self.nobs)
-        self.xx_obs = []
-        self.yy_obs = []
-        self.obs_id = np.arange(self.nobs)
-        #self.cmap = plt.cm.summer
-        #rcParams['axes.prop_cycle'] = cycler(color=self.cmap(np.linspace(0, 1, self.nobs)))
-        # self.obstacles = np.zeros(self.nobs, dtype=[('position',float,2),
-        #											('id', float, 1),
-        #											('color',float, 4)])
+            self.xobs = np.random.uniform(-self.xlim, self.xlim, self.nobs)
+            self.yobs = np.random.uniform(-self.ylim, self.ylim, self.nobs)
+            # speed of obstacles [m/sec]
+            self.vobs = np.random.uniform(2.57, 7.72, self.nobs)
+            # heading of obstacles [rad]
+            self.hobs = np.random.uniform(0, 2*np.pi, self.nobs)
+            self.xx_obs = []
+            self.yy_obs = []
+            self.obs_id = np.arange(self.nobs)
+            #self.cmap = plt.cm.summer
+            #rcParams['axes.prop_cycle'] = cycler(color=self.cmap(np.linspace(0, 1, self.nobs)))
+            # self.obstacles = np.zeros(self.nobs, dtype=[('position',float,2),
+            #											('id', float, 1),
+            #											('color',float, 4)])
 
-        #futrue path
+            #futrue path
 
         self.future_heading = []
         self.future_x = []
@@ -129,30 +135,61 @@ class DynamicObsSim:
         # plt.xlabel("x [m]")
         # plt.ylabel("y [m]")
         self.plotaxes = None
-        self.plot_draw = test.PLOT(self.static_obs,self.xlim,self.ylim)
+        self.plot_draw = test.PLOT(self.static_obs,self.xlim,self.ylim,self.factor)
         self.plotaxes_obs = list(range(self.nobs))
 
+
+
+
+
+
     # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
+    def read_dynamic(self,dynamics_file):
+        f=open(dynamics_file, "r")
+        f1 = f.readline()
+
+        self.xobs  = []
+        self.yobs  = []
+        self.vobs  = []
+        self.hobs  = []
+        self.nobs = int(f1)  # number of obstacles
+        self.obs_id = np.arange(self.nobs)
+
+        for i in range(self.nobs):
+            f1 = f.readline()
+            while f1.strip() == '':
+                f1 = f.readline()
+            f2 = f1.split(' ')
+            self.xobs.append(float(f2[0]))
+            self.yobs.append(float(f2[1]))
+            self.vobs.append(float(f2[2]))
+            self.hobs.append(float(f2[3]))
+        self.xobs = np.array(self.xobs)
+        self.yobs = np.array(self.yobs)
+        self.vobs = np.array(self.vobs)
+        self.hobs = np.array(self.hobs)
+            
+
     def read_world(self,file_world,geotiff,goal_location):
         maxx = 0
         maxy = 0
         if  geotiff != '':
             geotiff = depth_map.BathyGrid(geotiff)
             x1,x2,y1,y2 = geotiff.getBound()
-            dividfactor = 70
-            maxx = np.abs(x2-x1)/dividfactor
-            maxy = np.abs(y2-y1)/dividfactor
-            self.xlim = max(maxx,maxy)
+            maxx = np.abs(x2-x1)
+            maxy = np.abs(y2-y1)
+            geodata = geotiff.getGrid()
+            by,bx = np.shape(geodata)
+            factor = 9
+            self.xlim = max(bx,by)
             self.ylim = self.xlim
-            
-            
-            for i in range(0,maxx):
-                for j in range(0,maxy):
-                    data = geotiff.getDepth(i*dividfactor+x1,j*dividfactor+y1)
-                    if data != None:   
-                        if data < 2:
-                            self.static_obs.append((i ,j))
+            self.factor = maxx / bx
+            for i in range(bx/factor):
+                for j in range(by/factor):
+                    if geodata[j* factor,i* factor] < 2:
+                        self.static_obs[(i* factor , (by/factor - 1 -j)* factor )] = True;
             self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
+
         elif file_world != '':
             f=open(file_world, "r")
             f1 = f.readlines()
@@ -169,7 +206,7 @@ class DynamicObsSim:
                                 self.curr_x = self.wpt_x = j
                                 self.curr_y = self.wpt_y = ( maxy - i + 1 )
                             if f1[i][j] == '#':
-                                self.static_obs.append((j ,( maxy - i + 1 )))
+                                self.static_obs[(j ,( maxy - i + 1 ))] = True;
             self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
         if goal_location != '':
             f=open(goal_location, "r")
@@ -430,7 +467,6 @@ class DynamicObsSim:
             np.sin(self.hobs)  # x position of obstacles
         self.yobs = self.yobs + self.delta_obs * \
             np.cos(self.hobs)  # y position of obstacles
-
         for ii in range(self.nobs):
             if self.xobs[ii] > self.xlim:
                 self.xobs[ii] = self.xobs[ii] - 2*self.xlim
@@ -532,6 +568,9 @@ if __name__ == '__main__':
 
     parser.add_argument('-tiff', '--geotiff', dest='geotiff', action='store', default='',
                         help='File for geo tiff')
+    
+    parser.add_argument('-dynamic', '--dynamicobs', dest='dynamicobs', action='store', default='',
+                        help='File for dynamic obstacle')
 
     # Handle arguments
     args = parser.parse_args()
@@ -565,6 +604,8 @@ if __name__ == '__main__':
 
     boat_model = args.model
 
+    dynamic_obs = args.dynamicobs
+
     if boat_model.lower() == "coastal_surveyor" :
         boat_model = coastal_surveyor.coastal_surveyor
     else:
@@ -585,7 +626,7 @@ if __name__ == '__main__':
 	'''
     # Setup simulation
     sim = DynamicObsSim(start_x, start_y, start_heading,
-                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location,environment,geotiff,boat_model)
+                        start_speed, nobs, xlim, ylim, plot_bool,file_world,goal_location,environment,geotiff,boat_model,dynamic_obs)
     '''
 	# Example - Con'd:
 	sim.curr_x = float(fields[0])
