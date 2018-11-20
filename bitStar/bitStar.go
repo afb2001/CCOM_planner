@@ -14,7 +14,7 @@ import (
 
 const (
 	verbose        bool    = false
-	debugVis       bool    = true
+	debugVis       bool    = false
 	goalBias       float64 = 0.05
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1  // this might be low
@@ -269,7 +269,9 @@ func (e *Edge) UpdateTrueCost() float64 {
 	e.ApproxCost() // compute dPath if it isn't already done
 	// compute the plan along the dubins path, the collision penalty, and the ending time
 	// NOTE: this does a lot of work
-	e.plan, collisionPenalty, newlyCovered, e.end.state.Time = getSamples(e.dPath, e.start.state.Time, e.start.uncovered)
+	// e.plan, collisionPenalty, newlyCovered, e.end.state.Time = getSamplesAndPlan(e.dPath, e.start.state.Time, e.start.uncovered)
+	// don't make a plan yet, that's expensive
+	collisionPenalty, newlyCovered, e.end.state.Time = getSamples(e.dPath, e.start.state.Time, e.start.uncovered)
 	// e.end.state.Time += e.start.state.Time // think I fixed that
 	// update the uncovered path in e.end
 	e.end.uncovered = e.start.uncovered
@@ -572,7 +574,7 @@ func shortestPath(s1 *common.State, s2 *common.State) (path *dubins.Path, err in
 /**
 Convert the given path into a plan and compute the sum collision cost and the newly covered path.
 */
-func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
+func getSamplesAndPlan(path *dubins.Path, startTime float64, toCover common.Path) (plan *common.Plan, penalty float64, newlyCovered common.Path, finalTime float64) {
 	plan = new(common.Plan)
 	plan.Start.Time = startTime
 	t := startTime // unused?
@@ -609,6 +611,58 @@ func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan
 		}
 	}
 	return plan, penalty, newlyCoveredNoDup, t
+}
+
+func getPlan(edge *Edge) (plan *common.Plan) {
+	plan = new(common.Plan)
+	plan.Start.Time = edge.start.state.Time
+	var t float64
+	callback := func(q *[3]float64, inc float64) int {
+		t = inc/maxSpeed + plan.Start.Time
+		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
+		plan.AppendState(s)
+		return 0
+	}
+	err := edge.dPath.SampleMany(dubinsInc, callback)
+
+	if err != dubins.EDUBOK {
+		return nil
+	}
+	return
+}
+
+func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (penalty float64, newlyCovered common.Path, finalTime float64) {
+	t := startTime // unused?
+	callback := func(q *[3]float64, inc float64) int {
+		t = inc/maxSpeed + startTime
+		collisionProbability := o.CollisionExistsWithArray(*q, t)
+		if grid.IsBlocked(q[0], q[1]) {
+			penalty += collisionPenalty
+		} else if collisionProbability > 0 {
+			penalty += collisionPenalty * collisionProbability
+		}
+		newlyCovered = append(newlyCovered, toCover.NewlyCoveredArray(*q)...) // splash operator I guess
+		return 0
+	}
+	err := path.SampleMany(dubinsInc, callback)
+
+	if err != dubins.EDUBOK {
+		return math.MaxFloat64, newlyCovered, 0
+	}
+	newlyCoveredNoDup := common.Path{}
+	for _, s := range newlyCovered {
+		var contains bool
+		for _, x := range newlyCoveredNoDup {
+			if x.IsSamePosition(&s) {
+				contains = true
+				break
+			}
+		}
+		if !contains {
+			newlyCoveredNoDup = append(newlyCoveredNoDup, s)
+		}
+	}
+	return penalty, newlyCoveredNoDup, t
 }
 
 //endregion
@@ -927,7 +981,7 @@ func BitStar(startState common.State, timeRemaining float64, o1 *common.Obstacle
 
 func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 	for _, e := range getKClosest(v, *samples, math.MaxFloat64) {
-		if e == nil { // TODO -- fix bug in getKClosest that's letting nil values get put in
+		if e == nil {
 			continue
 		}
 		// remove the sample from the list (could be more efficient)
@@ -969,8 +1023,11 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 			printLog(fmt.Sprintf("f = g + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
 		}
 		Expand(vertex, qV, samples)
-		if qV.Len() == 0 || vertex.state.Time > 30+start.Time {
+		if vertex.state.Time > 30+start.Time {
 			return
+		}
+		if qV.Len() == 0 {
+			return nil
 		}
 		vertex = heap.Pop(qV).(*Vertex)
 	}
@@ -1004,13 +1061,14 @@ func TracePlan(v *Vertex) *common.Plan {
 	p.Start = start
 	// p.AppendState(&start) // yes this is necessary
 	for _, e := range branch {
-		p.AppendPlan(e.plan) // should be fully calculated by now
+		p.AppendPlan(getPlan(e))
 		p.AppendState(e.end.state)
 	}
 	return p
 }
 
 func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Obstacles) (bestPlan *common.Plan) {
+	// printLog("\n\n\n\n\n")
 	// defer profile.Start().Stop()
 	endTime := timeRemaining + now()
 	// setup
@@ -1019,6 +1077,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	startV.currentCostIsSet = true
 	startV.currentCost = float64(len(*toCover)) * coveragePenalty // changed this from - to +, which makes sense
 	startV.parentEdge = &Edge{start: startV, end: startV}
+	bestVertex = nil
 	// bestVertex = startV
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
@@ -1047,7 +1106,15 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 		if verbose {
 			printLog("Finished sampling")
 		}
-		if v := AStar(qV, &samples, endTime); bestVertex == nil || (v != nil && v.currentCost < bestVertex.currentCost) {
+		v := AStar(qV, &samples, endTime)
+		// if v == nil && now() < endTime  {
+		// 	printError("Got nil from AStar with time left")
+		// }
+		// if v == nil {
+		// 	printLog("Got nil from AStar")
+		// }
+		if bestVertex == nil || (v != nil && v.currentCost < bestVertex.currentCost) {
+			// printLog("Found a plan")
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex)
 			if verbose {
@@ -1056,6 +1123,14 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 				printLog(bestPlan.String())
 			}
 		}
+		// else {
+		// 	printLog("Did not find a better plan than the incumbent: ")
+		// 	if bestVertex != nil {
+		// 		printLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
+		// 	} else {
+		// 		printLog("Infinity (incumbent is nil)")
+		// 	}
+		// }
 		if verbose {
 			printLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}

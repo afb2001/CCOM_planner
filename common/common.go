@@ -10,6 +10,7 @@ const (
 	planTimeDensity     float64 = 0.5
 	TimeHorizon         float64 = 30 // not used as intended yet
 	coverageThreshold   float64 = 3
+	collisionDistance   float64 = 2.5
 )
 
 //region State
@@ -33,7 +34,12 @@ func (s *State) TimeUntil(other *State) float64 {
 Returns the Euclidean distance in two dimensions (x,y).
 */
 func (s *State) DistanceTo(other *State) float64 {
-	return math.Sqrt(math.Pow(s.X-other.X, 2) + math.Pow(s.Y-other.Y, 2))
+	// return math.Sqrt(math.Pow(s.X-other.X, 2) + math.Pow(s.Y-other.Y, 2))
+	return math.Sqrt((s.X-other.X)*(s.X-other.X) + (s.Y-other.Y)*(s.Y-other.Y))
+}
+
+func (s State) DistanceToArray(other [3]float64) float64 {
+	return math.Sqrt((s.X-other[0])*(s.X-other[0]) + (s.Y-other[1])*(s.Y-other[1]))
 }
 
 func (s *State) HeadingTo(other *State) float64 {
@@ -51,8 +57,14 @@ True iff other is within 1.5m in the x and y directions.
 */
 func (s *State) Collides(other *State) bool {
 	return s.Time == other.Time &&
-		(math.Abs(s.X-other.X) < 1.5) &&
-		(math.Abs(s.Y-other.Y) < 1.5)
+		(math.Abs(s.X-other.X) < collisionDistance) &&
+		(math.Abs(s.Y-other.Y) < collisionDistance)
+}
+
+func (s *State) CollidesWithArray(other [3]float64) bool {
+	// assume times are equal
+	return math.Abs(s.X-other[0]) < collisionDistance &&
+		math.Abs(s.Y-other[1]) < collisionDistance
 }
 
 /**
@@ -147,6 +159,15 @@ func (p Path) MinDistanceFrom(s State) (min float64) {
 func (p Path) NewlyCovered(s State) (covered Path) {
 	for _, x := range p {
 		if s.DistanceTo(&x) < coverageThreshold {
+			covered = append(covered, x)
+		}
+	}
+	return
+}
+
+func (p Path) NewlyCoveredArray(s [3]float64) (covered Path) {
+	for _, x := range p {
+		if x.DistanceToArray(s) < coverageThreshold {
 			covered = append(covered, x)
 		}
 	}
@@ -328,7 +349,16 @@ Returns a float64 probability of collision.
 */
 func (o *Obstacles) CollisionExists(state *State) float64 {
 	for _, s := range *o {
-		if s.Collides(s.Project(s.TimeUntil(state))) {
+		if s.Project(s.TimeUntil(state)).Collides(state) {
+			return 1.0
+		}
+	}
+	return 0
+}
+
+func (o *Obstacles) CollisionExistsWithArray(state [3]float64, t float64) float64 {
+	for _, s := range *o {
+		if s.Project(t - s.Time).CollidesWithArray(state) {
 			return 1.0
 		}
 	}

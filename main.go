@@ -16,8 +16,8 @@ import (
 const (
 	verbose               = true
 	rrtInc        float64 = 0.5
-	timeToPlan    float64 = 0.095 // make parameter (why is it off by a factor of 10??)
-	dubinsDensity float64 = 1     // factor of dubinsInc
+	timeToPlan    float64 = 0.09 // make parameter (why is it off by a factor of 10??)
+	dubinsDensity float64 = 1    // factor of dubinsInc
 
 )
 
@@ -127,7 +127,7 @@ var maxSpeed, maxTurningRadius float64
 var reader = bufio.NewReader(os.Stdin)
 
 func main() {
-	rand.Seed(3) // set seed for now
+	rand.Seed(4) // set seed for now
 
 	var line string
 	getLine() // start
