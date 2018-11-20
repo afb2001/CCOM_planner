@@ -297,7 +297,7 @@ func TestFindAStarPlan2(t *testing.T) {
 }
 
 func TestFindAStarPlan3(t *testing.T) {
-	t.SkipNow() // this takes a while (almost a minute
+	// t.SkipNow() // this takes a while (almost a minute
 	t.Log("Testing A* a bunch of times in a row from random states")
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
@@ -306,6 +306,7 @@ func TestFindAStarPlan3(t *testing.T) {
 	o1 := new(common.Obstacles)
 	for i := 0; i < 60; i++ {
 		s := randomState(50, 100, 0, 20)
+		s.Time = float64(i)
 		plan := FindAStarPlan(*s, 0.09, o1)
 		if plan == nil || plan.States == nil {
 			if !grid.IsBlocked(s.X, s.Y) {
