@@ -17,6 +17,7 @@
 #include <list>
 #include <unordered_set>
 #include "path.h"
+#include "tiffio.h"
 
 using namespace std;
 
@@ -160,8 +161,11 @@ void requestWorldInformation()
             path.lock_obs();
             do
             {
-                oldbytesRead = bytesRead = path.update_dynamic_obs(locationString, bytesRead, count) + oldbytesRead;
+                update = bytesRead = path.update_dynamic_obs(locationString, bytesRead, count);
+                oldbytesRead += bytesRead;
+                bytesRead = oldbytesRead;
                 ++count;
+                
             } while (update);
             path.unlock_obs();
         }
@@ -236,7 +240,7 @@ void print_map(string file)
 void read_goal(string goal)
 {
     ifstream f(goal);
-    if (goal != "NOFILE"&&f.is_open())
+    if (goal != "NOFILE" && f.is_open())
     {
         int numofgoal;
         f >> numofgoal;
@@ -259,7 +263,20 @@ void read_goal(string goal)
 
 void read_tiff(string tiffmap)
 {
-    ifstream f(tiffmap);
+    // tiff *tif = TIFFOpen(tiffmap.c_str(), "rc");         // read tif
+    // static ttag_t const TIFFTAG_SOMETAG = 34362; // some custom tag
+    // if (tif != nullptr)                          // if the file is open
+    // {
+    //     uint count;                                                 // get count
+    //     double *data;                                               // get data
+    //     if (TIFFGetField(tif, TIFFTAG_SOMETAG, &count, &data) == 1) // read tag
+    //         throw std::logic_error("the tag does not exist.");
+
+    //     // print the values (caution: count is in bytes)
+    //     for (int index = 0; index < count / sizeof(double); ++index)
+    //         std::cout << data[index];
+    //     TIFFClose(tif); // close the file
+    // }
 }
 
 int main(int argc, char *argv[])
@@ -277,8 +294,8 @@ int main(int argc, char *argv[])
     communication_With_Planner.cwrite("max speed 2.5");
     communication_With_Planner.cwrite("max turning radius 8");
 
-    string map, goal,tiffmap;
-    map = goal =tiffmap= "NOFILE";
+    string map, goal, tiffmap;
+    map = goal = tiffmap = "NOFILE";
 
     for (int i = 1; i < argc; i++)
     {
@@ -298,9 +315,10 @@ int main(int argc, char *argv[])
                 tiffmap = argv[i + 1];
         }
     }
-    // if(tiffmap != "NOFILE")
-    //     read_tiff(tiffmap);
-    // else
+
+    if (tiffmap != "NOFILE")
+        read_tiff(tiffmap);
+    else
         print_map(map);
     read_goal(goal);
 
