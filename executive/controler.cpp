@@ -13,7 +13,6 @@
 #include "ObjectPar.h"
 #include <cfloat>
 
-
 using namespace std;
 
 //model parameter
@@ -41,12 +40,20 @@ double drag_coefficient;
 
 mutex mtx;
 int running = 1;
+int send = 0;
 int plan = 0;
 ObjectPar start;
 ObjectPar action;
+ObjectPar oldaction = ObjectPar(0, 0, 0, 0, 0);
+vector<ObjectPar> dyamic_obstacles;
 string path = "";
+double currentTimestamp = -1, previous_location_time = -1;
+double currenttime_for_action = -1;
+string pheading = "0";
+string previousrequestString;
 string default_Command = "0,0";
-int receivePipeFromParent;
+string previous_Command = "0,0";
+int sendPipeToParent, receivePipeFromParent;
 double estimate_effect_speed = 0, estimate_effect_direction = 0;
 double ptime = 0;
 int iteration = 0;
@@ -76,20 +83,24 @@ void requestAction()
 {
     FILE *readstream = fdopen(receivePipeFromParent, "r");
     string s;
-    char locationString[1024];
 
     while (running)
     {
-        cerr << "MTX" << endl;
-        lock_guard<mutex> lock(mtx);
+        char locationString[1024];
+        mtx.lock();
+
         fgets(locationString, sizeof locationString, readstream);
         sscanf(locationString, "%lf %lf %lf %lf %lf\n", &start.x, &start.y, &start.heading, &start.speed, &start.otime);
-        
+        //cerr << "CONTROLLER::Start" << locationString << endl;
         fgets(locationString, sizeof locationString, readstream);
         sscanf(locationString, "%lf %lf %lf %lf %lf\n", &action.x, &action.y, &action.heading, &action.speed, &action.otime);
         readpath(readstream);
-       
+
+        // start.printerror();
+        // cerr << "CONTROLLER :: action ";
+        // action.printerror();
         plan = 1;
+        mtx.unlock();
     }
 }
 
@@ -162,7 +173,10 @@ void MPC(double &r, double &t)
     double duration = 0.05;
     double d_time = action.otime - start.otime;
     double coefficient = DBL_MAX;
-    
+
+    // cerr << d_time << endl;
+
+    //cerr << "START " << endl;
     if (ptime != start.otime && future.size() != 0 && update)
     {
         if(iteration < 20)
@@ -191,13 +205,10 @@ void MPC(double &r, double &t)
             estimate_effect_direction = fmod(estimate_effect_direction, M_PI * 2);
     }
     cerr << "current estimate " << estimate_effect_speed << " " << estimate_effect_direction << endl;
-    
 
     for (int i = -10; i <= 10; ++i)
     {
-        
         rudder = i / 10.0;
-
         for (int j = 10; j >= 0; --j)
         {
             throttle = j / 10.0;
@@ -231,9 +242,15 @@ void MPC(double &r, double &t)
                 coefficient = temp;
                 future = tempfuture;
             }
-            //cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
+            //  cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
         }
     }
+
+    // cerr << "TARGET " << endl;
+    // cerr << r << " " << t << " " << coefficient << endl;
+    // cerr << start.x << " " << start.y << " " << start.speed << " " << start.heading << endl;
+    // cerr << action.x << " " << action.y << " " << action.speed << " " << action.heading << endl;
+    // cerr << "END " << endl;
 }
 
 void sendAction()
@@ -249,10 +266,12 @@ void sendAction()
         string command = "";
         if (plan) //use mutex instead of busy waiting
         {
-            lock_guard<mutex> lock(mtx);
+
+            mtx.lock();
+            //cerr << action.x << " " << action.y << " " << action.speed << " " << action.heading << endl;
             if (action.speed == -1)
             {
-                command = default_Command;
+                command = "0,0";
                 update = false;
             }
             else if (action.speed == -2)
@@ -262,18 +281,25 @@ void sendAction()
             }
             else
             {
-                 
                 MPC(rudder, throttle);
                 update = true;
+                //command = "0,0";
                 command = to_string(rudder) + "," + to_string(throttle);
             }
+            // if(previous_Command == command)
+            //      command = "";
+            //  else
+            //      previous_Command = command;
 
             if (command.size() != 0)
             {
                 command = path + "\n" + command;
                 cout << command << endl
                      << flush;
+
+                //cerr << command << endl;
             }
+            mtx.unlock();
         }
         this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -288,11 +314,18 @@ int main(int argc, char *argv[])
     drag_coefficient = max_force / (pow(max_speed, 3));
 
     receivePipeFromParent = stoi(argv[1]);
+    sendPipeToParent = stoi(argv[2]);
     cout.precision(numeric_limits<float>::digits10 + 2);
     cerr.precision(numeric_limits<float>::digits10 + 2);
+    //cerr << "CONTROLLER INITIALIZE" << endl;
     thread thread_for_executive(thread([=] { requestAction(); }));
 
     sendAction();
     thread_for_executive.join();
+    //thread thread_for_UDVSEND(thread([=] { sendAction(); }));
+    //thread thread_for_UDVLOC(thread([=] { requestLocation(); }));
+    //this_thread::sleep_for(std::chrono::milliseconds(1000));
+    //thread_for_UDVSEND.join();
+    //thread_for_UDVLOC.join();
     return 0;
 }
