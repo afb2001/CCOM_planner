@@ -2,6 +2,7 @@
 #define OBJECTPAR_H
 #include <string>
 #include <iostream>
+#include <cmath>
 
 
 struct point{

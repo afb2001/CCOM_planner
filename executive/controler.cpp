@@ -80,6 +80,7 @@ void requestAction()
 
     while (running)
     {
+        cerr << "MTX" << endl;
         lock_guard<mutex> lock(mtx);
         fgets(locationString, sizeof locationString, readstream);
         sscanf(locationString, "%lf %lf %lf %lf %lf\n", &start.x, &start.y, &start.heading, &start.speed, &start.otime);
