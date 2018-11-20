@@ -4,6 +4,7 @@ goal=""
 map1=""
 goal1=""
 nbos=""
+dynamic =""
 args="$#"
 path="../"
 for (( i=1; i <= "$#"; i++ )); do
@@ -30,6 +31,14 @@ for (( i=1; i <= "$#"; i++ )); do
             nbos="-nobs $var1"
         fi
     fi
+
+    if [ ${!i} == "-dynamic" ]; then
+        if [ $((i+1)) -le "$#" ]; then
+            var=$((i+1))
+            var1=${!var}
+            dynamic="-dynamic $path$var1"
+        fi
+    fi
 done
 
 cd simulator
@@ -39,6 +48,11 @@ if [[ $map1 ]] && [[ $goal1 ]] && [[ $nbos ]]; then
     cd -
     cd executive
     
+    ./shim.py $map1 $goal1
+elif [[ $map1 ]] && [[ $goal1 ]] && [[ $dynamic ]]; then
+    ./dynamic_obs_sim_3.py "-p TRUE" $map1 $goal1 $dynamic &
+    cd -
+    cd executive
     ./shim.py $map1 $goal1
 elif [[ $map1 ]] && [[ $goal1 ]]; then
     ./dynamic_obs_sim_3.py "-p TRUE" $map1 $goal1 &

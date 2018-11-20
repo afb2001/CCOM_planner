@@ -17,7 +17,7 @@
 #include <list>
 #include <unordered_set>
 #include "path.h"
-// #include "tiffio.h"
+#include "tiffio.h"
 
 using namespace std;
 
@@ -263,20 +263,19 @@ void read_goal(string goal)
 
 void read_tiff(string tiffmap)
 {
-    // tiff *tif = TIFFOpen(tiffmap.c_str(), "rc");         // read tif
-    // static ttag_t const TIFFTAG_SOMETAG = 34362; // some custom tag
-    // if (tif != nullptr)                          // if the file is open
-    // {
-    //     uint count;                                                 // get count
-    //     double *data;                                               // get data
-    //     if (TIFFGetField(tif, TIFFTAG_SOMETAG, &count, &data) == 1) // read tag
-    //         throw std::logic_error("the tag does not exist.");
+    tiff *tif = TIFFOpen(tiffmap.c_str(), "rc");  
+    unsigned int width,height; 
+    if (tif != nullptr)                          
+    {
+        TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);           // uint32 width;
+        TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &height); 
+        cerr << width << " " << height << endl;
 
-    //     // print the values (caution: count is in bytes)
-    //     for (int index = 0; index < count / sizeof(double); ++index)
-    //         std::cout << data[index];
-    //     TIFFClose(tif); // close the file
-    // }
+        uint32 npixels=width*height;
+        uint32 *raster=(uint32 *) _TIFFmalloc(npixels *sizeof(uint32));
+
+        _TIFFfree(raster);
+    }
 }
 
 int main(int argc, char *argv[])
