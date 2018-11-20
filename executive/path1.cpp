@@ -4,6 +4,9 @@
 
 using namespace std;
 
+bool box = true;
+bool round1 = false;
+
 double getCurrentTime()
 {
     //change to clock_gettime
@@ -17,48 +20,48 @@ int main()
     cout.precision(10);
     string s;
     cin >> s;
-    while(s != "path")
+    while (s != "path")
     {
         cin >> s;
     }
     cin >> s;
     cin >> s;
     cin >> s;
-    cout << "done" << endl << flush; 
+    cout << "done" << endl
+         << flush;
     cerr << "FACKPLANNER:START" << endl;
-    double x1 = -1,y1,heading1,speed1,otime1;
-    while(true)
+    double x1 = -1, y1, heading1, speed1, otime1;
+    while (true)
     {
-        
+
         cin >> s;
-        while(s != "start")
+        while (s != "start")
         {
             cin >> s;
         }
         cin >> s;
-       
-        if(x1 == -1)
+
+        if (x1 == -1)
         {
-            cin >> x1 >>y1 >> heading1 >> speed1 >> otime1;
-
+            cin >> x1 >> y1 >> heading1 >> speed1 >> otime1;
         }
-        
 
-        while(s != "dynamic")
+        while (s != "dynamic")
         {
             cin >> s;
         }
         cin >> s;
         int num;
         cin >> num;
-        for(int i = 0; i< num; i++)
+        for (int i = 0; i < num; i++)
         {
             cin >> s >> s >> s >> s >> s;
         }
 
         int n = 0;
-        cout << "plan 20" << endl << flush; 
-        double x = x1,y = y1,heading = heading1,speed = speed1,otime = otime1;
+        cout << "plan 20" << endl
+             << flush;
+        double x = x1, y = y1, heading = heading1, speed = speed1, otime = otime1;
         double addx = -1.09;
         double addy = 0.702;
         double h = -0.8;
@@ -68,14 +71,26 @@ int main()
         int count = 0;
         double s = 0;
         int find = 0;
-        while(true)
+        while (true)
         {
-            if(n % 20 == 0)
+            if (round1)
             {
-                addx *= -1;
-                h *= -1;
+                if (n % 20 == 0)
+                {
+                    addx *= -1;
+                    h *= -1;
+                }
+                heading = h;
             }
-            heading = h;
+            else
+            {
+                if (n % 40 == 0)
+                {
+                    h2 += M_PI / 2;
+                    h2 = fmod(h2, M_PI * 2);
+                }
+                heading = h2;
+            }
             // if(n < 20)
             // {
             //     h1 = 1.57;
@@ -86,45 +101,27 @@ int main()
             // }
             //heading = h1;
 
-            // if(n % 40 == 0)
-            // {
-            //     h2 += M_PI/2;
-            //     h2 = fmod(h2,M_PI*2);
-            // }
-            // heading = h2;
-
-
             ++n;
-            
+
             otime += 0.5;
-            if(s < 2.5)
-                s+= 0.1;
+            if (s < 2.5)
+                s += 0.1;
             speed = s;
-            
-            
 
             x += sin(heading) * speed * 0.5;
             y += cos(heading) * speed * 0.5;
-           
-            
 
-            
-
-            if(ot < otime && count ++ < 20)
+            if (ot < otime && count++ < 20)
             {
-                
-                cout << x << " " << y << " " << heading << " " << speed << " "<< otime << endl << flush;  
+
+                cout << x << " " << y << " " << heading << " " << speed << " " << otime << endl
+                     << flush;
                 find = 1;
-            } else if (find)
+            }
+            else if (find)
             {
                 break;
             }
-
         }
-
-
-
-    
     }
-
 }

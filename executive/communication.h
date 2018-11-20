@@ -26,6 +26,8 @@ class Communitcation
 
     void set(std::string excutivepath,bool bindStdin, bool bindStdout, bool bindStderr, bool sendPipetoChild);
 
+    void set(std::string excutivepath,bool bindStdin, bool bindStdout, bool bindStderr, bool sendPipetoChild,std::string s);
+
     void cwrite(std::string s);
 
     void cwrite(char s[]);
