@@ -137,7 +137,7 @@ func main() {
 
 	var grid = buildGrid()
 
-	printLog(grid.Dump())
+	// printLog(grid.Dump())
 
 	var path = readPath()
 
