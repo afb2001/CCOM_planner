@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"github.com/afb2001/CCOM_planner/dubins"
-	"github.com/pkg/profile"
 	"log"
 	"math"
 	"math/rand"
@@ -15,7 +14,7 @@ import (
 
 const (
 	verbose        bool    = false
-	debugVis       bool    = false
+	debugVis       bool    = true
 	goalBias       float64 = 0.05
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1  // this might be low
@@ -586,7 +585,7 @@ func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (plan
 		} else if s.CollisionProbability > 0 {
 			penalty += collisionPenalty * s.CollisionProbability
 		}
-		printDebug(s.String(), "cost =", penalty, "color = 1 shape = dot")
+		// printDebug(s.String(), "cost =", penalty, "color = 1 shape = dot")
 		newlyCovered = append(newlyCovered, toCover.NewlyCovered(*s)...) // splash operator I guess
 		plan.AppendState(s)
 		return 0
@@ -1012,7 +1011,7 @@ func TracePlan(v *Vertex) *common.Plan {
 }
 
 func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Obstacles) (bestPlan *common.Plan) {
-	defer profile.Start().Stop()
+	// defer profile.Start().Stop()
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals
@@ -1020,7 +1019,7 @@ func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Ob
 	startV.currentCostIsSet = true
 	startV.currentCost = float64(len(*toCover)) * coveragePenalty // changed this from - to +, which makes sense
 	startV.parentEdge = &Edge{start: startV, end: startV}
-	bestVertex = startV
+	// bestVertex = startV
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
 	// currentSampleCount := bitStarSamples

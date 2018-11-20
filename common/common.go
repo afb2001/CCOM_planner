@@ -51,8 +51,8 @@ True iff other is within 1.5m in the x and y directions.
 */
 func (s *State) Collides(other *State) bool {
 	return s.Time == other.Time &&
-		(math.Abs(s.X-other.X) < 2.5) &&
-		(math.Abs(s.Y-other.Y) < 2.5)
+		(math.Abs(s.X-other.X) < 1.5) &&
+		(math.Abs(s.Y-other.Y) < 1.5)
 }
 
 /**
