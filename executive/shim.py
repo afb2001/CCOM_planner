@@ -128,7 +128,7 @@ if __name__ == "__main__":
     if goal:
         arguments.append("-g")
         arguments.append(goal)
-    if goal:
+    if tiffmap:
         arguments.append("-t")
         arguments.append(tiffmap)
 
