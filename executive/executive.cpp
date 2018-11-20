@@ -17,8 +17,8 @@
 #include <list>
 #include <unordered_set>
 #include "path.h"
-#include "xtiffio.h"
-#include "geotiffio.h"
+// #include "xtiffio.h"
+// #include "geotiffio.h"
 
 using namespace std;
 
@@ -262,52 +262,52 @@ void read_goal(string goal)
     }
 }
 
-void read_tiff(string tiffmap)
-{
-    TIFF *tif = (TIFF *)0;  /* TIFF-level descriptor */
-    GTIF *gtif = (GTIF *)0; /* GeoKey-level descriptor */
-    int versions[3];
-    int cit_length;
-    geocode_t model; /* all key-codes are of this type */
-    char *citation;
-    int size;
-    tagtype_t type;
-    int width,length;
+// void read_tiff(string tiffmap)
+// {
+//     TIFF *tif = (TIFF *)0;  /* TIFF-level descriptor */
+//     GTIF *gtif = (GTIF *)0; /* GeoKey-level descriptor */
+//     int versions[3];
+//     int cit_length;
+//     geocode_t model; /* all key-codes are of this type */
+//     char *citation;
+//     int size;
+//     tagtype_t type;
+//     int width,length;
 
-    /* Open TIFF descriptor to read GeoTIFF tags */
-    tif = XTIFFOpen(tiffmap.c_str(), "r");
-    gtif = GTIFNew(tif);
-    if (tif && gtif)
-    {
-        /* Get the GeoTIFF directory info */
-        GTIFDirectoryInfo(gtif, versions, 0);
+//     /* Open TIFF descriptor to read GeoTIFF tags */
+//     tif = XTIFFOpen(tiffmap.c_str(), "r");
+//     gtif = GTIFNew(tif);
+//     if (tif && gtif)
+//     {
+//         /* Get the GeoTIFF directory info */
+//         GTIFDirectoryInfo(gtif, versions, 0);
 
-        /* ASCII keys are variable-length; compute size */
-        cit_length = GTIFKeyInfo(gtif, GTCitationGeoKey, &size, &type);
-        if (cit_length > 0)
-        {
-            citation = (char*)malloc(size * cit_length);
-            GTIFKeyGet(gtif, GTCitationGeoKey, citation, 0, cit_length);
-            printf("Citation:%s\n", citation);
-        }
+//         /* ASCII keys are variable-length; compute size */
+//         cit_length = GTIFKeyInfo(gtif, GTCitationGeoKey, &size, &type);
+//         if (cit_length > 0)
+//         {
+//             citation = (char*)malloc(size * cit_length);
+//             GTIFKeyGet(gtif, GTCitationGeoKey, citation, 0, cit_length);
+//             printf("Citation:%s\n", citation);
+//         }
         
 
-        /* Get some TIFF info on this image */
-        TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
-        TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &length);
+//         /* Get some TIFF info on this image */
+//         TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+//         TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &length);
 
-        /* get rid of the key parser */
-        GTIFFree(gtif);
+//         /* get rid of the key parser */
+//         GTIFFree(gtif);
 
-        /* close the TIFF file descriptor */
-        XTIFFClose(tif);
-    }
-    cerr << width << " "<<length << " " << cit_length << " " << size << " " << citation<<endl;
+//         /* close the TIFF file descriptor */
+//         XTIFFClose(tif);
+//     }
+//     cerr << width << " "<<length << " " << cit_length << " " << size << " " << citation<<endl;
 
-    /* Open GTIF Key parser; keys will be read at this time. */
+//     /* Open GTIF Key parser; keys will be read at this time. */
 
-    print_map("");
-}
+//     print_map("");
+// }
 
 int main(int argc, char *argv[])
 {
