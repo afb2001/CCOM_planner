@@ -204,6 +204,8 @@ void print_map(string file)
         if (f.is_open())
         {
             getline(f, line);
+            string factor = line;
+            getline(f, line);
             string w = line;
             getline(f, line);
             string h = line;
@@ -211,7 +213,7 @@ void print_map(string file)
             cerr << "EXECUTIVE::MAP::" + w + " " + h << endl;
             int width = stoi(w), height = stoi(h);
             int hcount = 0;
-            communication_With_Planner.cwrite("map 1 " + w + " " + h);
+            communication_With_Planner.cwrite("map " + factor + " "  + w + " " + h);
             while (getline(f, line))
             {
                 ++hcount;
@@ -346,9 +348,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (tiffmap != "NOFILE")
-        read_tiff(tiffmap);
-    else
+    // if (tiffmap != "NOFILE")
+    //     read_tiff(tiffmap);
+    // else
         print_map(map);
     read_goal(goal);
 

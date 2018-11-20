@@ -194,12 +194,14 @@ class DynamicObsSim:
             f=open(file_world, "r")
             f1 = f.readlines()
             for i in range(0, len(f1)):
-                    if  i == 0 :
+                    if  i == 1 :
                         self.xlim = np.abs(int(int(f1[i])))
                         maxx = np.abs(int(int(f1[i])))
-                    elif i == 1:
+                    elif i == 2:
                         self.ylim = np.abs(int(int(f1[i])))
                         maxy = np.abs(int(int(f1[i])))
+                    elif i == 0:
+                        self.factor = np.abs(int(int(f1[i])))
                     else:
                         for j in range(0, len(f1[i])):
                             if f1[i][j] == '@':
