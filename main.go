@@ -107,14 +107,14 @@ func readPath() *common.Path {
 Update the given obstacle collection to account for n
 updated obstacles coming from stdin.
 */
-func updateObstacles(o *common.Obstacles, n int) {
+func updateObstacles(o common.Obstacles, n int) {
 	for i := 0; i < n; i++ {
 		var id int
 		var x, y, heading, speed, t float64
 		var line string = getLine()
 		fmt.Sscanf(line, "%d %f %f %f %f %f", &id, &x, &y, &heading, &speed, &t)
 		s := &common.State{X: x, Y: y, Heading: (heading * -1) + math.Pi/2, Speed: speed, Time: t}
-		o.Update(id, s)
+		o[id] = s
 	}
 }
 
@@ -137,7 +137,7 @@ func main() {
 
 	var grid = buildGrid()
 
-	printLog(grid.Dump())
+	// printLog(grid.Dump())
 
 	var path = readPath()
 
@@ -173,14 +173,15 @@ func main() {
 		}
 
 		var nObstacles int
-		o := new(common.Obstacles)
-		fmt.Sscanf(getLine(), "dynamic obs %d", nObstacles)
+		o := make(common.Obstacles)
+		printLog("Reading dynamic obstacles")
+		fmt.Sscanf(getLine(), "dynamic obs %d", &nObstacles)
 		updateObstacles(o, nObstacles)
 
 		// plan := makePlan(grid, start, *path, o)
 		// plan := bitStar.BitStar(*start, timeToPlan, o)
 		printLog("Planning...")
-		plan := bitStar.FindAStarPlan(*start, timeToPlan, o)
+		plan := bitStar.FindAStarPlan(*start, timeToPlan, &o)
 		if plan == nil {
 			printLog("Couldn't find a plan.")
 			fmt.Println(common.DefaultPlan(start))
