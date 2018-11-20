@@ -4,7 +4,7 @@ goal=""
 map1=""
 goal1=""
 nbos=""
-dynamic =""
+dynamic=""
 args="$#"
 path="../"
 for (( i=1; i <= "$#"; i++ )); do

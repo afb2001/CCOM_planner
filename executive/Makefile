@@ -4,7 +4,7 @@ CXX = g++
 all: executive controler
 
 executive: executive.cpp communication.o path.o
-	$(CXX)  executive.cpp communication.o path.o -O2 -o executive -std=c++11 -pthread -ltiff
+	$(CXX)  executive.cpp communication.o path.o -O2 -o executive -std=c++11 -pthread -lgeotiff -ltiff
 
 controler: controler.cpp communication.o
 	$(CXX)  controler.cpp communication.o -O2 -o controler -std=c++11 -pthread
