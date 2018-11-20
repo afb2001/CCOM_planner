@@ -99,12 +99,12 @@ func TestVertex_UpdateApproxToGo(t *testing.T) {
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
-	if h := v2.UpdateApproxToGo(nil); h != -56 {
-		t.Errorf("Expected %d, got %f", -56, h)
+	if h := v2.UpdateApproxToGo(nil); h != -116 {
+		t.Errorf("Expected %d, got %f", -116, h)
 	}
 	t.Log("Testing f value...")
-	if f := v2.fValue(); f > -51 || f < -52 { // TODO -- why did this not give the exact thing (below)? dubins??
-		t.Errorf("Expected %f, got %f", -56+v2.state.DistanceTo(&start)/0.5, f)
+	if f := v2.fValue(); f > -111 || f < -112 { // TODO -- why did this not give the exact thing (below)? dubins??
+		t.Errorf("Expected %f, got %f", -116+v2.state.DistanceTo(&start)/0.5, f)
 	}
 }
 
@@ -129,8 +129,8 @@ func TestEdge_UpdateTrueCost(t *testing.T) {
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
 	v2.parentEdge.UpdateTrueCost()
-	if v2.parentEdge.TrueCost() != -58 {
-		t.Errorf("Expected -58, got %f", v2.parentEdge.TrueCost())
+	if v2.parentEdge.TrueCost() != -118 {
+		t.Errorf("Expected -118, got %f", v2.parentEdge.TrueCost())
 	}
 }
 
@@ -160,8 +160,8 @@ func TestStaticCollision(t *testing.T) {
 	v2.parentEdge = &e
 	v2.parentEdge.UpdateTrueCost()
 	// not sure about this number it seems like it might be wrong but it's high so it's OK
-	if c := v2.parentEdge.TrueCost(); c != 5373.8 {
-		t.Errorf("Expected %f, got %f", 5373.8, c)
+	if c := v2.parentEdge.TrueCost(); c != 5343.8 {
+		t.Errorf("Expected %f, got %f", 5343.8, c)
 	}
 }
 

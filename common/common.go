@@ -261,6 +261,7 @@ type Grid struct {
 Create a new grid of given dimensions
 */
 func NewGrid(width int, height int) Grid {
+	// TODO! -- fix to make normal allocation
 	cells := new([][]cell)
 	for y := 0; y < height; y++ {
 		col := new([]cell)
