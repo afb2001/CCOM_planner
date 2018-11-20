@@ -1,6 +1,29 @@
 #include "path.h"
 using namespace std;
 
+bool Path::checkCollision(double sx, double sy, double ex, double ey)
+{
+    double d = atan2(ey - sy, ex - sx);
+    double newx = sx, newy = sy;
+    double cx = newx - ex;
+    double cy = newy - ey;
+    point p;
+    while (true)
+    {
+        if (cx * cx + cy * cy < 0.09)
+            break;
+        newx += cos(d) * 0.3;
+        newy += sin(d) * 0.3;
+        p.x = (int)newx;
+        p.y = (int)newy;
+        if (Obstacles.find(p) != Obstacles.end())
+            return true;
+        cx = newx - ex;
+        cy = newy - ey;
+    }
+    return false;
+}
+
 void Path::replacePath(ObjectPar &current)
 {
     if (newpath.size() > 1)
@@ -12,11 +35,14 @@ void Path::replacePath(ObjectPar &current)
         double displacement = (current.otime - next_start.otime) * current.speed;
         double diffx = current.x + displacement * cos(angle) - next_start.x;
         double diffy = current.y + displacement * sin(angle) - next_start.y;
+        if (debug)
+            diffx = diffy = 0;
         for (auto i : newpath)
             if (i.otime > current.otime)
                 path.emplace_back(i.x + diffx, i.y + diffy, i.heading, i.speed, i.otime);
 
-        path.insert( path.end(), newpath.begin(), newpath.end() );
+        if (!debug)
+            path.insert(path.end(), newpath.begin(), newpath.end());
     }
     newpath.clear();
 };
@@ -34,6 +60,9 @@ void Path::findStart()
     {
         for (int i = pathindex; i < path_size; i++)
         {
+
+            // if (i + 1 < path_size && path[i].otime <= time_1 && checkCollision(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y))
+            //     cerr << "COLLISION " << endl;
             if (path[i].otime > time_1 && i != 0 && visit)
             {
                 next_start.set(path[i].x, path[i].y, path[i].heading, path[i].speed, time_1);

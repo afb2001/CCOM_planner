@@ -69,6 +69,46 @@ void Communitcation::set(std::string excutivepath,bool bindStdin, bool bindStdou
     }
 }
 
+void Communitcation::set(std::string excutivepath,bool bindStdin, bool bindStdout, bool bindStderr, bool sendPipetoChild,string s)
+{
+    pipe(sendp);
+    pipe(getp);
+    pid = fork();
+    if (pid == 0) //child
+    {
+        if (sendPipetoChild)
+        {
+            
+            close(sendp[1]);
+            close(getp[0]);
+            execl(excutivepath.c_str(),excutivepath.c_str(),to_string(sendp[0]).c_str(),to_string(getp[1]).c_str(),s.c_str(), (char *)NULL);
+        }
+        else
+        {
+            if (bindStdin)
+                dup2(sendp[0], fileno(stdin));
+            if (bindStdout)
+                dup2(getp[1], fileno(stdout));
+            if (bindStderr)
+                dup2(getp[1], fileno(stderr));
+
+            close(sendp[0]);
+            close(sendp[1]);
+            close(getp[0]);
+            close(getp[1]);
+            execl(excutivepath.c_str(),excutivepath.c_str(), (char *)NULL);
+        }
+
+        
+        
+    }
+    else
+    {
+        close(sendp[0]);
+        close(getp[1]);
+    }
+}
+
 void Communitcation::cwrite(std::string s)
 {
     write(sendp[1], s.c_str(), s.length());

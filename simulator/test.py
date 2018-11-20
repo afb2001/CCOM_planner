@@ -8,7 +8,7 @@ import math
 import os
 import glob
 
-mutex = Lock()
+
 
 Color_line = (0, 0, 0)
 Color_line_middle = (180, 180, 180)
@@ -41,7 +41,8 @@ sprites = pygame.sprite.Group()
 
 
 class PLOT:
-    def __init__(self, static_obs, xlim, ylim, factor):
+    def __init__(self, static_obs,static_draw, xlim, ylim, factor):
+        self.mutex = Lock()
         self._running = True
         self.display = None
         self._image_surf = None
@@ -67,6 +68,9 @@ class PLOT:
         self.triangleY = (-10, 10, 10)
         self.static_obs = static_obs
         self.factor = factor
+        self.static_draw = static_draw
+        self.dynamicOBS =[]
+        self.select = None
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
@@ -105,10 +109,41 @@ class PLOT:
                 'explosion/{}.png'.format(i)))
         # self.exp_img = [pygame.image.load(os.path.join('explosion', img)).convert_alpha()
         #           for img in os.listdir('explosion')]
+    def distance(self,p0, p1):
+        return (p0[0] - p1[0])**2 + (p0[1] - p1[1])**2
+
+    def angle(self,p0, p1):
+        return -math.atan2(p0[0]-p1[0],p0[1]-p1[1])
+
+    def selects(self):
+        self.mutex.acquire()
+        try:
+            s = self.select
+            if s != None and s[2] != 0:
+                self.select = None
+        finally:
+            self.mutex.release()
+        return s
 
     def on_event(self, event):
         if event.type == QUIT:
             sys.exit(1)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            p = pygame.mouse.get_pos()
+            if self.select == None:
+                for i in range(self.nobs):
+                    if (self.distance(p,self.dynamicOBS[i]) < 1000 ):
+                        self.mutex.acquire()
+                        try:
+                            self.select = (i,self.hobs[i],0)
+                        finally:
+                            self.mutex.release()
+                        print i
+                        break;
+            else:
+                i = self.select[0]
+                self.select = (i,self.angle(self.dynamicOBS[i],p),self.distance(p,self.dynamicOBS[i])/5000)
+
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 self.originX -= self.scalew/(self.lines+1)
@@ -197,6 +232,9 @@ class PLOT:
         #     self.update()
         # self.stop()
         self.pathList = [(curr_x, curr_y)]
+     
+
+        self.dynamicOBS.extend([(0,0) for i in range(nobs)])
         self.updateInformation(
             curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [], self.estimateStart, [])
         self.update()
@@ -277,12 +315,13 @@ class PLOT:
 
     def draw_obs(self):
         for index in range(self.nobs):
+            self.dynamicOBS[index] = self.scale_item(self.xobs[index], self.yobs[index])
             self.draw_vehicle(
-                self.hobs[index], Color_Red, *self.scale_item(self.xobs[index], self.yobs[index]))
+                self.hobs[index], Color_Red, *self.dynamicOBS[index])
 
-        for obs in self.static_obs:
-            self.draw_static_obs((0, 0, 0), *obs)
-
+        for obs in self.static_draw:
+            self.draw_static_obs1((0, 0, 0), *obs)
+      
         for i in range(len(self.goal_location)):
             if(self.distSquare(self.curr_x, self.curr_y, *self.goal_location[i]) <= 10):
                 self.F_goal_location.append(self.goal_location.pop(i))
@@ -303,6 +342,16 @@ class PLOT:
         pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
         # pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
         #     x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
+
+    def draw_static_obs1(self, color, o1, o2):
+        x1,y1 = self.scale_item(*o1)
+        x2,y2 = self.scale_item(*o2)
+        
+        if o1[1] != o2[1] -1:
+            print o1,o2
+            os._exit(0)
+
+        pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
 
     def draw_vehicle(self, angle, color, x, y):
         tX = []

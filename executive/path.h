@@ -7,6 +7,7 @@
 #include <list>
 #include <string>
 #include <mutex>
+#include <unordered_set>
 
 using namespace std;
 
@@ -57,6 +58,8 @@ class Path
 
     string construct_request_string();
 
+    bool checkCollision(double cx, double cy, double ex, double ey);
+
     //below access method for executive
     const vector<ObjectPar> &getDynamicObs() const;
 
@@ -77,6 +80,10 @@ class Path
     void lock_obs();
     void unlock_obs();
 
+    unordered_set<point> Obstacles;
+    bool debug;
+    
+
   private:
     vector<ObjectPar> path;
     vector<ObjectPar> newpath;
@@ -86,6 +93,8 @@ class Path
 
     string defaultAction_1 = ObjectPar(-1).toString();
     string defaultAction_2 = ObjectPar(-2).toString();
+
+    
 
     mutex mtx_path, mtx_obs, mtx_cover;
 

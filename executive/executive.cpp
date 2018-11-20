@@ -26,8 +26,9 @@ int running = 1;
 int request_start = 0;
 
 Path path;
+bool debug = false;
 
-unordered_set<point> Obstacles;
+
 
 Communitcation communication_With_Planner, communication_With_Controler;
 
@@ -48,48 +49,6 @@ void checkTerminate()
     }
 }
 
-bool checkCollision(double cx, double cy, double ex, double ey)
-{
-    double slope = (ey - cy) / (ex - cx);
-
-    if (((int)ex) == ((int)cx))
-    {
-        int cux = cx;
-        int starty = cy, endy = ey;
-        int increment = (ey > cy) ? 1 : -1;
-        while (starty != endy)
-        {
-            if (Obstacles.find(point(cux, starty)) != Obstacles.end())
-                return true;
-            starty += increment;
-        }
-    }
-    else if (fabs(slope) > 1)
-    {
-        int increment = (ey > cy) ? 1 : -1;
-        int starty = cy, endy = ey;
-        double b = (cx * cy - ex * cy) / (cx - ex);
-        while (starty != endy)
-        {
-            if (Obstacles.find(point((int)((starty - b) / slope), starty)) != Obstacles.end())
-                return true;
-            starty += increment;
-        }
-    }
-    else
-    {
-        int increment = (ex > cx) ? 1 : -1;
-        int startx = cx, endx = ex;
-        double b = (cx * cy - ex * cy) / (cx - ex);
-        while (startx != endx)
-        {
-            if (Obstacles.find(point(startx, slope * startx + b)) != Obstacles.end())
-                return true;
-            startx += increment;
-        }
-    }
-    return false;
-}
 
 // fix the moving of start
 void requestPath()
@@ -213,7 +172,7 @@ void print_map(string file)
             cerr << "EXECUTIVE::MAP::" + w + " " + h << endl;
             int width = stoi(w), height = stoi(h);
             int hcount = 0;
-            communication_With_Planner.cwrite("map " + factor + " "  + w + " " + h);
+            communication_With_Planner.cwrite("map " + factor + " " + w + " " + h);
             while (getline(f, line))
             {
                 ++hcount;
@@ -222,7 +181,7 @@ void print_map(string file)
                 {
                     if (line[i] == '#')
                     {
-                        Obstacles.insert(point(i, height - hcount));
+                        path.Obstacles.emplace(point(i, height - hcount));
                     }
                 }
             }
@@ -292,7 +251,6 @@ void read_goal(string goal)
 //             GTIFKeyGet(gtif, GTCitationGeoKey, citation, 0, cit_length);
 //             printf("Citation:%s\n", citation);
 //         }
-        
 
 //         /* Get some TIFF info on this image */
 //         TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
@@ -313,21 +271,8 @@ void read_goal(string goal)
 
 int main(int argc, char *argv[])
 {
-    cout.precision(numeric_limits<float>::digits10 + 2);
-    cerr.precision(5);
-
-    communication_With_Planner.set("planner", 1, 1, 0, 0);
-    communication_With_Controler.set("controler", 1, 1, 0, 1);
-
-    thread thread_for_controller(thread([=] { sendAction(); }));
-    thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
-
-    communication_With_Planner.cwrite("Start");
-    communication_With_Planner.cwrite("max speed 2.5");
-    communication_With_Planner.cwrite("max turning radius 8");
-
-    string map, goal, tiffmap;
-    map = goal = tiffmap = "NOFILE";
+    string map, goal, tiffmap, boat;
+    map = goal = tiffmap = boat = "NOFILE";
 
     for (int i = 1; i < argc; i++)
     {
@@ -346,12 +291,36 @@ int main(int argc, char *argv[])
             if (i + 1 < argc)
                 tiffmap = argv[i + 1];
         }
+        else if (!strcmp(argv[i], "-b"))
+        {
+            if (i + 1 < argc)
+                boat = argv[i + 1];
+        }
+        else if(!strcmp(argv[i], "-debug"))
+        {
+            path.debug = debug = true;
+        }
     }
+    cout.precision(numeric_limits<float>::digits10 + 2);
+    cerr.precision(5);
+
+    communication_With_Planner.set("planner", 1, 1, 0, 0);
+    if (boat != "NOFILE")
+        communication_With_Controler.set("controler", 1, 1, 0, 1, boat);
+    else
+        communication_With_Controler.set("controler", 1, 1, 0, 1);
+
+    thread thread_for_controller(thread([=] { sendAction(); }));
+    thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
+
+    communication_With_Planner.cwrite("Start");
+    communication_With_Planner.cwrite("max speed 2.5");
+    communication_With_Planner.cwrite("max turning radius 8");
 
     // if (tiffmap != "NOFILE")
     //     read_tiff(tiffmap);
     // else
-        print_map(map);
+    print_map(map);
     read_goal(goal);
 
     communication_With_Planner.cwrite("path to cover " + to_string(path.get_covered().size()));

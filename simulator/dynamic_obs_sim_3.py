@@ -135,7 +135,7 @@ class DynamicObsSim:
         # plt.xlabel("x [m]")
         # plt.ylabel("y [m]")
         self.plotaxes = None
-        self.plot_draw = test.PLOT(self.static_obs,self.xlim,self.ylim,self.factor)
+        self.plot_draw = test.PLOT(self.static_obs,self.static_draw,self.xlim,self.ylim,self.factor)
         self.plotaxes_obs = list(range(self.nobs))
 
 
@@ -180,19 +180,36 @@ class DynamicObsSim:
             maxy = np.abs(y2-y1)
             geodata = geotiff.getGrid()
             by,bx = np.shape(geodata)
-            factor = 9
+            previous = None
+            factor = 2
             self.xlim = max(bx,by)
             self.ylim = self.xlim
             self.factor = maxx / bx
-            for i in range(bx/factor):
-                for j in range(by/factor):
+            for j in range(by/factor):
+                for i in range(bx/factor):    
                     if geodata[j* factor,i* factor] < 2:
                         self.static_obs[(i* factor , (by/factor - 1 -j)* factor )] = True;
+                        if previous == None:
+                            previous = ((i* factor , (by/factor - 1 -j)* factor ))
+                    else:
+                        if previous != None:
+                            x,y = previous
+                            self.static_draw.append((previous,(i*factor,y+1) ))
+                            previous = None
+                if previous != None:
+                            x,y = previous
+                            self.static_draw.append((previous,(bx,y+1) ))
+                            previous = None
+
+
+
+                    
             self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
 
         elif file_world != '':
             f=open(file_world, "r")
             f1 = f.readlines()
+            previous = None
             for i in range(0, len(f1)):
                     if  i == 1 :
                         self.xlim = np.abs(int(int(f1[i])))
@@ -204,11 +221,20 @@ class DynamicObsSim:
                         self.factor = np.abs(int(int(f1[i])))
                     else:
                         for j in range(0, len(f1[i])):
-                            if f1[i][j] == '@':
-                                self.curr_x = self.wpt_x = j
-                                self.curr_y = self.wpt_y = ( maxy - i + 1 )
                             if f1[i][j] == '#':
                                 self.static_obs[(j ,( maxy - i + 1 ))] = True;
+                                if previous == None:
+                                    previous = ((j , maxy - i + 1 ))
+                            else:
+                                if previous != None:
+                                    x,y = previous
+                                    self.static_draw.append(( previous,(j , maxy - i + 2 )))
+                                    previous = None
+                        if previous != None:
+                            x,y = previous
+                            self.static_draw.append((previous,(maxx,y+1) ))
+                            previous = None
+                    
             self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
         if goal_location != '':
             f=open(goal_location, "r")
@@ -463,6 +489,12 @@ class DynamicObsSim:
         if self.last_update_time is None:
             self.last_update_time = self.update_time
 
+        select = self.plot_draw.selects()
+        if(select != None):
+            index,h,s = select
+            self.hobs[index] = h
+            self.vobs[index] = s
+        
         self.tobs = self.update_time - self.last_update_time  # time [sec]
         self.delta_obs = self.vobs*self.tobs  # distance [m]
         self.xobs = self.xobs + self.delta_obs * \
