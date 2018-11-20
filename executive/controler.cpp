@@ -76,12 +76,11 @@ void requestAction()
 {
     FILE *readstream = fdopen(receivePipeFromParent, "r");
     string s;
+    char locationString[1024];
 
     while (running)
     {
-        char locationString[1024];
-        mtx.lock();
-
+        lock_guard<mutex> lock(mtx);
         fgets(locationString, sizeof locationString, readstream);
         sscanf(locationString, "%lf %lf %lf %lf %lf\n", &start.x, &start.y, &start.heading, &start.speed, &start.otime);
         
@@ -90,8 +89,6 @@ void requestAction()
         readpath(readstream);
        
         plan = 1;
-        mtx.unlock();
-        cerr << "MTX" << endl;
     }
 }
 
@@ -251,9 +248,7 @@ void sendAction()
         string command = "";
         if (plan) //use mutex instead of busy waiting
         {
-
-            mtx.lock();
-           
+            lock_guard<mutex> lock(mtx);
             if (action.speed == -1)
             {
                 command = default_Command;
@@ -278,7 +273,6 @@ void sendAction()
                 cout << command << endl
                      << flush;
             }
-            mtx.unlock();
         }
         this_thread::sleep_for(std::chrono::milliseconds(100));
     }
