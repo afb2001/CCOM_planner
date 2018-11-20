@@ -15,6 +15,8 @@ void Path::replacePath(ObjectPar &current)
         for (auto i : newpath)
             if (i.otime > current.otime)
                 path.emplace_back(i.x + diffx, i.y + diffy, i.heading, i.speed, i.otime);
+
+        path.insert( path.end(), newpath.begin(), newpath.end() );
     }
     newpath.clear();
 };

@@ -118,6 +118,7 @@ if __name__ == "__main__":
 
     gridmap = args.map
     goal = args.goal
+    tiffmap = args.tiffmap
 
     arguments = []
 
@@ -127,6 +128,9 @@ if __name__ == "__main__":
     if goal:
         arguments.append("-g")
         arguments.append(goal)
+    if goal:
+        arguments.append("-t")
+        arguments.append(tiffmap)
 
     open_executive(arguments)
     asv_thread = threading.Thread(target=recv_asv)

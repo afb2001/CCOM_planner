@@ -257,6 +257,11 @@ void read_goal(string goal)
     }
 }
 
+void read_tiff(string tiffmap)
+{
+    ifstream f(tiffmap);
+}
+
 int main(int argc, char *argv[])
 {
     cout.precision(numeric_limits<float>::digits10 + 2);
@@ -272,8 +277,8 @@ int main(int argc, char *argv[])
     communication_With_Planner.cwrite("max speed 2.5");
     communication_With_Planner.cwrite("max turning radius 8");
 
-    string map, goal;
-    map = goal = "NOFILE";
+    string map, goal,tiffmap;
+    map = goal =tiffmap= "NOFILE";
 
     for (int i = 1; i < argc; i++)
     {
@@ -283,11 +288,20 @@ int main(int argc, char *argv[])
                 map = argv[i + 1];
         }
         else if (!strcmp(argv[i], "-g"))
+        {
             if (i + 1 < argc)
                 goal = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-t"))
+        {
+            if (i + 1 < argc)
+                tiffmap = argv[i + 1];
+        }
     }
-
-    print_map(map);
+    // if(tiffmap != "NOFILE")
+    //     read_tiff(tiffmap);
+    // else
+        print_map(map);
     read_goal(goal);
 
     communication_With_Planner.cwrite("path to cover " + to_string(path.get_covered().size()));
