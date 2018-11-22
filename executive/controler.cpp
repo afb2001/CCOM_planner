@@ -33,7 +33,7 @@ struct pointc
 {
     double x, y, time;
     pointc(double x1, double y1, double time1)
-        :x(x1),y(y1),time(time1){};
+        : x(x1), y(y1), time(time1){};
 };
 
 double max_prop_speed;
@@ -100,9 +100,8 @@ double radians(double rudder_angle)
     return (rudder_angle * M_PI) / 180;
 }
 
-double radians_diff(double a)
+double radians_diff(double a,double b)
 {
-    double b = estimate_effect_direction;
     if (a < 0)
         a = fmod(a + M_PI * 10000, M_PI * 2);
     if (b < 0)
@@ -178,23 +177,25 @@ void MPC(double &r, double &t)
                 break;
             }
         }
-        double diffx = start.x - future[index].x;
-        double diffy = start.y - future[index].y;
-        cerr << "time" << future[index].time - start.otime << endl;
-        double new_effect_speed = sqrt(diffx * diffx + diffy * diffy) / (future[index].time - (future[0].time - 0.05));
-        estimate_effect_speed += (new_effect_speed - estimate_effect_speed) / iteration;
-        double new_effect_angle = atan2(diffx, diffy);
-        estimate_effect_direction += radians_diff(new_effect_angle) / iteration;
+        double dtime = future[index].time - (future[0].time - 0.05);
+        double diffx = (start.x - future[index].x) / dtime;
+        double diffy = (start.y - future[index].y) / dtime;
+        double deltax = estimate_effect_speed * sin(estimate_effect_direction);
+        double deltay = estimate_effect_speed * cos(estimate_effect_direction);
+        deltax += diffx / iteration;
+        deltay += diffy / iteration;
+        estimate_effect_direction = atan2(deltax, deltay);
+        double cosd = cos(estimate_effect_direction);
+        estimate_effect_speed = (cosd > 0.1) ? deltay / cosd : deltax / sin(estimate_effect_direction);
         if (estimate_effect_direction < 0)
             estimate_effect_direction = fmod(estimate_effect_direction + M_PI * 10000, M_PI * 2);
         else if (estimate_effect_direction > 2 * M_PI)
             estimate_effect_direction = fmod(estimate_effect_direction, M_PI * 2);
-
-       
     }
     //  estimate_effect_direction = 1.57;
     //     estimate_effect_speed = 1;
     cerr << "current estimate " << estimate_effect_speed << " " << estimate_effect_direction << endl;
+    double choosex, choosey;
 
     for (int i = -10; i <= 10; ++i)
     {
@@ -212,7 +213,7 @@ void MPC(double &r, double &t)
                 estimate(rpm1, throttle, duration, speed1, rudder, heading1, x1, y1);
                 if (tempfuture.size() < 10)
                 {
-                    tempfuture.emplace_back(x1,y1,start.otime + starttime);
+                    tempfuture.emplace_back(x1, y1, start.otime + starttime);
                 }
 
                 // cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
@@ -222,17 +223,22 @@ void MPC(double &r, double &t)
                 estimate(rpm1, throttle, d_time - starttime, speed1, rudder, heading1, x1, y1);
                 //cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
             }
-            double temp = sqrt(pow(x1 - action.x, 2) + pow(y1 - action.y, 2));
+            double temp = pow(x1 - action.x, 2) + pow(y1 - action.y, 2);
             if (coefficient > temp)
             {
                 r = (int)(rudder * 1000.0) / 1000.0;
                 t = (int)(throttle * 1000.0) / 1000.0;
+                choosex = x1;
+                choosey = y1;
                 coefficient = temp;
                 future = tempfuture;
             }
-            //cerr << rudder << " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << " " << temp << endl;
+             cerr << temp << " " << rudder << " " << throttle << " " << x1 << " " << y1 << endl;
         }
     }
+     cerr << "action " << action.x << " " << action.y << " target "  << choosex << " " << choosey <<endl;
+     cerr << "choose coeff " << coefficient << " "<< r << " " << t << "\n\n" <<  endl;
+    
 }
 
 void sendAction()
@@ -292,7 +298,7 @@ int main(int argc, char *argv[])
         ifstream f(argv[3]);
         if (f.is_open())
         {
-            f >> max_rpm >> max_power >> idle_rpm >>prop_ratio >>prop_pitch >>max_rpm_change_rate >>max_speed >>mass>>max_rudder_angle>>rudder_distance>>rudder_coefficient;
+            f >> max_rpm >> max_power >> idle_rpm >> prop_ratio >> prop_pitch >> max_rpm_change_rate >> max_speed >> mass >> max_rudder_angle >> rudder_distance >> rudder_coefficient;
         }
     }
     cout.precision(numeric_limits<float>::digits10 + 2);

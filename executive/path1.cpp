@@ -3,6 +3,7 @@
 #include <cmath>
 
 using namespace std;
+#define maxspeed 1
 
 bool box = true;
 bool round1 = false;
@@ -104,7 +105,7 @@ int main()
             ++n;
 
             otime += 0.5;
-            if (s < 2.5)
+            if (s < maxspeed)
                 s += 0.1;
             speed = s;
 

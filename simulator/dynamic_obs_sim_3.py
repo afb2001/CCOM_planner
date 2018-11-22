@@ -181,7 +181,7 @@ class DynamicObsSim:
             geodata = geotiff.getGrid()
             by,bx = np.shape(geodata)
             previous = None
-            factor = 2
+            factor = 1
             self.xlim = max(bx,by)
             self.ylim = self.xlim
             self.factor = maxx / bx

@@ -46,8 +46,8 @@ class PLOT:
         self._running = True
         self.display = None
         self._image_surf = None
-        self.screenH = 800
-        self.screenW = 600
+        self.screenH = 600
+        self.screenW = 800
         self.maxX = xlim
         self.maxY = ylim
         self.xlim = xlim
@@ -80,22 +80,17 @@ class PLOT:
     def on_init(self):
         pygame.init()
         self.display = pygame.display.set_mode(
-            (self.screenH, self.screenW), HWSURFACE | RESIZABLE)
+            (self.screenW, self.screenH), HWSURFACE | RESIZABLE)
         self.w, self.h = pygame.display.get_surface().get_size()
-        self.scalew = self.w*0.8
-        self.scaleh = self.h*0.8
-        self.startw = self.w * 0.1
-        self.starth = self.h * 0.1
+        self.minwh = min(self.w,self.h)
+        self.scalew = self.minwh*0.8
+        self.scaleh = self.minwh*0.8
+        self.startw = (self.w - self.scalew)/2
+        self.starth = (self.h - self.scaleh)/2
         self._running = True
         self.background = pygame.Surface(self.display.get_size())
         self.background.fill((240, 240, 240))
         self.background = self.background.convert()
-        # self._image_surf = pygame.transform.scale(pygame.image.load(
-        #     "boat.png"), (int(self.scalew/20), int(self.scaleh/20))).convert_alpha()
-        # self.image_obstacle = pygame.transform.scale(pygame.image.load(
-        #     "obstacle.png"), (int(self.scalew/20), int(self.scaleh/20))).convert_alpha()
-        # self.boatw = int(self.scalew/20)/2.0
-        # self.boath = int(self.scaleh/20)
         self.curr_x = 0
         self.curr_y = 0
         self.start_heading = 0
@@ -128,6 +123,24 @@ class PLOT:
     def on_event(self, event):
         if event.type == QUIT:
             sys.exit(1)
+        elif event.type == pygame.VIDEORESIZE:
+            self.originX /= self.scalew/(self.lines+1)
+            self.originY /= self.scaleh/(self.lines+1)
+            self.w,self.h =  event.size
+            self.minwh = min(self.w,self.h)
+            print self.w,self.h,self.minwh
+            self.scalew = self.minwh*0.8
+            self.scaleh = self.minwh*0.8
+            self.startw = (self.w - self.scalew)/2
+            self.starth = (self.h - self.scaleh)/2
+            self.display = pygame.display.set_mode(
+            (self.w, self.h), HWSURFACE | RESIZABLE)
+            self.background = pygame.Surface(self.display.get_size())
+            self.background.fill((240, 240, 240))
+            self.background = self.background.convert()
+            self.originX *= self.scalew/(self.lines+1)
+            self.originY *= self.scaleh/(self.lines+1)
+            print self.w,self.h,self.minwh,self.scalew,self.scaleh,self.startw,self.starth,self.originX,self.originY,self.scale_xy(self.scalew,self.scaleh)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             p = pygame.mouse.get_pos()
             if self.select == None:
@@ -143,7 +156,6 @@ class PLOT:
             else:
                 i = self.select[0]
                 self.select = (i,self.angle(self.dynamicOBS[i],p),self.distance(p,self.dynamicOBS[i])/5000)
-
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 self.originX -= self.scalew/(self.lines+1)
@@ -240,15 +252,15 @@ class PLOT:
         self.update()
 
     def checkCollision(self):
-        if self.static_obs.get((int(self.curr_x), int(self.curr_y))):
-            sprites.add(Explosion(self.scale_item(
-                self.curr_x, self.curr_y), self.exp_img))
-            return
-        for i in range(0, self.nobs):
-            if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
-                sprites.add(Explosion(self.scale_item(
-                    self.curr_x, self.curr_y), self.exp_img))
+        x,y = self.scale_item(self.curr_x, self.curr_y)
+        if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
+            if self.static_obs.get((int(self.curr_x), int(self.curr_y))):
+                sprites.add(Explosion((x,y), self.exp_img))
                 return
+            for i in range(0, self.nobs):
+                if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
+                    sprites.add(Explosion((x,y), self.exp_img))
+                    return
 
     def dist(self, x, x1, y, y1):
         return (x - x1)**2 + (y - y1)**2
@@ -338,31 +350,37 @@ class PLOT:
 
     def draw_static_obs(self, color, x, y):
         x1,y1 = self.scale_item(x, y)
-        x2 ,y2 = self.scale_item(x+1, y+1)
-        pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
+        x2,y2 = self.scale_item(x+1, y+1)
+        x1 = max(self.startw,x1)
+        y1 = max(self.starth,y1)
+        x2 = min(self.startw + self.scalew,x2)
+        y2 = min(self.starth + self.scaleh,y2)
+        if not(x1 >= self.startw + self.scalew or y1 >= self.starth + self.scaleh or x2 <= self.startw or y2 <= self.starth):
+            pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
         # pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
         #     x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
 
     def draw_static_obs1(self, color, o1, o2):
         x1,y1 = self.scale_item(*o1)
-        x2,y2 = self.scale_item(*o2)
-        
-        if o1[1] != o2[1] -1:
-            print o1,o2
-            os._exit(0)
-
-        pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
+        x2,y2 = self.scale_item(*o2)   
+        x1 = max(self.startw,x1)
+        y1 = max(self.starth,y1)
+        x2 = min(self.startw + self.scalew,x2)
+        y2 = min(self.starth + self.scaleh,y2)
+        if not(x1 >= self.startw + self.scalew or y1 >= self.starth + self.scaleh or x2 <= self.startw or y2 <= self.starth):
+            pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
 
     def draw_vehicle(self, angle, color, x, y):
-        tX = []
-        tY = []
-        c = math.cos(angle)
-        s = math.sin(angle)
-        for i in range(3):
-            tX.append(self.triangleX[i]*c - self.triangleY[i]*s + x)
-            tY.append(self.triangleX[i]*s + self.triangleY[i]*c + y)
-        pygame.draw.polygon(self.display, color, ((
-            tX[0], tY[0]), (tX[1], tY[1]), (tX[2], tY[2])))
+        if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
+            tX = []
+            tY = []
+            c = math.cos(angle)
+            s = math.sin(angle)
+            for i in range(3):
+                tX.append(self.triangleX[i]*c - self.triangleY[i]*s + x)
+                tY.append(self.triangleX[i]*s + self.triangleY[i]*c + y)
+            pygame.draw.polygon(self.display, color, ((
+                tX[0], tY[0]), (tX[1], tY[1]), (tX[2], tY[2])))
 
     def draw_text(self):
         scaleh = self.scaleh/(self.lines+1)

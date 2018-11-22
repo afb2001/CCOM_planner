@@ -61,8 +61,8 @@ void Path::findStart()
         for (int i = pathindex; i < path_size; i++)
         {
 
-            // if (i + 1 < path_size && path[i].otime <= time_1 && checkCollision(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y))
-            //     cerr << "COLLISION " << endl;
+            if (i + 1 < path_size && path[i].otime <= time_1 && checkCollision(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y))
+                cerr << "COLLISION " << endl;
             if (path[i].otime > time_1 && i != 0 && visit)
             {
                 next_start.set(path[i].x, path[i].y, path[i].heading, path[i].speed, time_1);
