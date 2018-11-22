@@ -10,7 +10,7 @@ const (
 	planTimeDensity     float64 = 0.5
 	TimeHorizon         float64 = 30 // not used as intended yet
 	coverageThreshold   float64 = 3
-	collisionDistance   float64 = 2.5
+	collisionDistance   float64 = 1.8
 )
 
 //region State
@@ -261,6 +261,7 @@ type Grid struct {
 Create a new grid of given dimensions
 */
 func NewGrid(width int, height int) Grid {
+	// TODO! -- fix to make normal allocation
 	cells := new([][]cell)
 	for y := 0; y < height; y++ {
 		col := new([]cell)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"github.com/afb2001/CCOM_planner/dubins"
+	"github.com/pkg/profile"
 	"log"
 	"math"
 	"math/rand"
@@ -288,6 +289,23 @@ func (e *Edge) UpdateTrueCost() float64 {
 	// e.end.currentCostIsSet = true
 
 	return e.trueCost
+}
+
+func (e *Edge) Smooth() {
+	// if e is the start (or somehow there's a cycle...)
+	if e.start.parentEdge == e {
+		return
+	}
+	parentCost := e.start.parentEdge.TrueCost() // should be up to date in A*, check for BIT*
+	currentCost := e.TrueCost()
+	smoothedEdge := &Edge{start: e.start.parentEdge.start, end: e.end}
+	smoothedEdge.UpdateTrueCost()
+	if smoothedEdge.TrueCost() < parentCost+currentCost {
+		// printLog(fmt.Sprintf("Smoothing edge %v to %v", *e, *smoothedEdge))
+		*e = *smoothedEdge
+		e.end.parentEdge = smoothedEdge
+		e.Smooth()
+	}
 }
 
 func (e Edge) netTime() float64 {
@@ -995,6 +1013,10 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		if verbose {
 			printLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
 		}
+
+		// smoothing
+		// e.Smooth()
+
 		// used to do these in UpdateTrueCost...
 		e.end.currentCost = e.start.currentCost + e.trueCost
 		e.end.currentCostIsSet = true
@@ -1069,7 +1091,7 @@ func TracePlan(v *Vertex) *common.Plan {
 
 func FindAStarPlan(startState common.State, timeRemaining float64, o1 *common.Obstacles) (bestPlan *common.Plan) {
 	// printLog("\n\n\n\n\n")
-	// defer profile.Start().Stop()
+	defer profile.Start().Stop()
 	endTime := timeRemaining + now()
 	// setup
 	o, start = *o1, startState // assign globals

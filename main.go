@@ -127,7 +127,7 @@ var maxSpeed, maxTurningRadius float64
 var reader = bufio.NewReader(os.Stdin)
 
 func main() {
-	rand.Seed(4) // set seed for now
+	rand.Seed(7) // set seed for now
 
 	var line string
 	getLine() // start
