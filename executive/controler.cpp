@@ -28,6 +28,7 @@ double rudder_distance = 2.0;
 double mass = 2000.0;
 double max_power = 8948.4;
 double max_speed = 2.75;
+double probability[4] = {0.5,0.3,0.15,0.05};
 
 struct pointc
 {
@@ -45,7 +46,7 @@ mutex mtx;
 int running = 1;
 int plan = 0;
 ObjectPar start;
-ObjectPar action;
+ObjectPar actions[4];
 string path = "";
 string default_Command = "0,0";
 int receivePipeFromParent;
@@ -88,7 +89,15 @@ void requestAction()
         sscanf(locationString, "%lf %lf %lf %lf %lf\n", &start.x, &start.y, &start.heading, &start.speed, &start.otime);
 
         fgets(locationString, sizeof locationString, readstream);
-        sscanf(locationString, "%lf %lf %lf %lf %lf\n", &action.x, &action.y, &action.heading, &action.speed, &action.otime);
+        sscanf(locationString, "%lf %lf %lf %lf %lf\n", &actions[0].x, &actions[0].y, &actions[0].heading, &actions[0].speed, &actions[0].otime);
+        if (actions[0].otime >= 0)
+        {
+            for (int i = 1; i < 4; i++)
+            {
+                fgets(locationString, sizeof locationString, readstream);
+                sscanf(locationString, "%lf %lf %lf %lf %lf\n", &actions[i].x, &actions[i].y, &actions[i].heading, &actions[i].speed, &actions[i].otime);
+            }
+        }
         readpath(readstream);
 
         plan = 1;
@@ -100,7 +109,7 @@ double radians(double rudder_angle)
     return (rudder_angle * M_PI) / 180;
 }
 
-double radians_diff(double a,double b)
+double radians_diff(double a, double b)
 {
     if (a < 0)
         a = fmod(a + M_PI * 10000, M_PI * 2);
@@ -154,11 +163,10 @@ void MPC(double &r, double &t)
 {
     double x = start.x, y = start.y, heading = start.heading, speed = start.speed;
     double rpm = idle_rpm + (speed / max_speed) * (max_rpm - idle_rpm);
-
     double throttle = 0;
     double rudder = -1;
     double duration = 0.05;
-    double d_time = action.otime - start.otime;
+
     double coefficient = DBL_MAX;
 
     if (ptime != start.otime && future.size() != 0 && update)
@@ -205,40 +213,44 @@ void MPC(double &r, double &t)
         for (int j = 10; j >= 0; --j)
         {
             throttle = j / 10.0;
-            double x1 = x, y1 = y, heading1 = heading, speed1 = speed, starttime = 0, rpm1 = rpm;
-            vector<pointc> tempfuture;
-            while (starttime + duration < d_time)
-            {
-                starttime += duration;
-                estimate(rpm1, throttle, duration, speed1, rudder, heading1, x1, y1);
-                if (tempfuture.size() < 10)
-                {
-                    tempfuture.emplace_back(x1, y1, start.otime + starttime);
-                }
 
-                // cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
-            }
-            if (starttime != d_time)
+            double x1 = x, y1 = y, heading1 = heading, speed1 = speed, starttime = 0, rpm1 = rpm, d_time, temp = 0;
+            vector<pointc> tempfuture;
+            for (int index = 0; index < 4; index++)
             {
-                estimate(rpm1, throttle, d_time - starttime, speed1, rudder, heading1, x1, y1);
-                //cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
+                d_time = actions[index].otime - start.otime;
+                if(d_time < 0)
+                    continue;
+                while (starttime + duration < d_time)
+                {
+                    starttime += duration;
+                    estimate(rpm1, throttle, duration, speed1, rudder, heading1, x1, y1);
+                    if (tempfuture.size() < 10)
+                    {
+                        tempfuture.emplace_back(x1, y1, start.otime + starttime);
+                    }
+                    // cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
+                }
+                if (starttime != d_time)
+                {
+                    estimate(rpm1, throttle, d_time - starttime, speed1, rudder, heading1, x1, y1);
+                    //cerr << rudder<< " " << throttle << " " << x1 << " " << y1 << " " << speed1 << " " << heading1 << endl;
+                }
+                temp += (pow(x1 - actions[index].x, 2) + pow(y1 - actions[index].y, 2)) * probability[index];
             }
-            double temp = pow(x1 - action.x, 2) + pow(y1 - action.y, 2);
             if (coefficient > temp)
             {
                 r = (int)(rudder * 1000.0) / 1000.0;
                 t = (int)(throttle * 1000.0) / 1000.0;
-                choosex = x1;
-                choosey = y1;
                 coefficient = temp;
                 future = tempfuture;
             }
-             cerr << temp << " " << rudder << " " << throttle << " " << x1 << " " << y1 << endl;
+            //cerr << temp << " " << rudder << " " << throttle << " " << x1 << " " << y1 << endl;
         }
     }
-     cerr << "action " << action.x << " " << action.y << " target "  << choosex << " " << choosey <<endl;
-     cerr << "choose coeff " << coefficient << " "<< r << " " << t << "\n\n" <<  endl;
-    
+    //cerr << "action " << action.x << " " << action.y << " target " << choosex << " " << choosey << endl;
+    //cerr << "choose coeff " << coefficient << " " << r << " " << t << "\n\n"
+      //   << endl;
 }
 
 void sendAction()
@@ -255,19 +267,18 @@ void sendAction()
         if (plan) //use mutex instead of busy waiting
         {
             lock_guard<mutex> lock(mtx);
-            if (action.speed == -1)
+            if (actions[0].speed == -1)
             {
                 command = default_Command;
                 update = false;
             }
-            else if (action.speed == -2)
+            else if (actions[0].speed == -2)
             {
                 command = "1,0.1";
                 update = false;
             }
             else
             {
-
                 MPC(rudder, throttle);
                 update = true;
                 command = to_string(rudder) + "," + to_string(throttle);

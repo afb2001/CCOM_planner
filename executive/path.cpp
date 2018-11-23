@@ -14,9 +14,7 @@ bool Path::checkCollision(double sx, double sy, double ex, double ey)
             break;
         newx += cos(d) * 0.3;
         newy += sin(d) * 0.3;
-        p.x = (int)newx;
-        p.y = (int)newy;
-        if (Obstacles.find(p) != Obstacles.end())
+        if (Obstacles[getindex((int)newx,(int)newy)])
             return true;
         cx = newx - ex;
         cy = newy - ey;
@@ -53,7 +51,8 @@ void Path::findStart()
     int path_size = path.size();
     bool find = false, visit = true;
     ObjectPar current_loc = current;
-    double time_1 = current_loc.otime + 1, time_4 = current_loc.otime + 4;
+    double time_time[4]{current_loc.otime + 1,current_loc.otime + 2,current_loc.otime + 3,current_loc.otime + 4};
+    int index = 0;
     replacePath(current_loc);
 
     if (path_size > 1 && pathindex < path_size)
@@ -61,19 +60,25 @@ void Path::findStart()
         for (int i = pathindex; i < path_size; i++)
         {
 
-            if (i + 1 < path_size && path[i].otime <= time_1 && checkCollision(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y))
+            if (path[i].otime <= time_time[0] && i + 1 < path_size  && checkCollision(path[i].x, path[i].y, path[i + 1].x, path[i + 1].y))
                 cerr << "COLLISION " << endl;
-            if (path[i].otime > time_1 && i != 0 && visit)
-            {
-                next_start.set(path[i].x, path[i].y, path[i].heading, path[i].speed, time_1);
-                visit = false;
-            }
-            else if (path[i].otime > time_4 && i != 0)
+            
+            if (path[i].otime > time_time[index])
             {
                 double predictHead = fmod(path[i].heading + 10000 * M_PI, 2 * M_PI);
-                action.set(path[i].x, path[i].y, predictHead, path[i].speed, path[i].otime);
-                find = true;
-                break;
+                actions[index].set(path[i].x, path[i].y, predictHead, path[i].speed, path[i].otime);   
+                if(index == 3)
+                {
+                    find = true;
+                    break;
+                }
+                else if(index == 0)
+                {
+                    next_start.set(path[i].x, path[i].y, path[i].heading, path[i].speed, time_time[index]);
+                    visit = false;
+                }
+                index += 1;
+
             }
         }
     }
@@ -84,7 +89,7 @@ void Path::findStart()
         {
             next_start.setEstimate(1, current_loc);
         }
-        action = ObjectPar(-1);
+        actions[0] = ObjectPar(-1);
     }
     mtx_path.unlock();
 };
@@ -158,7 +163,7 @@ void Path::sendAction(string &s, int &sleep)
     ObjectPar current_loc = current;
     mtx_path.lock();
     int path_size = path.size();
-    if (action.otime > current_loc.otime)
+    if (actions[0].otime > current_loc.otime)
     {
         while (path_size > pathindex && current_loc.otime > path[pathindex].otime)
             pathindex++;
@@ -166,7 +171,8 @@ void Path::sendAction(string &s, int &sleep)
             return;
 
         s += current_loc.toString() + "\n";
-        s += action.toString() + "\n";
+        for(int i = 0; i< 4; i++)
+            s += actions[i].toString() + "\n";
         construct_path_string(s);
     }
     else
@@ -231,10 +237,7 @@ const ObjectPar &Path::getCurrent() const
     return current;
 };
 
-const ObjectPar &Path::getAction() const
-{
-    return action;
-};
+
 
 const list<point> &Path::get_covered() const
 {
@@ -246,7 +249,7 @@ bool Path::finish()
 {
     if (cover.empty())
     {
-        action = ObjectPar(-2);
+        actions[0] = ObjectPar(-2);
         return true;
     }
     return false;
@@ -254,7 +257,7 @@ bool Path::finish()
 
 void Path::initialize()
 {
-    action = next_start = current;
+    actions[0] = next_start = current;
     next_start.otime += 1;
 }
 
@@ -266,4 +269,4 @@ void Path::lock_obs()
 void Path::unlock_obs()
 {
     mtx_obs.unlock();
-};
+}

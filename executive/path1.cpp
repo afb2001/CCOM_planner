@@ -60,7 +60,7 @@ int main()
         }
 
         int n = 0;
-        cout << "plan 20" << endl
+        cout << "plan 50" << endl
              << flush;
         double x = x1, y = y1, heading = heading1, speed = speed1, otime = otime1;
         double addx = -1.09;
@@ -112,7 +112,7 @@ int main()
             x += sin(heading) * speed * 0.5;
             y += cos(heading) * speed * 0.5;
 
-            if (ot < otime && count++ < 20)
+            if (ot < otime && count++ < 50)
             {
 
                 cout << x << " " << y << " " << heading << " " << speed << " " << otime << endl

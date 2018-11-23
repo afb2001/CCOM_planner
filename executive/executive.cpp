@@ -28,8 +28,6 @@ int request_start = 0;
 Path path;
 bool debug = false;
 
-
-
 Communitcation communication_With_Planner, communication_With_Controler;
 
 double getCurrentTime()
@@ -48,7 +46,6 @@ void checkTerminate()
         exit(1);
     }
 }
-
 
 // fix the moving of start
 void requestPath()
@@ -171,6 +168,8 @@ void print_map(string file)
             cerr << "EXEUTIVE::START " << w << " " << h << endl;
             cerr << "EXECUTIVE::MAP::" + w + " " + h << endl;
             int width = stoi(w), height = stoi(h);
+            path.Maxx = width;
+            path.Obstacles = new bool[width * height];
             int hcount = 0;
             communication_With_Planner.cwrite("map " + factor + " " + w + " " + h);
             while (getline(f, line))
@@ -180,11 +179,37 @@ void print_map(string file)
                 for (int i = 0; i < line.size(); i++)
                 {
                     if (line[i] == '#')
-                    {
-                        path.Obstacles.emplace(point(i, height - hcount));
-                    }
+                        path.Obstacles[path.getindex(i, height - hcount)] = true;
+                    else
+                        path.Obstacles[path.getindex(i, height - hcount)] = false;
                 }
             }
+
+            // while (getline(f, line))
+            // {
+            //     ++hcount;
+            //     string s = "";
+            //     char previous = ' ';
+            //     int ncount = 0;
+            //     for (int i = 0; i < line.size(); i++)
+            //     {
+            //         if (line[i] == '#')
+            //             path.Obstacles[path.getindex(i, height - hcount)] = true;
+            //         else
+            //             path.Obstacles[path.getindex(i, height - hcount)] = false;
+
+            //         if (line[i] != previous)
+            //         {
+            //             if (i == 0)
+            //                 s += line[i];
+            //             else
+            //                 s += " " + to_string(ncount);
+            //             previous = line[i];
+            //         }
+            //         ncount += 1;
+            //     }
+            //     communication_With_Planner.cwrite(s);
+            // }
 
             f.close();
             return;
@@ -193,10 +218,11 @@ void print_map(string file)
     string s = "";
     cerr << "EXECUTIVE::MAP::DEFAULT" << endl;
     communication_With_Planner.cwrite("map 1 2000 2000");
-    for (int i = 0; i < 2000; i++)
-        s += '-';
-    for (int i = 0; i < 2000; i++)
-        communication_With_Planner.cwrite(s);
+    for (int i = 0; i < 1999; i++)
+        s += "_\n";
+    s += "_";
+    path.Obstacles = new bool[2000 * 2000]{};
+    communication_With_Planner.cwrite(s);
 }
 
 void read_goal(string goal)
@@ -296,7 +322,7 @@ int main(int argc, char *argv[])
             if (i + 1 < argc)
                 boat = argv[i + 1];
         }
-        else if(!strcmp(argv[i], "-debug"))
+        else if (!strcmp(argv[i], "-debug"))
         {
             path.debug = debug = true;
         }

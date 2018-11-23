@@ -15,10 +15,12 @@ start_lon = -70.7105114
 
 
 class Dynamics:
-    def __init__(self,model,init_x=0.0,init_y=0.0, environment=None):
+    def __init__(self,model,init_x=0.0,init_y=0.0,init_heading = 0.0,init_speed = 0.0, environment=None):
         self.model = model
         self.x_o = init_x
         self.y_o = init_y
+        self.h_o = init_heading
+        self.s_o = init_speed
         self.environment = environment
         
         self.reset()
@@ -38,11 +40,12 @@ class Dynamics:
 
     def reset(self):
         self.rpm = 0
-        self.speed = 0.0
+        self.speed = self.s_o
+        
         self.longitude = math.radians(start_lon)
         self.latitude = math.radians(start_lat)
         
-        self.heading = 0.0
+        self.heading = self.h_o
         self.pitch = 0.0
         self.roll = 0.0
 

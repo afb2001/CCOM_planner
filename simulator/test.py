@@ -254,7 +254,13 @@ class PLOT:
     def checkCollision(self):
         x,y = self.scale_item(self.curr_x, self.curr_y)
         if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
-            if self.static_obs.get((int(self.curr_x), int(self.curr_y))):
+            x1 = int(self.curr_x)
+            y1 = int(self.curr_y)
+            try:
+                collision = self.static_obs[x1][y1]
+            except:
+                collision = False
+            if collision:
                 sprites.add(Explosion((x,y), self.exp_img))
                 return
             for i in range(0, self.nobs):
@@ -355,7 +361,7 @@ class PLOT:
         y1 = max(self.starth,y1)
         x2 = min(self.startw + self.scalew,x2)
         y2 = min(self.starth + self.scaleh,y2)
-        if not(x1 >= self.startw + self.scalew or y1 >= self.starth + self.scaleh or x2 <= self.startw or y2 <= self.starth):
+        if not(x1 > self.startw + self.scalew or y1 > self.starth + self.scaleh or x2 < self.startw or y2 < self.starth):
             pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
         # pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
         #     x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
@@ -367,11 +373,11 @@ class PLOT:
         y1 = max(self.starth,y1)
         x2 = min(self.startw + self.scalew,x2)
         y2 = min(self.starth + self.scaleh,y2)
-        if not(x1 >= self.startw + self.scalew or y1 >= self.starth + self.scaleh or x2 <= self.startw or y2 <= self.starth):
+        if not(x1 > self.startw + self.scalew or y1 > self.starth + self.scaleh or x2 < self.startw or y2 < self.starth):
             pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
 
     def draw_vehicle(self, angle, color, x, y):
-        if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
+        if  self.startw <= x <= self.startw + self.scalew and self.starth <= y <= self.starth + self.scaleh:
             tX = []
             tY = []
             c = math.cos(angle)

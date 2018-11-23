@@ -8,6 +8,7 @@
 #include <string>
 #include <mutex>
 #include <unordered_set>
+#include <bitset>
 
 using namespace std;
 
@@ -21,10 +22,12 @@ class Path
     {
         pathindex = 0;
         current = next_start = ObjectPar(0);
-        action = ObjectPar(-1);
+        actions[0] = ObjectPar(-1);
     };
 
-    ~Path(){};
+    ~Path(){
+        delete [] Obstacles;
+    };
 
     void replacePath(ObjectPar &current);
     //lock this with update info
@@ -69,9 +72,12 @@ class Path
 
     const ObjectPar &getCurrent() const;
 
-    const ObjectPar &getAction() const;
-
     const list<point> &get_covered() const;
+
+    int getindex(int x,int y)
+    {
+        return y * Maxx + x;
+    };
 
     //below condition check or lock access
     bool finish();
@@ -80,7 +86,8 @@ class Path
     void lock_obs();
     void unlock_obs();
 
-    unordered_set<point> Obstacles;
+    int Maxx = 0;
+    bool *Obstacles = 0;
     bool debug;
     
 
@@ -98,9 +105,11 @@ class Path
 
     mutex mtx_path, mtx_obs, mtx_cover;
 
-    ObjectPar current, action, next_start;
+    ObjectPar current, next_start;
 
     int pathindex, dummy, byteREAD, dummyindex;
+
+    ObjectPar actions[4];
 
     double tempx, tempy, tempspeed, temptime, tempheading;
 

@@ -12,6 +12,7 @@ import threading
 import time
 import environment as ev
 import depth_map
+from bitarray import bitarray
 # import matplotlib
 import test
 # matplotlib.use("TkAgg")
@@ -31,12 +32,12 @@ class DynamicObsSim:
         # Set parameters for the model.
         self.environment = environment
         self.boat_model = boat_model
-        self.boat_dynamics = dynamics.Dynamics(self.boat_model, start_x, start_y,self.environment)
+        self.boat_dynamics = dynamics.Dynamics(self.boat_model, start_x, start_y,start_heading,start_speed,self.environment)
 
         # Set the starting state
         self.start_lat = 43.0
         self.start_long = -70.1
-        self.start_heading = 0.0  # start_heading
+        self.start_heading = start_heading
         self.start_speed = start_speed
 
         # Set target waypoint
@@ -84,7 +85,7 @@ class DynamicObsSim:
         self.ylim = np.abs(ylim)
 
         # read the grid and update the boat model, limit, curr_x, curr_y, wpt_x, wpt_y
-        self.static_obs = {}
+        self.static_obs = None
         self.static_draw = []
         self.goal_location = []
         self.factor = 1
@@ -173,7 +174,7 @@ class DynamicObsSim:
     def read_world(self,file_world,geotiff,goal_location):
         maxx = 0
         maxy = 0
-        if  geotiff != '':
+        if  geotiff:
             geotiff = depth_map.BathyGrid(geotiff)
             x1,x2,y1,y2 = geotiff.getBound()
             maxx = np.abs(x2-x1)
@@ -181,35 +182,34 @@ class DynamicObsSim:
             geodata = geotiff.getGrid()
             by,bx = np.shape(geodata)
             previous = None
-            factor = 1
             self.xlim = max(bx,by)
             self.ylim = self.xlim
-            self.factor = maxx / bx
-            for j in range(by/factor):
-                for i in range(bx/factor):    
-                    if geodata[j* factor,i* factor] < 2:
-                        self.static_obs[(i* factor , (by/factor - 1 -j)* factor )] = True;
+            self.factor = maxx / bx 
+            self.static_obs = [bitarray(by) for i in xrange(bx)]
+            for j in range(by):
+                for i in range(bx):    
+                    if geodata[j,i] < 2:
+                        self.static_obs[i ][by - 1 -j] = True;
                         if previous == None:
-                            previous = ((i* factor , (by/factor - 1 -j)* factor ))
+                            previous = ((i , (by - 1 -j) ))
                     else:
+                        self.static_obs[i ][by - 1 -j] = False;
                         if previous != None:
                             x,y = previous
-                            self.static_draw.append((previous,(i*factor,y+1) ))
+                            self.static_draw.append((previous,(i,y+1) ))
                             previous = None
                 if previous != None:
                             x,y = previous
                             self.static_draw.append((previous,(bx,y+1) ))
                             previous = None
-
-
-
                     
-            self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
+            self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.curr_heading,self.start_speed,self.environment)
 
         elif file_world != '':
             f=open(file_world, "r")
             f1 = f.readlines()
             previous = None
+            
             for i in range(0, len(f1)):
                     if  i == 1 :
                         self.xlim = np.abs(int(int(f1[i])))
@@ -217,25 +217,28 @@ class DynamicObsSim:
                     elif i == 2:
                         self.ylim = np.abs(int(int(f1[i])))
                         maxy = np.abs(int(int(f1[i])))
+                        self.static_obs = [bitarray(maxy) for i in xrange(maxx)]
+                        print maxx,maxy
                     elif i == 0:
                         self.factor = np.abs(int(int(f1[i])))
                     else:
-                        for j in range(0, len(f1[i])):
+                        string = f1[i].strip()
+                        for j in range(0, len(string)):
                             if f1[i][j] == '#':
-                                self.static_obs[(j ,( maxy - i + 1 ))] = True;
+                                self.static_obs[j][maxy - i + 2] = True;
                                 if previous == None:
-                                    previous = ((j , maxy - i + 1 ))
+                                    previous = ((j , maxy - i + 2 ))
                             else:
+                                self.static_obs[j][maxy - i + 2] = False;
                                 if previous != None:
                                     x,y = previous
-                                    self.static_draw.append(( previous,(j , maxy - i + 2 )))
+                                    self.static_draw.append(( previous,(j ,y+1)))
                                     previous = None
                         if previous != None:
                             x,y = previous
                             self.static_draw.append((previous,(maxx,y+1) ))
                             previous = None
-                    
-            self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.environment)
+            self.boat_dynamics = dynamics.Dynamics(self.boat_model, self.curr_x, self.curr_y,self.curr_heading,self.start_speed,self.environment)
         if goal_location != '':
             f=open(goal_location, "r")
             f1 = f.readlines()
@@ -310,7 +313,9 @@ class DynamicObsSim:
         self.boat_dynamics.update(self.throttle, self.rudder, self.update_time)
         self.curr_x = self.boat_dynamics.x
         self.curr_y = self.boat_dynamics.y
+    
         self.curr_heading = self.boat_dynamics.heading
+       
         self.curr_speed = self.boat_dynamics.speed
         self.curr_lat = self.boat_dynamics.longitude
         self.curr_long = self.boat_dynamics.latitude
@@ -576,6 +581,9 @@ if __name__ == '__main__':
     # No point of using heading in the initial state since the simultion behaves the same.
     parser.add_argument('-a', '--asv', dest='initial_asv_state', action='store', default='0,0,0,0',
                         help='Initial ASV state: "x,y,speed,heading" (m,m,m/s,rad). Default is 0,0,0,0')  # ,default='0,0,0,0' <-- add to the help
+    
+    parser.add_argument('-af', '--asvfile', dest='initial_asv_state_file', action='store', default='',
+                        help='File of Initial ASV state: "x,y,speed,heading" (m,m,m/s,rad). Default is 0,0,0,0')
     '''
 	parser.add_argument('-a','--asv', dest='initial_asv_state',action='store',default='0,0,0',	
 			help='Initial ASV state: "x,y,speed" (m,m,m/s). Default is 0,0,0') 
@@ -609,8 +617,12 @@ if __name__ == '__main__':
     # Handle arguments
     args = parser.parse_args()
 
-    fields = args.initial_asv_state.split(',')
-    print("Initial ASV state, (x,y,speed): ", fields)
+    if args.initial_asv_state_file:
+        fields=open(args.initial_asv_state_file, "r").readline().split(',')
+    else:
+        fields = args.initial_asv_state.split(',')
+
+    print("Initial ASV state, (x,y,speed,heading): ", fields)
 
     start_x = float(fields[0])
     start_y = float(fields[1])
