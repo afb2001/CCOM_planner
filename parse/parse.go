@@ -53,21 +53,23 @@ func BuildGrid(reader *bufio.Reader) *common.Grid {
 		block := line[0] == "#"
 		line = line[1:]
 		var x int
-		if len(line) == 0 && block {
+		for _, s := range line {
+			col, _ := strconv.Atoi(s)
+			if block {
+				for ; x < col; x++ {
+					grid.BlockRange(x*resolution, y*resolution, resolution)
+				}
+			} else {
+				x = col
+			}
+			block = !block
+		}
+		if block {
 			for ; x < width; x++ {
 				grid.BlockRange(x*resolution, y*resolution, resolution)
 			}
-		} else {
-			for _, s := range line {
-				col, _ := strconv.Atoi(s)
-				if block {
-					for ; x < col; x++ {
-						grid.BlockRange(x*resolution, y*resolution, resolution)
-					}
-				}
-				block = !block
-			}
 		}
+
 	}
 	return &grid
 }
