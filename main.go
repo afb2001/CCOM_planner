@@ -80,7 +80,7 @@ func main() {
 		}
 
 		var nObstacles int
-		o := make(common.Obstacles, nObstacles)
+		o := [nObstacles]*common.State{}[0:]
 		PrintLog("Reading dynamic obstacles")
 		fmt.Sscanf(GetLine(reader), "dynamic obs %d", &nObstacles)
 		ReadObstacles(reader, o, nObstacles)
@@ -88,7 +88,7 @@ func main() {
 		// plan := makePlan(grid, start, *path, o)
 		// plan := bitStar.BitStar(*start, timeToPlan, o)
 		PrintLog("Planning...")
-		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, &o)
+		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
 		if plan == nil {
 			PrintLog("Couldn't find a plan.")
 			fmt.Println(common.DefaultPlan(start))

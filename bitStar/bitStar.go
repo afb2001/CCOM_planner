@@ -1077,13 +1077,13 @@ func TracePlan(v *Vertex) *common.Plan {
 	return p
 }
 
-func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 *common.Obstacles) (bestPlan *common.Plan) {
+func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
 	resetGlobals()
 	// PrintLog("\n\n\n\n\n")
 	defer profile.Start().Stop()
 	endTime := timeRemaining + now()
 	// setup
-	o, start = *o1, startState // assign globals
+	o, start = o1, startState // assign globals
 	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: *toCover}
 	startV.currentCostIsSet = true
 	startV.currentCost = float64(len(*toCover)) * coveragePenalty // changed this from - to +, which makes sense
