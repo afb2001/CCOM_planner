@@ -44,7 +44,7 @@ func main() {
 
 	var grid = BuildGrid(reader)
 
-	PrintLog(grid.Dump())
+	// PrintLog(grid.Dump())
 
 	var path = ReadPath(reader, maxSpeed)
 

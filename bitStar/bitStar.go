@@ -1144,7 +1144,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if verbose {
 			PrintLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
-		// currentSampleCount *= 2
+		currentSampleCount *= 2
 	}
 	if verbose {
 		PrintLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))
