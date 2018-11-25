@@ -495,10 +495,10 @@ class DynamicObsSim:
             self.last_update_time = self.update_time
 
         select = self.plot_draw.selects()
-        if(select != None):
-            index,h,s = select
-            self.hobs[index] = h
-            self.vobs[index] = s
+        for key, value in select.iteritems():
+            self.hobs[key] = value[0]
+            self.vobs[key] = value[1]
+            
         
         self.tobs = self.update_time - self.last_update_time  # time [sec]
         self.delta_obs = self.vobs*self.tobs  # distance [m]

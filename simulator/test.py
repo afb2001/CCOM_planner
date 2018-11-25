@@ -99,6 +99,8 @@ class PLOT:
         self.yobs = []
         self.hobs = []
         self.exp_img = []
+        self.dynamicMap = {}
+        self.dynamicAction = {}
         for i in range(1, 8):
             self.exp_img.append(pygame.image.load(
                 'explosion/{}.png'.format(i)))
@@ -111,11 +113,22 @@ class PLOT:
         return -math.atan2(p0[0]-p1[0],p0[1]-p1[1])
 
     def selects(self):
+        
+            
         self.mutex.acquire()
         try:
-            s = self.select
-            if s != None and s[2] != 0:
-                self.select = None
+            for key, value in self.dynamicAction.iteritems():
+                index = value[2]
+                l = self.dynamicMap[key]
+                if index == -1 or len(l) == 1:
+                    continue
+                if(self.distance(self.dynamicOBS[key],l[index]) < 10):
+                    if len(l) > index + 1:
+                        index += 1
+                    else:
+                        index = 0
+                    self.dynamicAction[key] = (self.angle(self.dynamicOBS[key],l[index]),3,index)
+            s = self.dynamicAction
         finally:
             self.mutex.release()
         return s
@@ -128,7 +141,6 @@ class PLOT:
             self.originY /= self.scaleh/(self.lines+1)
             self.w,self.h =  event.size
             self.minwh = min(self.w,self.h)
-            print self.w,self.h,self.minwh
             self.scalew = self.minwh*0.8
             self.scaleh = self.minwh*0.8
             self.startw = (self.w - self.scalew)/2
@@ -140,22 +152,31 @@ class PLOT:
             self.background = self.background.convert()
             self.originX *= self.scalew/(self.lines+1)
             self.originY *= self.scaleh/(self.lines+1)
-            print self.w,self.h,self.minwh,self.scalew,self.scaleh,self.startw,self.starth,self.originX,self.originY,self.scale_xy(self.scalew,self.scaleh)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             p = pygame.mouse.get_pos()
             if self.select == None:
+                
                 for i in range(self.nobs):
-                    if (self.distance(p,self.dynamicOBS[i]) < 1000 ):
+                    if (self.distance(p,self.dynamicOBS[i]) < 500 ):
+                        print i
                         self.mutex.acquire()
                         try:
+                            self.dynamicMap[i] = []
+                            self.dynamicAction[i] = (self.hobs[i],0,-1)
                             self.select = (i,self.hobs[i],0)
                         finally:
                             self.mutex.release()
-                        print i
                         break;
             else:
                 i = self.select[0]
-                self.select = (i,self.angle(self.dynamicOBS[i],p),self.distance(p,self.dynamicOBS[i])/5000)
+                if self.distance(p,self.dynamicOBS[i]) < 500:
+                    self.dynamicMap[i].append(self.dynamicOBS[i])
+                    l = self.dynamicMap[i]
+                    if len(l) > 1:
+                        self.dynamicAction[i] = (self.angle(self.dynamicOBS[i],self.dynamicMap[i][0]),3,0)
+                    self.select = None
+                else:
+                    self.dynamicMap[i].append(p)
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 self.originX -= self.scalew/(self.lines+1)

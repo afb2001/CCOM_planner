@@ -172,44 +172,44 @@ void print_map(string file)
             path.Obstacles = new bool[width * height];
             int hcount = 0;
             communication_With_Planner.cwrite("map " + factor + " " + w + " " + h);
-            while (getline(f, line))
-            {
-                ++hcount;
-                communication_With_Planner.cwrite(line);
-                for (int i = 0; i < line.size(); i++)
-                {
-                    if (line[i] == '#')
-                        path.Obstacles[path.getindex(i, height - hcount)] = true;
-                    else
-                        path.Obstacles[path.getindex(i, height - hcount)] = false;
-                }
-            }
-
             // while (getline(f, line))
             // {
             //     ++hcount;
-            //     string s = "";
-            //     char previous = ' ';
-            //     int ncount = 0;
+            //     communication_With_Planner.cwrite(line);
             //     for (int i = 0; i < line.size(); i++)
             //     {
             //         if (line[i] == '#')
             //             path.Obstacles[path.getindex(i, height - hcount)] = true;
             //         else
             //             path.Obstacles[path.getindex(i, height - hcount)] = false;
-
-            //         if (line[i] != previous)
-            //         {
-            //             if (i == 0)
-            //                 s += line[i];
-            //             else
-            //                 s += " " + to_string(ncount);
-            //             previous = line[i];
-            //         }
-            //         ncount += 1;
             //     }
-            //     communication_With_Planner.cwrite(s);
             // }
+
+            while (getline(f, line))
+            {
+                ++hcount;
+                string s = "";
+                char previous = ' ';
+                int ncount = 0;
+                for (int i = 0; i < line.size(); i++)
+                {
+                    if (line[i] == '#')
+                        path.Obstacles[path.getindex(i, height - hcount)] = true;
+                    else
+                        path.Obstacles[path.getindex(i, height - hcount)] = false;
+
+                    if (line[i] != previous)
+                    {
+                        if (i == 0)
+                            s += line[i];
+                        else
+                            s += " " + to_string(ncount);
+                        previous = line[i];
+                    }
+                    ncount += 1;
+                }
+                communication_With_Planner.cwrite(s);
+            }
 
             f.close();
             return;
