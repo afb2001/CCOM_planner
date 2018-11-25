@@ -277,7 +277,7 @@ func TestFindAStarPlan(t *testing.T) {
 	var p = bigPath()
 	InitGlobals(bigGrid(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -291,14 +291,14 @@ func TestFindAStarPlan2(t *testing.T) {
 	var p = new(common.Path)
 	InitGlobals(bigGrid(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, p, 0.095, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, p, 0.095, *o1)
 	if plan != nil {
 		t.Errorf("Plan was too long")
 	}
 }
 
 func TestFindAStarPlan3(t *testing.T) {
-	// t.SkipNow() // this takes a while (almost a minute
+	t.SkipNow() // this takes a while (almost a minute
 	t.Log("Testing A* a bunch of times in a row from random states")
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
@@ -308,7 +308,7 @@ func TestFindAStarPlan3(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		s := randomState(50, 100, 0, 20)
 		s.Time = float64(i)
-		plan := FindAStarPlan(*s, &p, 0.09, o1)
+		plan := FindAStarPlan(*s, &p, 0.09, *o1)
 		if plan == nil || plan.States == nil {
 			if !grid.IsBlocked(s.X, s.Y) {
 				t.Errorf("Empty plan for unblocked state")

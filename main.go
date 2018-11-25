@@ -80,9 +80,12 @@ func main() {
 		}
 
 		var nObstacles int
-		o := [nObstacles]*common.State{}[0:]
+		o := make(common.Obstacles, nObstacles)
 		PrintLog("Reading dynamic obstacles")
-		fmt.Sscanf(GetLine(reader), "dynamic obs %d", &nObstacles)
+		_, err := fmt.Sscanf(GetLine(reader), "dynamic obs %d", &nObstacles)
+		if err != nil {
+			PrintLog("Encountered error:", err)
+		}
 		ReadObstacles(reader, o, nObstacles)
 
 		// plan := makePlan(grid, start, *path, o)

@@ -6,7 +6,6 @@ import (
 	"github.com/afb2001/CCOM_planner/common"
 	"github.com/afb2001/CCOM_planner/dubins"
 	. "github.com/afb2001/CCOM_planner/util"
-	"github.com/pkg/profile"
 	"math"
 	"math/rand"
 	"reflect"
@@ -1080,7 +1079,7 @@ func TracePlan(v *Vertex) *common.Plan {
 func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
 	resetGlobals()
 	// PrintLog("\n\n\n\n\n")
-	defer profile.Start().Stop()
+	// defer profile.Start().Stop()
 	endTime := timeRemaining + now()
 	// setup
 	o, start = o1, startState // assign globals
