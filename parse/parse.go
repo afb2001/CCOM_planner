@@ -47,7 +47,7 @@ func BuildGrid(reader *bufio.Reader) *common.Grid {
 	var width, height, resolution int
 	fmt.Sscanf(GetLine(reader), "map %d %d %d", &resolution, &width, &height)
 	PrintLog("Building grid")
-	grid := common.NewGrid(width, height)
+	grid := common.NewGrid(width*resolution, height*resolution)
 	for y := height - 1; y >= 0; y-- {
 		line := strings.Fields(GetLine(reader))
 		block := line[0] == "#"
