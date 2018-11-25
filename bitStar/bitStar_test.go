@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
+	. "github.com/afb2001/CCOM_planner/util"
 	"math"
 	"math/rand"
 	"os"
@@ -17,7 +18,7 @@ var p = common.Path{p1, p2}
 
 func setUp() {
 	g.BlockRange(1, 1, 1)
-	InitGlobals(g, &p, 0.5, 0.20)
+	InitGlobals(g, 0.5, 0.20)
 	start = common.State{X: 2.5, Y: 1.25, Heading: 3 * math.Pi / 2}
 }
 
@@ -95,7 +96,7 @@ func TestVertex_ApproxCost(t *testing.T) {
 
 func TestVertex_UpdateApproxToGo(t *testing.T) {
 	t.Log("Testing vertex update approx to go...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.25, Heading: math.Pi}, uncovered: *toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.25, Heading: math.Pi}, uncovered: p}
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -110,7 +111,7 @@ func TestVertex_UpdateApproxToGo(t *testing.T) {
 
 func TestEdge_ApproxCost(t *testing.T) {
 	t.Log("Testing edge approx cost...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: p}
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	// if there's a dPath it's probably right so don't worry about it
@@ -122,9 +123,9 @@ func TestEdge_ApproxCost(t *testing.T) {
 
 func TestEdge_UpdateTrueCost(t *testing.T) {
 	t.Log("Testing edge true cost...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
-	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: p}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}         // root vertex setup
+	v1.currentCost = -float64(len(p)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -136,9 +137,9 @@ func TestEdge_UpdateTrueCost(t *testing.T) {
 
 func TestEdge_UpdateStart(t *testing.T) {
 	t.Log("Testing edge update start...")
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
-	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: p}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}         // root vertex setup
+	v1.currentCost = -float64(len(p)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -151,7 +152,7 @@ func TestEdge_UpdateStart(t *testing.T) {
 
 func TestStaticCollision(t *testing.T) {
 	t.Log("Testing edge through obstacle...")
-	toCover = toCover.Without(p2) // so we can have just one point to cover
+	toCover := p.Without(p2) // so we can have just one point to cover
 	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: *toCover}
 	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
 	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
@@ -167,9 +168,9 @@ func TestStaticCollision(t *testing.T) {
 
 func TestBoundedBiasedRandomState(t *testing.T) {
 	t.Log("Testing random state generation...")
-	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: *toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
-	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: p}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}         // root vertex setup
+	v1.currentCost = -float64(len(p)) * coveragePenalty // here too
 	s := BoundedBiasedRandomState(&g, p, &start, 60)
 	if s == nil || s.X < 0 || s.Y < 0 {
 		if s != nil {
@@ -185,7 +186,7 @@ func TestEdgeQueue_PushPop(t *testing.T) {
 	qE.cost = func(edge *Edge) float64 {
 		return edge.start.CurrentCost() + edge.ApproxCost() + edge.end.UpdateApproxToGo(edge.start)
 	}
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: p}
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	qE.Push(&e)
@@ -206,7 +207,7 @@ func TestVertexQueue_PushPop(t *testing.T) {
 	qV.cost = func(v *Vertex) float64 {
 		return v.CurrentCost() + v.UpdateApproxToGo(nil)
 	}
-	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: *toCover}
+	v1 := Vertex{state: &common.State{X: 1.5, Y: 0.5, Heading: math.Pi}, uncovered: p}
 	// v2 := Vertex{state: &common.State{X: 0.5, Y: 0.5, Heading: math.Pi}}
 	// e := Edge{start: &v1, end: &v2}
 	heap.Push(qV, &v1)
@@ -238,7 +239,7 @@ func TestVertexQueue_PushPopMany(t *testing.T) {
 	heap.Push(qV, v2)
 	heap.Push(qV, v5)
 	v := heap.Pop(qV).(*Vertex)
-	printLog(v.state)
+	PrintLog(v.state)
 	if v != v1 {
 		t.Errorf("Wrong order popping from queue")
 	}
@@ -248,7 +249,7 @@ func TestBitStar(t *testing.T) {
 	t.SkipNow()
 	t.Log("Testing BIT* in a small world")
 	o1 := new(common.Obstacles)
-	plan := BitStar(start, 0.09, o1)
+	plan := BitStar(start, &p, 0.09, o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -260,9 +261,9 @@ func TestBitStar2(t *testing.T) {
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
 	var p = bigPath()
-	InitGlobals(bigGrid(), &p, 2.5, 0.75)
+	InitGlobals(bigGrid(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, 0.09, o1)
+	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, &p, 0.09, o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -274,9 +275,9 @@ func TestFindAStarPlan(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
 	var p = bigPath()
-	InitGlobals(bigGrid(), &p, 2.5, 0.75)
+	InitGlobals(bigGrid(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.095, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -288,9 +289,9 @@ func TestFindAStarPlan2(t *testing.T) {
 	t.Log("Testing A* without any path to cover")
 	// redo setup
 	var p = new(common.Path)
-	InitGlobals(bigGrid(), p, 2.5, 0.75)
+	InitGlobals(bigGrid(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, 0.095, o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, p, 0.095, o1)
 	if plan != nil {
 		t.Errorf("Plan was too long")
 	}
@@ -302,18 +303,18 @@ func TestFindAStarPlan3(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
 	var p = bigPath()
-	InitGlobals(bigGrid(), &p, 2.5, 0.75)
+	InitGlobals(bigGrid(), 2.5, 0.75)
 	o1 := new(common.Obstacles)
 	for i := 0; i < 60; i++ {
 		s := randomState(50, 100, 0, 20)
 		s.Time = float64(i)
-		plan := FindAStarPlan(*s, 0.09, o1)
+		plan := FindAStarPlan(*s, &p, 0.09, o1)
 		if plan == nil || plan.States == nil {
 			if !grid.IsBlocked(s.X, s.Y) {
 				t.Errorf("Empty plan for unblocked state")
 				break
 			} else {
-				printLog("Sampled blocked state " + s.String())
+				PrintLog("Sampled blocked state " + s.String())
 			}
 		}
 	}

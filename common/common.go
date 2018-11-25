@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 const (
@@ -253,7 +254,7 @@ func (c *cell) isBlocked() bool {
 Grid struct for holding distances to static obstacles (shore)
 */
 type Grid struct {
-	cells         [][]cell
+	cells         [][]bool
 	Width, Height int
 }
 
@@ -261,30 +262,25 @@ type Grid struct {
 Create a new grid of given dimensions
 */
 func NewGrid(width int, height int) Grid {
-	// TODO! -- fix to make normal allocation
-	cells := new([][]cell)
-	for y := 0; y < height; y++ {
-		col := new([]cell)
-		for x := 0; x < width; x++ {
-			*col = append(*col, newCell(y, x))
-		}
-		*cells = append(*cells, *col)
+	cells := make([][]bool, height)
+	for y := range cells {
+		cells[y] = make([]bool, width)
 	}
-	return Grid{cells: *cells, Width: width, Height: height}
+	return Grid{cells: cells, Width: width, Height: height}
 }
 
 /**
 Get the cell at x, y.
 */
-func (g *Grid) get(x int, y int) *cell {
-	return &(g.cells[y][x])
+func (g *Grid) get(x int, y int) bool {
+	return g.cells[y][x]
 }
 
 /**
 Block the cell at x, y. For initialization only (probably).
 */
 func (g *Grid) block(x int, y int) {
-	g.get(x, y).distanceToShore = 0
+	g.cells[y][x] = true
 }
 
 /**
@@ -299,18 +295,19 @@ func (g *Grid) BlockRange(x int, y int, r int) {
 }
 
 func (g *Grid) Dump() string {
-	var s = "\n"
+	var sb = strings.Builder{}
+	sb.WriteRune('\n')
 	for y := g.Height - 1; y >= 0; y-- {
 		for x := 0; x < g.Width; x++ {
 			if g.IsBlocked(float64(x), float64(y)) {
-				s += "#"
+				sb.WriteRune('#')
 			} else {
-				s += "_"
+				sb.WriteRune('_')
 			}
 		}
-		s += "\n"
+		sb.WriteRune('\n')
 	}
-	return s
+	return sb.String()
 }
 
 /**
@@ -320,7 +317,7 @@ func (g *Grid) IsBlocked(x float64, y float64) bool {
 	if x < 0 || x > float64(g.Width) || y < 0 || y > float64(g.Height) {
 		return true
 	}
-	return g.get(int(x), int(y)).isBlocked()
+	return g.get(int(x), int(y))
 }
 
 //endregion
@@ -330,18 +327,18 @@ func (g *Grid) IsBlocked(x float64, y float64) bool {
 /**
 Type alias for (dynamic) obstacle collection.
 */
-type Obstacles map[int]*State
+type Obstacles []*State
 
-/**
-Add or update the obstacle collection with the new obstacle.
-*/
-func (o *Obstacles) Update(id int, newState *State) {
-	(*o)[id] = newState
-}
-
-func (o *Obstacles) Remove(id int) {
-	delete(*o, id)
-}
+// /**
+// Add or update the obstacle collection with the new obstacle.
+// */
+// func (o *Obstacles) Update(id int, newState *State) {
+// 	(*o)[id] = newState
+// }
+//
+// func (o *Obstacles) Remove(id int) {
+// 	delete(*o, id)
+// }
 
 /**
 Check if any of the obstacles collide with the given state.
