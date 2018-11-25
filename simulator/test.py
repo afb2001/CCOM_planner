@@ -58,6 +58,7 @@ class PLOT:
         self.moveX = 0
         self.moveY = 0
         self.cost = 0
+        self.collision = 0
         self.future_x = []
         self.future_y = []
         self.goal_location = []
@@ -71,6 +72,8 @@ class PLOT:
         self.static_draw = static_draw
         self.dynamicOBS =[]
         self.select = None
+        self.pDynamicHit = None
+        self.pStaticHit = None
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
@@ -101,6 +104,7 @@ class PLOT:
         self.exp_img = []
         self.dynamicMap = {}
         self.dynamicAction = {}
+        
         for i in range(1, 8):
             self.exp_img.append(pygame.image.load(
                 'explosion/{}.png'.format(i)))
@@ -283,10 +287,14 @@ class PLOT:
                 collision = False
             if collision:
                 sprites.add(Explosion((x,y), self.exp_img))
+                self.collision += 0 if self.pStaticHit == (x1,y1) else 1
+                self.pStaticHit = (x1,y1)
                 return
             for i in range(0, self.nobs):
                 if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
                     sprites.add(Explosion((x,y), self.exp_img))
+                    self.collision += 0 if self.pDynamicHit == i else 1
+                    self.pDynamicHit = i
                     return
 
     def dist(self, x, x1, y, y1):
@@ -432,10 +440,17 @@ class PLOT:
             self.curr_x, self.curr_y)
         textsurface = self.myfont.render(text, True, (0, 0, 0))
         self.display.blit(textsurface, (20, 10))
-        text = "Cost:(  {:.2f}  )".format(self.cost)
-        self.cost += 0.05
+
+        text = "Collisions:(  {:.2f}  )".format(self.collision)
         textsurface1 = self.myfont.render(text, True, (0, 0, 0))
         self.display.blit(textsurface1, (20, 10 + textsurface.get_height()))
+
+        text = "Cost:(  {:.2f}  )".format(self.cost)
+        self.cost += 0.05
+        textsurface2 = self.myfont.render(text, True, (0, 0, 0))
+        self.display.blit(textsurface2, (20, 10 + textsurface1.get_height() + textsurface.get_height()))
+
+        
 
     def update(self):
         for event in pygame.event.get():
