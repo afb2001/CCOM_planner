@@ -111,10 +111,20 @@ if __name__ == "__main__":
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
                         help='File for goal location')
 
+    parser.add_argument('-tiff', '--tiffmap', dest='tiffmap', action='store', default='',
+                        help='File for tiffmap')
+    parser.add_argument('-model', '--model', dest='model', action='store', default='',
+                        help='File for model')
+    parser.add_argument('-debug', '--debug', dest='debug', action='store', default='_',
+                        help='debug mode')
+
     args = parser.parse_args()
 
     gridmap = args.map
     goal = args.goal
+    tiffmap = args.tiffmap
+    model = args.model
+    debug = args.debug
 
     arguments = []
 
@@ -124,6 +134,14 @@ if __name__ == "__main__":
     if goal:
         arguments.append("-g")
         arguments.append(goal)
+    if tiffmap:
+        arguments.append("-t")
+        arguments.append(tiffmap)
+    if model:
+        arguments.append("-b")
+        arguments.append(model)
+    if debug != '_':
+        arguments.append("-debug")
 
     open_executive(arguments)
     asv_thread = threading.Thread(target=recv_asv)

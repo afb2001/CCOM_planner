@@ -8,7 +8,7 @@ import math
 import os
 import glob
 
-mutex = Lock()
+
 
 Color_line = (0, 0, 0)
 Color_line_middle = (180, 180, 180)
@@ -41,12 +41,13 @@ sprites = pygame.sprite.Group()
 
 
 class PLOT:
-    def __init__(self, static_obs, xlim, ylim):
+    def __init__(self, static_obs,static_draw, xlim, ylim, factor):
+        self.mutex = Lock()
         self._running = True
         self.display = None
         self._image_surf = None
-        self.screenH = 800
-        self.screenW = 600
+        self.screenH = 600
+        self.screenW = 800
         self.maxX = xlim
         self.maxY = ylim
         self.xlim = xlim
@@ -57,41 +58,42 @@ class PLOT:
         self.moveX = 0
         self.moveY = 0
         self.cost = 0
+        self.collision = 0
         self.future_x = []
         self.future_y = []
         self.goal_location = []
+        self.F_goal_location = []
         self.future_heading = []
-        self.estimateStart = (0,0,0)
+        self.estimateStart = (0, 0, 0)
         self.triangleX = (0, -5, 5)
         self.triangleY = (-10, 10, 10)
         self.static_obs = static_obs
+        self.factor = factor
+        self.static_draw = static_draw
+        self.dynamicOBS =[]
+        self.select = None
+        self.pDynamicHit = None
+        self.pStaticHit = None
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
         except:
             self.myfont = pygame.font.SysFont(None, 20)
-        
-            
 
     def on_init(self):
         pygame.init()
         self.display = pygame.display.set_mode(
-            (self.screenH, self.screenW), HWSURFACE | RESIZABLE)
+            (self.screenW, self.screenH), HWSURFACE | RESIZABLE)
         self.w, self.h = pygame.display.get_surface().get_size()
-        self.scalew = self.w*0.8
-        self.scaleh = self.h*0.8
-        self.startw = self.w * 0.1
-        self.starth = self.h * 0.1
+        self.minwh = min(self.w,self.h)
+        self.scalew = self.minwh*0.8
+        self.scaleh = self.minwh*0.8
+        self.startw = (self.w - self.scalew)/2
+        self.starth = (self.h - self.scaleh)/2
         self._running = True
         self.background = pygame.Surface(self.display.get_size())
         self.background.fill((240, 240, 240))
         self.background = self.background.convert()
-        # self._image_surf = pygame.transform.scale(pygame.image.load(
-        #     "boat.png"), (int(self.scalew/20), int(self.scaleh/20))).convert_alpha()
-        # self.image_obstacle = pygame.transform.scale(pygame.image.load(
-        #     "obstacle.png"), (int(self.scalew/20), int(self.scaleh/20))).convert_alpha()
-        # self.boatw = int(self.scalew/20)/2.0
-        # self.boath = int(self.scaleh/20)
         self.curr_x = 0
         self.curr_y = 0
         self.start_heading = 0
@@ -100,15 +102,85 @@ class PLOT:
         self.yobs = []
         self.hobs = []
         self.exp_img = []
+        self.dynamicMap = {}
+        self.dynamicAction = {}
+        
         for i in range(1, 8):
             self.exp_img.append(pygame.image.load(
                 'explosion/{}.png'.format(i)))
         # self.exp_img = [pygame.image.load(os.path.join('explosion', img)).convert_alpha()
         #           for img in os.listdir('explosion')]
+    def distance(self,p0, p1):
+        return (p0[0] - p1[0])**2 + (p0[1] - p1[1])**2
+
+    def angle(self,p0, p1):
+        return -math.atan2(p0[0]-p1[0],p0[1]-p1[1])
+
+    def selects(self):
+        
+            
+        self.mutex.acquire()
+        try:
+            for key, value in self.dynamicAction.iteritems():
+                index = value[2]
+                l = self.dynamicMap[key]
+                if index == -1 or len(l) == 1:
+                    continue
+                if(self.distance(self.dynamicOBS[key],l[index]) < 10):
+                    if len(l) > index + 1:
+                        index += 1
+                    else:
+                        index = 0
+                    self.dynamicAction[key] = (self.angle(self.dynamicOBS[key],l[index]),3,index)
+            s = self.dynamicAction
+        finally:
+            self.mutex.release()
+        return s
 
     def on_event(self, event):
         if event.type == QUIT:
             sys.exit(1)
+        elif event.type == pygame.VIDEORESIZE:
+            self.originX /= self.scalew/(self.lines+1)
+            self.originY /= self.scaleh/(self.lines+1)
+            self.w,self.h =  event.size
+            self.minwh = min(self.w,self.h)
+            self.scalew = self.minwh*0.8
+            self.scaleh = self.minwh*0.8
+            self.startw = (self.w - self.scalew)/2
+            self.starth = (self.h - self.scaleh)/2
+            self.display = pygame.display.set_mode(
+            (self.w, self.h), HWSURFACE | RESIZABLE)
+            self.background = pygame.Surface(self.display.get_size())
+            self.background.fill((240, 240, 240))
+            self.background = self.background.convert()
+            self.originX *= self.scalew/(self.lines+1)
+            self.originY *= self.scaleh/(self.lines+1)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            p = pygame.mouse.get_pos()
+            if self.select == None:
+                
+                for i in range(self.nobs):
+                    if (self.distance(p,self.dynamicOBS[i]) < 500 ):
+                        print i
+                        self.mutex.acquire()
+                        try:
+                            self.dynamicMap[i] = []
+                            self.dynamicAction[i] = (self.hobs[i],0,-1)
+                            self.select = (i,self.hobs[i],0)
+                        finally:
+                            self.mutex.release()
+                        break;
+            else:
+                i = self.select[0]
+                if self.distance(p,self.dynamicOBS[i]) < 500:
+                    self.dynamicMap[i].append(self.dynamicOBS[i])
+                    l = self.dynamicMap[i]
+                    if len(l) > 1:
+                        self.dynamicAction[i] = (self.angle(self.dynamicOBS[i],self.dynamicMap[i][0]),3,0)
+                    self.select = None
+                else:
+                    self.dynamicMap[i].append(p)
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT:
                 self.originX -= self.scalew/(self.lines+1)
@@ -197,22 +269,33 @@ class PLOT:
         #     self.update()
         # self.stop()
         self.pathList = [(curr_x, curr_y)]
+     
+
+        self.dynamicOBS.extend([(0,0) for i in range(nobs)])
         self.updateInformation(
-            curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [],self.estimateStart,[])
+            curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, [], [], [], self.estimateStart, [])
         self.update()
 
     def checkCollision(self):
-        for i in self.static_obs:
-            x, y = i
-            if x <= self.curr_x < x + 1 and y <= self.curr_y < y + 1:
-                sprites.add(Explosion(self.scale_item(
-                    self.curr_x, self.curr_y), self.exp_img))
+        x,y = self.scale_item(self.curr_x, self.curr_y)
+        if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
+            x1 = int(self.curr_x)
+            y1 = int(self.curr_y)
+            try:
+                collision = self.static_obs[x1][y1]
+            except:
+                collision = False
+            if collision:
+                sprites.add(Explosion((x,y), self.exp_img))
+                self.collision += 0 if self.pStaticHit == (x1,y1) else 1
+                self.pStaticHit = (x1,y1)
                 return
-        for i in range(0, self.nobs):
-            if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
-                sprites.add(Explosion(self.scale_item(
-                    self.curr_x, self.curr_y), self.exp_img))
-                return
+            for i in range(0, self.nobs):
+                if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
+                    sprites.add(Explosion((x,y), self.exp_img))
+                    self.collision += 0 if self.pDynamicHit == i else 1
+                    self.pDynamicHit = i
+                    return
 
     def dist(self, x, x1, y, y1):
         return (x - x1)**2 + (y - y1)**2
@@ -235,21 +318,21 @@ class PLOT:
                 i * scalew, 0), self.scale_xy(i*scalew, self.scaleh))
             # self.draw_text(self.scalew,i * scaleh, i * self.maxX/(self.lines + 1) )
 
-    def updateInformation(self, curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, future_x, future_y, future_heading,estimateStart,goal_location):
-            if self.pathList[-1] != (curr_x, curr_y):
-                self.pathList.append((curr_x, curr_y))
-            self.curr_x = curr_x
-            self.curr_y = curr_y
-            self.start_heading = start_heading
-            self.nobs = nobs
-            self.xobs = xobs
-            self.yobs = yobs
-            self.hobs = hobs
-            self.future_heading = future_heading
-            self.future_x = future_x
-            self.future_y = future_y
-            self.estimateStart = estimateStart
-            self.goal_location = goal_location
+    def updateInformation(self, curr_x, curr_y, start_heading, nobs, xobs, yobs, hobs, future_x, future_y, future_heading, estimateStart, goal_location):
+        if self.pathList[-1] != (curr_x, curr_y):
+            self.pathList.append((curr_x, curr_y))
+        self.curr_x = curr_x
+        self.curr_y = curr_y
+        self.start_heading = start_heading
+        self.nobs = nobs
+        self.xobs = xobs
+        self.yobs = yobs
+        self.hobs = hobs
+        self.future_heading = future_heading
+        self.future_x = future_x
+        self.future_y = future_y
+        self.estimateStart = estimateStart
+        self.goal_location = goal_location
 
     def draw_future(self):
         size = len(self.future_heading)
@@ -262,9 +345,9 @@ class PLOT:
                         self.future_heading[i], c, *self.scale_item(self.future_x[i], self.future_y[i]))
             self.draw_vehicle(
                 self.future_heading[0], Color_CYAN, *self.scale_item(self.future_x[0], self.future_y[0]))
-        x,y,heading = self.estimateStart
+        x, y, heading = self.estimateStart
         self.draw_vehicle(
-                        heading, Color_GREEN, *self.scale_item(x, y))
+            heading, Color_GREEN, *self.scale_item(x, y))
 
     def draw_current(self):
         self.draw_vehicle(self.start_heading, Color_BLUE, *
@@ -279,43 +362,74 @@ class PLOT:
 
     def draw_obs(self):
         for index in range(self.nobs):
+            self.dynamicOBS[index] = self.scale_item(self.xobs[index], self.yobs[index])
             self.draw_vehicle(
-                self.hobs[index], Color_Red, *self.scale_item(self.xobs[index], self.yobs[index]))
+                self.hobs[index], Color_Red, *self.dynamicOBS[index])
 
-        for obs in self.static_obs:
-            self.draw_static_obs((0,0,0),*obs)
-        
+        for obs in self.static_draw:
+            self.draw_static_obs1((0, 0, 0), *obs)
+      
+        for i in range(len(self.goal_location)):
+            if(self.distSquare(self.curr_x, self.curr_y, *self.goal_location[i]) <= 10):
+                self.F_goal_location.append(self.goal_location.pop(i))
+                break
+
         for goal in self.goal_location:
-            self.draw_static_obs((0,255,0),*goal)
+            self.draw_static_obs((0, 255, 0), *goal)
 
-    def draw_static_obs(self, color,x, y):
-        pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
-            x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
+        for goal in self.F_goal_location:
+            self.draw_static_obs((0, 255, 255), *goal)
+
+    def distSquare(self, x1, y1, x2, y2):
+        return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)
+
+    def draw_static_obs(self, color, x, y):
+        x1,y1 = self.scale_item(x, y)
+        x2,y2 = self.scale_item(x+1, y+1)
+        x1 = max(self.startw,x1)
+        y1 = max(self.starth,y1)
+        x2 = min(self.startw + self.scalew,x2)
+        y2 = min(self.starth + self.scaleh,y2)
+        if not(x1 > self.startw + self.scalew or y1 > self.starth + self.scaleh or x2 < self.startw or y2 < self.starth):
+            pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
+        # pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
+        #     x+1, y), self.scale_item(x+1, y+1), self.scale_item(x, y+1)))
+
+    def draw_static_obs1(self, color, o1, o2):
+        x1,y1 = self.scale_item(*o1)
+        x2,y2 = self.scale_item(*o2)   
+        x1 = max(self.startw,x1)
+        y1 = max(self.starth,y1)
+        x2 = min(self.startw + self.scalew,x2)
+        y2 = min(self.starth + self.scaleh,y2)
+        if not(x1 > self.startw + self.scalew or y1 > self.starth + self.scaleh or x2 < self.startw or y2 < self.starth):
+            pygame.draw.rect(self.display, color, (x1, y1, x2-x1, y2-y1))
 
     def draw_vehicle(self, angle, color, x, y):
-        tX = []
-        tY = []
-        c = math.cos(angle)
-        s = math.sin(angle)
-        for i in range(3):
-            tX.append(self.triangleX[i]*c - self.triangleY[i]*s + x)
-            tY.append(self.triangleX[i]*s + self.triangleY[i]*c + y)
-        pygame.draw.polygon(self.display, color, ((
-            tX[0], tY[0]), (tX[1], tY[1]), (tX[2], tY[2])))
+        if  self.startw <= x <= self.startw + self.scalew and self.starth <= y <= self.starth + self.scaleh:
+            tX = []
+            tY = []
+            c = math.cos(angle)
+            s = math.sin(angle)
+            for i in range(3):
+                tX.append(self.triangleX[i]*c - self.triangleY[i]*s + x)
+                tY.append(self.triangleX[i]*s + self.triangleY[i]*c + y)
+            pygame.draw.polygon(self.display, color, ((
+                tX[0], tY[0]), (tX[1], tY[1]), (tX[2], tY[2])))
 
     def draw_text(self):
         scaleh = self.scaleh/(self.lines+1)
         scalew = self.scalew/(self.lines+1)
         for i in range(0, self.lines+2):
-            text = str(int(self.moveY+(self.lines - i + 1)
-                           * self.maxY/(self.lines + 1)))
+            text = str(int(self.factor*(self.moveY+(self.lines - i + 1)
+                                        * self.maxY/(self.lines + 1))))
             textsurface = self.myfont.render(text, True, (0, 0, 0))
             x, y = self.scale_xy(0, (i) * scaleh)
             x -= textsurface.get_width() + 10
             y -= textsurface.get_height()/2
             self.display.blit(textsurface, (x, y))
-            text = str(int(self.moveX+(self.lines - i + 1)
-                           * self.maxX/(self.lines + 1)))
+            text = str(int(self.factor*(self.moveX+(self.lines - i + 1)
+                           * self.maxX/(self.lines + 1))))
             textsurface = self.myfont.render(text, True, (0, 0, 0))
             x, y = self.scale_xy((self.lines - i + 1)*scalew, self.scaleh)
             x -= textsurface.get_width() / 2
@@ -326,10 +440,17 @@ class PLOT:
             self.curr_x, self.curr_y)
         textsurface = self.myfont.render(text, True, (0, 0, 0))
         self.display.blit(textsurface, (20, 10))
-        text = "Cost:(  {:.2f}  )".format(self.cost)
-        self.cost += 0.05
+
+        text = "Collisions:(  {:.2f}  )".format(self.collision)
         textsurface1 = self.myfont.render(text, True, (0, 0, 0))
         self.display.blit(textsurface1, (20, 10 + textsurface.get_height()))
+
+        text = "Cost:(  {:.2f}  )".format(self.cost)
+        self.cost += 0.05
+        textsurface2 = self.myfont.render(text, True, (0, 0, 0))
+        self.display.blit(textsurface2, (20, 10 + textsurface1.get_height() + textsurface.get_height()))
+
+        
 
     def update(self):
         for event in pygame.event.get():

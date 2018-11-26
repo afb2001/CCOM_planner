@@ -1,5 +1,4 @@
 #include <iostream>
-//#include <iomanip>
 #include <limits>
 #include <chrono>
 #include <thread>
@@ -16,39 +15,23 @@
 #include "communication.h"
 #include <fstream>
 #include <list>
+#include <unordered_set>
+#include "path.h"
+// #include "xtiffio.h"
+// #include "geotiffio.h"
 
 using namespace std;
 
-mutex mtx_path;
-mutex mtx_obs;
-mutex mtx_cover;
-
-int pathindex = 0;
 int running = 1;
 int request_start = 0;
-int request_start1 = 0;
-int countn = 0;
-int send = 1;
-double difx = 0, dify = 0;
-double previousheading = 0;
 
-ObjectPar pstart;
-ObjectPar previousAction;
-ObjectPar estimateStart;
-ObjectPar current_location;
-ObjectPar action;
-
-vector<ObjectPar> dyamic_obstacles;
-vector<ObjectPar> path;
-
-list<point> cover;
-list<point> newcover;
+Path path;
+bool debug = false;
 
 Communitcation communication_With_Planner, communication_With_Controler;
 
 double getCurrentTime()
 {
-    //change to clock_gettime
     struct timespec t;
     clock_gettime(CLOCK_REALTIME, &t);
     return t.tv_sec + t.tv_nsec * 1e-9;
@@ -64,144 +47,32 @@ void checkTerminate()
     }
 }
 
-void findStart()
-{
-    mtx_path.lock();
-    int path_size = path.size();
-    bool find = false,visit = true;
-    if (path_size > 0 && pathindex < path_size)
-    {
-        ObjectPar current = current_location;
-        double otime = current_location.otime + 4;
-        
-        for (int i = pathindex; i < path_size; i++)
-        {
-            if(path[i].otime > otime - 3 && i != 0 && visit)
-            {
-                estimateStart = ObjectPar(path[i].x, path[i].y, current.heading, path[i].speed, otime - 3);
-                visit = false;
-            }
-            else if (path[i].otime > otime && i != 0)
-            {
-                double timeiterval = 1; //otime - path[i - 1].otime;
-                double predictHead = path[i].heading;
-                while (predictHead < 0)
-                    predictHead += 2 * M_PI;
-                predictHead = fmod(predictHead, 2 * M_PI);
-                // cerr << "FIRST " << h1 << " " <<  h2 << " " << heading  << endl;
-
-                // double angle = atan2(path[i].y - current.y, path[i].x - current.x);
-
-                // while(angle < 0)
-                //     angle += 2 * M_PI;
-                // angle = fmod(angle,2*M_PI);
-                // double anglediff = atan2(cos(current.heading-angle), sin(current.heading-angle));
-                // if(fabs(anglediff) > 0.5)
-                //     anglediff = (anglediff > 0) ? 0.5 : -0.5;
-                // double heading;
-
-                // if(M_PI - abs(abs(current.heading -angle) - M_PI) > 0.5)
-                // {
-                //     if(angle > current.heading)
-                //     {
-                //         if(angle - M_PI > current.heading)
-                //             heading= current.heading - 0.5; 
-                //         else
-                //             heading = current.heading + 0.5; 
-                //     }
-                //     else
-                //     {
-                //         if(current.heading - M_PI > angle)
-                //             heading = current.heading + 0.5; 
-                //         else
-                //             heading = current.heading - 0.5; 
-                //     }
-                // }
-                
-                //cerr << heading<< endl;
-                //cerr << "ANGLE " << anglediff << " " << current.heading << " " << angle << " " << current.heading + anglediff<< endl;;
-                //angle = current.heading + anglediff;
-                //cerr << "difx " << timeiterval * current.speed * cos(angle) << " diffy " << timeiterval * current.speed * sin(angle) << endl;
-                //cerr << "ANGLE " << angle << " "<<path[i].y << " " << current.y << " " << path[i].x << " " << current.x <<" " <<cos(angle) << sin(angle)<<endl;
-                action = ObjectPar(path[i].x, path[i].y, predictHead, path[i].speed, path[i].otime); //chage to relative heading
-                //estimateStart = ObjectPar(current.x + timeiterval * current.speed * cos(angle), current.y + timeiterval * current.speed * sin(angle), current.heading, path[i].speed, otime - 3);
-                find = true;
-                break;
-            }
-        }
-    }
-
-    if (!find)
-    {
-        //cerr << "SECOND" << endl;
-        ObjectPar current = current_location;
-        double timeiterval = 1;
-        //double heading = atan2(previousAction.x - pstart.x, previousAction.y - pstart.y);
-        //estimateStart = ObjectPar(current.x + timeiterval * previousAction.speed * cos(heading), current.y + timeiterval * previousAction.speed * sin(heading), current.heading, current.speed, current.otime + 1);
-        if(visit)
-            estimateStart = ObjectPar(current.x + timeiterval * cos(current.heading) * current.speed, current.y + timeiterval * sin(current.heading) * current.speed, current.heading, current.speed, current.otime + 1);
-        action = ObjectPar(-1, -1, -1, -1, -1);
-        // if (path.size() > pathindex && path[pathindex].speed == 0)
-        //     action = ObjectPar(-1, -1, -1, -1, -1);
-        // else
-        //     action = ObjectPar(current.x + timeiterval * previousAction.speed * cos(heading), current.y + timeiterval * previousAction.speed * sin(heading), current.heading, current.speed, current.otime + 1);
-    }
-
-    mtx_path.unlock();
-}
-
 // fix the moving of start
 void requestPath()
 {
-    string s;
-    int numberOfState;
-    double x, y, heading, speed, otime;
     FILE *readstream = fdopen(communication_With_Planner.getWpipe(), "r");
+    double start, end, time_bound;
+    int numberOfState, sleeptime;
     char response[1024];
-    while (!request_start || !request_start1)
+
+    while (!request_start)
         this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    previousAction = current_location;
-    pstart = current_location;
-    action = current_location;
-    estimateStart = current_location;
-    estimateStart.otime += 1;
+    path.initialize();
+
     while (running)
     {
-
-        vector<ObjectPar> newpath;
-        communication_With_Planner.cwrite("plan");
-        mtx_cover.lock();
-        int size = newcover.size();
-        communication_With_Planner.cwrite("newly covered " + to_string(size));
-        for (point p : newcover)
+        if (path.finish())
         {
-            communication_With_Planner.cwrite(to_string(p.x) + " " + to_string(p.y));
-            cerr << "EXECUTIVE::NEWLYCOVERD:: " << p.x << " " << p.y << endl;
-        }
-        newcover.clear();
-        mtx_cover.unlock();
-        double start = getCurrentTime();
-        findStart();
-        //cerr << "REAL::" << current_location.toString() << endl;
-        //cerr << "EXECUTIVE::SENDSTART::" << estimateStart.toString() << endl;
-        communication_With_Planner.cwrite("start state " + estimateStart.toString());
-        mtx_obs.lock();
-        int d_obstacles_size = dyamic_obstacles.size();
-        s = "dynamic obs " + to_string(d_obstacles_size);
-        communication_With_Planner.cwrite(s);
-
-        for (int i = 0; i < d_obstacles_size; i++)
-        {
-            s = to_string(i);
-            s += " " + dyamic_obstacles[i].toString();
-            communication_With_Planner.cwrite(s);
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            running = 0;
+            break;
         }
 
-        mtx_obs.unlock();
+        start = getCurrentTime();
+        communication_With_Planner.cwrite(path.construct_request_string());
 
         fgets(response, sizeof response, readstream);
-
         if (!strncmp(response, "done", 4))
         {
             running = 0;
@@ -209,87 +80,19 @@ void requestPath()
         }
 
         sscanf(response, "plan %d\n", &numberOfState);
-        if(numberOfState == 0)
-        {
-            this_thread::sleep_for(chrono::milliseconds(50));
-            checkTerminate();
-            continue;
-        }
-        mtx_path.lock();
 
+        time_bound = path.getCurrent().otime;
 
-        double time_bound = current_location.otime;
-        ObjectPar current = current_location;
-        int path_size = path.size();
-        bool unvisit = true;
-        double sleeptime = 0;
-        ObjectPar p;
-        double diffx = 0, diffy = 0;
-
-        for (int i = pathindex; i < path_size; i++)
-        {
-            if (path[i].otime >= time_bound && path[i].otime <= estimateStart.otime)
-                newpath.push_back(path[i]);
-            else
-                break;
-        }
         for (int i = 0; i < numberOfState; i++) // if no new path then keep old path
         {
             fgets(response, sizeof response, readstream);
-            sscanf(response, "%lf %lf %lf %lf %lf\n", &x, &y, &heading, &speed, &otime);
-            if (time_bound > otime)
-                continue;
-
-            // cerr << ObjectPar(x,y,heading,speed,otime).toString()<< endl;
-
-            if (unvisit)
-            {
-                int index = newpath.size();
-                if (index != 0)
-                {
-                    sleeptime = estimateStart.otime - time_bound; // newpath[index - 1].otime;
-                    if (sleeptime < 0)
-                        sleeptime = 0;
-                }
-                ObjectPar p;
-                int j = -1;
-                bool find = false;
-                for (j = pathindex; j < path_size; j++)
-                {
-                    if (path[j].otime > estimateStart.otime)
-                    {
-                        p = path[j];
-                        find = true;
-                        break;
-                    }
-                }
-                if (!find)
-                {
-                    diffx = 0;
-                    diffy = 0;
-                }
-                else
-                {
-                    double timeiterval = p.otime - estimateStart.otime;
-                    double angle = atan2(p.y - current.y, p.x - current.x);
-                    diffx = current.x + timeiterval * current.speed * cos(angle) - estimateStart.x;
-                    diffy = current.y + timeiterval * current.speed * sin(angle) - estimateStart.y;
-                }
-                unvisit = false;
-            }
-            p = ObjectPar(x + diffx, y + diffy, heading, speed, otime);
-            newpath.push_back(p);
+            path.update_newpath(response, time_bound);
         }
-        // cerr << "END" << endl;
-        if (!unvisit)
-        {
-            path = newpath;
-            pathindex = 0;
-        }
-        mtx_path.unlock();
-        double end = getCurrentTime();
-        if (end - start <= 1)
-            this_thread::sleep_for(chrono::milliseconds(((int)((1 - (end - start)) * 1000))));
+
+        end = getCurrentTime();
+        sleeptime = (numberOfState) ? ((end - start <= 1) ? ((int)((1 - (end - start)) * 1000)) : 0) : 50;
+
+        this_thread::sleep_for(chrono::milliseconds(sleeptime));
         checkTerminate();
     }
 }
@@ -298,50 +101,30 @@ void requestWorldInformation()
 {
     char locationString[8192];
     double x, y, heading, speed, otime;
-    int index, h, oldbytesRead, bytesRead;
-    while (running) // should clear the previous one prevent the disappear obs
+    int index, h, oldbytesRead, bytesRead, count, update;
+    while (running)
     {
         read(STDIN_FILENO, locationString, 8192);
-
         if (!strncmp(locationString, "Location", 8))
         {
             request_start = 1;
-            sscanf(locationString + 9, "%lf,%lf,%lf,%lf,%lf [%d]", &current_location.x, &current_location.y, &current_location.speed, &current_location.heading, &current_location.otime, &h);
-            mtx_cover.lock();
-            auto it = cover.begin();
-            while (it != cover.end())
-            {
-                float x = it->x - current_location.x;
-                float y = it->y - current_location.y;
-                if (x * x + y * y <= 25)
-                {
-                    auto it1 = it;
-                    newcover.push_back(*it);
-                    ++it;
-                    cover.erase(it1);
-                }
-                else
-                    ++it;
-            }
-            mtx_cover.unlock();
+            path.update_current(locationString, 9);
+            path.update_covered();
         }
         else if (!strncmp(locationString, "Obstacle", 8))
         {
-            request_start1 = 1;
-            bytesRead = 9;
-            oldbytesRead = bytesRead;
-            mtx_obs.lock();
-            int d_obstacles_size = dyamic_obstacles.size();
-            while (sscanf(locationString + bytesRead, "%d,%lf,%lf,%lf,%lf,%lf\n%n", &index, &x, &y, &speed, &heading, &otime, &bytesRead) == 6)
+            oldbytesRead = bytesRead = 9;
+            count = 0;
+            path.lock_obs();
+            do
             {
-                bytesRead += oldbytesRead;
-                oldbytesRead = bytesRead;
-                index < d_obstacles_size ? dyamic_obstacles[index].set(x, y, heading, speed, otime) : dyamic_obstacles.push_back(ObjectPar(x, y, heading, speed, otime));
-            }
-            d_obstacles_size = dyamic_obstacles.size();
-            while (index >= d_obstacles_size)
-                dyamic_obstacles.pop_back();
-            mtx_obs.unlock();
+                update = bytesRead = path.update_dynamic_obs(locationString, bytesRead, count);
+                oldbytesRead += bytesRead;
+                bytesRead = oldbytesRead;
+                ++count;
+
+            } while (update);
+            path.unlock_obs();
         }
         else
         {
@@ -353,82 +136,17 @@ void requestWorldInformation()
     }
 }
 
-void sendPath(string &s)
-{
-    int size = path.size() - pathindex;
-    int size1 = path.size();
-    s += "path " + to_string(size) + "\n";
-    for (int i = pathindex; i < size1; i++)
-    {
-        s += path[i].toString();
-        if (size1 - 1 != i)
-            s += '\n';
-    }
-    s += "\n" + estimateStart.toString(); //for estimate start
-    s += '\0';
-}
-
 void sendAction()
 {
+    int sleep;
+    string send_string;
     while (running)
     {
 
-        mtx_path.lock();
-        int path_size = path.size();
-
-        if (send && action.otime > current_location.otime)
-        {
-            string s = "";
-            pstart = current_location;
-            s += pstart.toString() + "\n";
-            while (path_size > pathindex && pstart.otime > path[pathindex].otime)
-                pathindex++;
-            if (path_size == pathindex)
-            {
-                mtx_path.unlock();
-                this_thread::sleep_for(std::chrono::milliseconds(50));
-                checkTerminate();
-                continue;
-            }
-
-            previousAction = action;
-            previousheading = atan2(previousAction.x - pstart.x, previousAction.y - pstart.y);
-            //s += path[pathindex].toString() + "\n";
-            s += action.toString() + "\n";
-            sendPath(s);
-            communication_With_Controler.cwrite(s);
-
-            if (path_size >= pathindex)
-            {
-
-                //int sleeptime = (path[pathindex].otime - previousAction.otime) * 1000;
-                //if (sleeptime > 50)
-                int sleeptime = 50;
-                mtx_path.unlock();
-
-                this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
-            }
-            else
-            {
-                communication_With_Controler.cwrite(s);
-                //if (send && path_size > pathindex)
-                mtx_path.unlock();
-                this_thread::sleep_for(std::chrono::milliseconds(50));
-            }
-        }
-        else
-        {
-            string s = "";
-            pstart = current_location;
-            s += pstart.toString() + "\n";
-            s += ObjectPar(-1, -1, -1, -1, -1).toString() + "\n";
-            s += "path 0";
-            s += "\n" + estimateStart.toString(); //for estimate start
-            s += '\0';
-            communication_With_Controler.cwrite(s);
-            mtx_path.unlock();
-            this_thread::sleep_for(std::chrono::milliseconds(50));
-        }
+        path.sendAction(send_string, sleep);
+        if (send_string != "")
+            communication_With_Controler.cwrite(send_string);
+        this_thread::sleep_for(std::chrono::milliseconds(50));
         checkTerminate();
     }
 }
@@ -442,29 +160,75 @@ void print_map(string file)
         if (f.is_open())
         {
             getline(f, line);
+            string factor = line;
+            getline(f, line);
             string w = line;
             getline(f, line);
             string h = line;
             cerr << "EXEUTIVE::START " << w << " " << h << endl;
             cerr << "EXECUTIVE::MAP::" + w + " " + h << endl;
-            communication_With_Planner.cwrite("map 1 " + w + " " + h);
+            int width = stoi(w), height = stoi(h);
+            path.Maxx = width;
+            path.Obstacles = new bool[width * height];
+            int hcount = 0;
+            communication_With_Planner.cwrite("map " + factor + " " + w + " " + h);
+            // while (getline(f, line))
+            // {
+            //     ++hcount;
+            //     communication_With_Planner.cwrite(line);
+            //     for (int i = 0; i < line.size(); i++)
+            //     {
+            //         if (line[i] == '#')
+            //             path.Obstacles[path.getindex(i, height - hcount)] = true;
+            //         else
+            //             path.Obstacles[path.getindex(i, height - hcount)] = false;
+            //     }
+            // }
+
             while (getline(f, line))
-                communication_With_Planner.cwrite(line);
+            {
+                ++hcount;
+                string s = "";
+                char previous = ' ';
+                int ncount = 0;
+                for (int i = 0; i < line.size(); i++)
+                {
+                    if (line[i] == '#')
+                        path.Obstacles[path.getindex(i, height - hcount)] = true;
+                    else
+                        path.Obstacles[path.getindex(i, height - hcount)] = false;
+
+                    if (line[i] != previous)
+                    {
+                        if (i == 0)
+                            s += line[i];
+                        else
+                            s += " " + to_string(ncount);
+                        previous = line[i];
+                    }
+                    ncount += 1;
+                }
+                communication_With_Planner.cwrite(s);
+            }
 
             f.close();
             return;
         }
     }
+    string s = "";
     cerr << "EXECUTIVE::MAP::DEFAULT" << endl;
     communication_With_Planner.cwrite("map 1 2000 2000");
-    for (int i = 0; i < 2000; i++)
-        communication_With_Planner.cwrite("________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________");
+    for (int i = 0; i < 1999; i++)
+        s += "_\n";
+    s += "_";
+    path.Obstacles = new bool[2000 * 2000]{};
+    communication_With_Planner.cwrite(s);
 }
 
 void read_goal(string goal)
 {
     ifstream f(goal);
-    if (f.is_open())
+    if (goal != "NOFILE" && f.is_open())
     {
         int numofgoal;
         f >> numofgoal;
@@ -472,68 +236,121 @@ void read_goal(string goal)
         for (int i = 0; i < numofgoal; i++)
         {
             f >> x >> y;
-            cover.push_back(point(x, y));
+            cerr << "cover " << x << " " << y << endl;
+            path.add_covered(x, y);
         }
         f.close();
         return;
     }
     else
     {
-        cover.push_back(point(10, 10));
-        cover.push_back(point(9, 0));
+        path.add_covered(10, 10);
+        path.add_covered(9, 0);
     }
 }
 
+// void read_tiff(string tiffmap)
+// {
+//     TIFF *tif = (TIFF *)0;  /* TIFF-level descriptor */
+//     GTIF *gtif = (GTIF *)0; /* GeoKey-level descriptor */
+//     int versions[3];
+//     int cit_length;
+//     geocode_t model; /* all key-codes are of this type */
+//     char *citation;
+//     int size;
+//     tagtype_t type;
+//     int width,length;
+
+//     /* Open TIFF descriptor to read GeoTIFF tags */
+//     tif = XTIFFOpen(tiffmap.c_str(), "r");
+//     gtif = GTIFNew(tif);
+//     if (tif && gtif)
+//     {
+//         /* Get the GeoTIFF directory info */
+//         GTIFDirectoryInfo(gtif, versions, 0);
+
+//         /* ASCII keys are variable-length; compute size */
+//         cit_length = GTIFKeyInfo(gtif, GTCitationGeoKey, &size, &type);
+//         if (cit_length > 0)
+//         {
+//             citation = (char*)malloc(size * cit_length);
+//             GTIFKeyGet(gtif, GTCitationGeoKey, citation, 0, cit_length);
+//             printf("Citation:%s\n", citation);
+//         }
+
+//         /* Get some TIFF info on this image */
+//         TIFFGetField(tif, TIFFTAG_IMAGEWIDTH, &width);
+//         TIFFGetField(tif, TIFFTAG_IMAGELENGTH, &length);
+
+//         /* get rid of the key parser */
+//         GTIFFree(gtif);
+
+//         /* close the TIFF file descriptor */
+//         XTIFFClose(tif);
+//     }
+//     cerr << width << " "<<length << " " << cit_length << " " << size << " " << citation<<endl;
+
+//     /* Open GTIF Key parser; keys will be read at this time. */
+
+//     print_map("");
+// }
+
 int main(int argc, char *argv[])
 {
-    cout.precision(numeric_limits<float>::digits10 + 2);
-    cerr.precision(5);
-
-    communication_With_Planner.set("planner", 1, 1, 0, 0);
-    communication_With_Controler.set("controler", 1, 1, 0, 1);
-
-    thread thread_for_controller(thread([=] { sendAction(); }));
-    thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
-
-    communication_With_Planner.cwrite("Start");
-    communication_With_Planner.cwrite("max speed 2.75");
-    communication_With_Planner.cwrite("max turning radius 8");
-    bool map = false, goal = false;
+    string map, goal, tiffmap, boat;
+    map = goal = tiffmap = boat = "NOFILE";
 
     for (int i = 1; i < argc; i++)
     {
         if (!strcmp(argv[i], "-m"))
         {
             if (i + 1 < argc)
-            {
-                map = true;
-                print_map(argv[i + 1]);
-            }
+                map = argv[i + 1];
         }
         else if (!strcmp(argv[i], "-g"))
         {
             if (i + 1 < argc)
-            {
-                goal = true;
-                read_goal(argv[i + 1]);
-            }
+                goal = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-t"))
+        {
+            if (i + 1 < argc)
+                tiffmap = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-b"))
+        {
+            if (i + 1 < argc)
+                boat = argv[i + 1];
+        }
+        else if (!strcmp(argv[i], "-debug"))
+        {
+            path.debug = debug = true;
         }
     }
+    cout.precision(numeric_limits<float>::digits10 + 2);
+    cerr.precision(5);
 
-    if (!map)
-    {
-        string file1 = "NOFILE";
-        print_map(file1);
-    }
-    if (!goal)
-    {
-        cover.push_back(point(10, 10));
-        cover.push_back(point(9, 0));
-    }
+    communication_With_Planner.set("planner", 1, 1, 0, 0);
+    if (boat != "NOFILE")
+        communication_With_Controler.set("controler", 1, 1, 0, 1, boat);
+    else
+        communication_With_Controler.set("controler", 1, 1, 0, 1);
 
-    int size = cover.size();
-    communication_With_Planner.cwrite("path to cover " + to_string(size));
-    for (point p : cover)
+    thread thread_for_controller(thread([=] { sendAction(); }));
+    thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
+
+    communication_With_Planner.cwrite("Start");
+    communication_With_Planner.cwrite("max speed 2.5");
+    communication_With_Planner.cwrite("max turning radius 8");
+
+    // if (tiffmap != "NOFILE")
+    //     read_tiff(tiffmap);
+    // else
+    print_map(map);
+    read_goal(goal);
+
+    communication_With_Planner.cwrite("path to cover " + to_string(path.get_covered().size()));
+    for (point p : path.get_covered())
         communication_With_Planner.cwrite(to_string(p.x) + " " + to_string(p.y));
 
     char done[100];
