@@ -1,8 +1,56 @@
 
 planner=()
 simulator=("-p TRUE")
+v=""
 path="../"
+
+./planner 2>&1 | ./test sample/test1.map sample/goal.goal
 for (( i=1; i <= "$#"; i++ )); do
+
+    if [ ${!i} == "-v" ]; then
+        if [ $((i+1)) -le "$#" ]; then
+            var=$((i+1))
+            test=${!var}
+
+            v="TRUE"
+
+            simulator+=("-m")
+            simulator+=("$path$test.map")
+            planner+=("-m")
+            planner+=("$path$test.map")
+            simulator+=("-g")
+            simulator+=("$path$test.goal")
+            planner+=("-g")
+            planner+=("$path$test.goal")
+            simulator+=("-af")
+            simulator+=("$path$test.asv")
+            simulator+=("-dynamic")
+            simulator+=("$path$test.dynamic")
+            istest="TRUE"
+        fi
+    fi
+    #test
+    if [ ${!i} == "-test" ]; then
+        if [ $((i+1)) -le "$#" ]; then
+            var=$((i+1))
+            test=${!var}
+
+            simulator+=("-m")
+            simulator+=("$path$test.map")
+            planner+=("-m")
+            planner+=("$path$test.map")
+            simulator+=("-g")
+            simulator+=("$path$test.goal")
+            planner+=("-g")
+            planner+=("$path$test.goal")
+            simulator+=("-af")
+            simulator+=("$path$test.asv")
+            simulator+=("-dynamic")
+            simulator+=("$path$test.dynamic")
+            istest="TRUE"
+        fi
+    fi
+
 
     #both
     if [ ${!i} == "-map" ]; then
@@ -96,13 +144,15 @@ for (( i=1; i <= "$#"; i++ )); do
     fi
 
 done
-echo "${simulator[@]}"
+
+
 cd simulator
 ./dynamic_obs_sim_3.py "${simulator[@]}" &
 cd -
 cd executive
 ./shim.py "${planner[@]}"
 cd -
+
 
 # if [[ $map1 ]] && [[ $goal1 ]] && [[ $nbos ]]; then
 #     ./dynamic_obs_sim_3.py "-p TRUE" $map1 $goal1 $nbos &
