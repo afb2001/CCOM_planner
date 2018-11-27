@@ -7,7 +7,7 @@ path="../"
 
 for (( i=1; i <= "$#"; i++ )); do
 
-    if [ ${!i} == "-v" ]; then
+    if [ ${!i} == "-vis" ]; then
         v="TRUE"
     fi
     #test
