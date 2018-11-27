@@ -324,7 +324,6 @@ class DynamicObsSim:
         ''' Monitor for updates to wpts/speed '''
 
         try:
-            
             data = self.soc.recv(4096)
             if(data[:4]== 'path'):
                 n = int(data.split(' ')[1])

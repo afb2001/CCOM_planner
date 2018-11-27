@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
 	"github.com/afb2001/CCOM_planner/dubins"
+	"github.com/afb2001/CCOM_planner/tsp"
 	. "github.com/afb2001/CCOM_planner/util"
 	"math"
 	"math/rand"
@@ -38,8 +39,10 @@ var o common.Obstacles
 var bestVertex *Vertex
 var maxSpeed, maxTurningRadius float64
 
-func InitGlobals(g1 common.Grid, speed, radius float64) {
-	grid, maxSpeed, maxTurningRadius = g1, speed, radius
+var solver tsp.Solver
+
+func InitGlobals(g1 common.Grid, speed, radius float64, s tsp.Solver) {
+	grid, maxSpeed, maxTurningRadius, solver = g1, speed, radius, s
 }
 
 func resetGlobals() {
@@ -145,8 +148,13 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	// which is not a super unlikely scenario, making this heuristic not as horrible as it may seem.
 	// The parent's uncovered path is used because we probably don't know ours yet,
 	// and if we do it could be wrong.
-	approxToGo := parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
+	// approxToGo := parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
+	// 	float64(len(parent.uncovered))*coveragePenalty
+
+	// switching to TSP heuristic (inadmissible)
+	approxToGo := solver.Solve(v.state.X, v.state.Y, parent.uncovered)/maxSpeed*timePenalty -
 		float64(len(parent.uncovered))*coveragePenalty
+
 	// if we're updating without specifying a parent we can cache it, but not otherwise
 	if parentNil {
 		v.approxToGo = approxToGo
@@ -1000,7 +1008,7 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		e.end.currentCostIsSet = true
 		// if bestVertex == nil || e.end.CurrentCost() + e.end.UpdateApproxToGo(nil) < bestVertex.CurrentCost(){
 
-		PrintDebug(e.end.state, "cost =", e.end.CurrentCost(), "color = 1 shape = boat")
+		// PrintDebug(e.end.state, "cost =", e.end.CurrentCost(), "color = 1 shape = boat")
 		// PrintDebug("done")
 
 		heap.Push(qV, e.end)
@@ -1157,6 +1165,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		PrintLog("Couldn't find a plan any better than staying put.")
 	}
 	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
+	PrintDebug("done")
 	return
 }
 

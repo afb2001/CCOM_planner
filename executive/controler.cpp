@@ -29,6 +29,7 @@ double mass = 2000.0;
 double max_power = 8948.4;
 double max_speed = 2.75;
 double probability[4] = {0.5,0.3,0.15,0.05};
+//double probability[4] = {0.1,0.1,0.1,0.7};
 
 struct pointc
 {
@@ -210,9 +211,9 @@ void MPC(double &r, double &t)
 
         rudder = i / 10.0;
 
-        for (int j = 10; j >= 0; --j)
+        for (int j = 100; j >= 0; --j)
         {
-            throttle = j / 10.0;
+            throttle = j / 100.0;
 
             double x1 = x, y1 = y, heading1 = heading, speed1 = speed, starttime = 0, rpm1 = rpm, d_time, temp = 0;
             vector<pointc> tempfuture;
@@ -283,7 +284,6 @@ void sendAction()
                 update = true;
                 command = to_string(rudder) + "," + to_string(throttle);
             }
-
             if (command.size() != 0)
             {
                 command = path + "\n" + command;

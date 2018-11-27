@@ -6,6 +6,7 @@ import (
 	"github.com/afb2001/CCOM_planner/bitStar"
 	"github.com/afb2001/CCOM_planner/common"
 	. "github.com/afb2001/CCOM_planner/parse"
+	"github.com/afb2001/CCOM_planner/tsp"
 	. "github.com/afb2001/CCOM_planner/util"
 	"math/rand"
 	"os"
@@ -48,7 +49,9 @@ func main() {
 
 	var path = ReadPath(reader, maxSpeed)
 
-	bitStar.InitGlobals(*grid, maxSpeed, maxTurningRadius)
+	solver := tsp.NewSolver(*path)
+
+	bitStar.InitGlobals(*grid, maxSpeed, maxTurningRadius, solver)
 
 	fmt.Println("ready")
 

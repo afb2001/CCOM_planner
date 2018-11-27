@@ -184,7 +184,6 @@ void print_map(string file)
             //             path.Obstacles[path.getindex(i, height - hcount)] = false;
             //     }
             // }
-
             while (getline(f, line))
             {
                 ++hcount;

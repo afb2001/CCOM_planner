@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"github.com/afb2001/CCOM_planner/common"
+	"github.com/afb2001/CCOM_planner/tsp"
 	. "github.com/afb2001/CCOM_planner/util"
 	"math"
 	"math/rand"
@@ -18,7 +19,8 @@ var p = common.Path{p1, p2}
 
 func setUp() {
 	g.BlockRange(1, 1, 1)
-	InitGlobals(g, 0.5, 0.20)
+	solver := tsp.NewSolver(p)
+	InitGlobals(g, 0.5, 0.20, solver)
 	start = common.State{X: 2.5, Y: 1.25, Heading: 3 * math.Pi / 2}
 }
 
@@ -261,7 +263,8 @@ func TestBitStar2(t *testing.T) {
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
 	var p = bigPath()
-	InitGlobals(bigGrid(), 2.5, 0.75)
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
 	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, &p, 0.09, o1)
 	fmt.Println(plan.String())
@@ -275,7 +278,8 @@ func TestFindAStarPlan(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
 	var p = bigPath()
-	InitGlobals(bigGrid(), 2.5, 0.75)
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
 	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
 	fmt.Println(plan.String())
@@ -289,7 +293,8 @@ func TestFindAStarPlan2(t *testing.T) {
 	t.Log("Testing A* without any path to cover")
 	// redo setup
 	var p = new(common.Path)
-	InitGlobals(bigGrid(), 2.5, 0.75)
+	solver := tsp.NewSolver(*p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
 	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, p, 0.095, *o1)
 	if plan != nil {
@@ -298,12 +303,13 @@ func TestFindAStarPlan2(t *testing.T) {
 }
 
 func TestFindAStarPlan3(t *testing.T) {
-	t.SkipNow() // this takes a while (almost a minute
+	// t.SkipNow() // this takes a while (almost a minute
 	t.Log("Testing A* a bunch of times in a row from random states")
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
 	var p = bigPath()
-	InitGlobals(bigGrid(), 2.5, 0.75)
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
 	for i := 0; i < 60; i++ {
 		s := randomState(50, 100, 0, 20)

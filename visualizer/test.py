@@ -396,6 +396,8 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         print "require 2 argument map and goal file\n\n\n\n\n\n\n\n\n\n"
         os._exit(0)
+
+    print sys.argv[1]
     f = open(sys.argv[1], "r")
     f1 = f.readlines()
     static_obs = []
@@ -403,16 +405,20 @@ if __name__ == "__main__":
     xlim = 0
     ylim = 0
     for i in range(0, len(f1)):
-        if i == 0:
+        if i == 1:
             xlim = np.abs(int(int(f1[i])))
             maxx = np.abs(int(int(f1[i])))
-        elif i == 1:
+        elif i == 2:
             ylim = np.abs(int(int(f1[i])))
             maxy = np.abs(int(int(f1[i])))
+        elif i == 0:
+            pass
         else:
             for j in range(0, len(f1[i])):
                 if f1[i][j] == '#':
                     static_obs.append((j, (maxy - i + 1)))
+
+    print maxx,maxy
 
     f = open(sys.argv[2], "r")
     f1 = f.readlines()

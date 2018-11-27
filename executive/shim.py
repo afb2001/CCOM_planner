@@ -150,8 +150,11 @@ if __name__ == "__main__":
     obs_thread = threading.Thread(target=recv_obs)
     obs_thread.do_run = True
     obs_thread.start()
+    
     try:
         recv_control()
+    except expression:
+        print expression
     finally:
         sys.stderr.write('Shutting down the state listeners\n')
         obs_thread.do_run = False

@@ -74,6 +74,8 @@ class PLOT:
         self.select = None
         self.pDynamicHit = None
         self.pStaticHit = None
+        self.dynamicMap = {}
+        self.dynamicAction = {}
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
@@ -102,8 +104,6 @@ class PLOT:
         self.yobs = []
         self.hobs = []
         self.exp_img = []
-        self.dynamicMap = {}
-        self.dynamicAction = {}
         
         for i in range(1, 8):
             self.exp_img.append(pygame.image.load(

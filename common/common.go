@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/afb2001/CCOM_planner/util"
 	"math"
 	"strings"
 )
@@ -203,6 +204,7 @@ func (p *Plan) AppendState(s *State) {
 			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
 			p.States[len(p.States)-1].TimeUntil(s) >= planTimeDensity) {
 		p.States = append(p.States, s)
+		util.PrintDebug(s.String(), "cost =", 0, "color = 1 shape = boat")
 	}
 }
 
