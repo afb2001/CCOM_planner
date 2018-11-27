@@ -99,12 +99,12 @@ void requestPath()
 
 void requestWorldInformation()
 {
-    char locationString[8192];
+    char locationString[81920];
     double x, y, heading, speed, otime;
     int index, h, oldbytesRead, bytesRead, count, update;
     while (running)
     {
-        read(STDIN_FILENO, locationString, 8192);
+        read(STDIN_FILENO, locationString, 81920);
         if (!strncmp(locationString, "Location", 8))
         {
             request_start = 1;
