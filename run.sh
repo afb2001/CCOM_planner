@@ -2,32 +2,13 @@
 planner=()
 simulator=("-p TRUE")
 v=""
+vis=()
 path="../"
 
-./planner 2>&1 | ./test sample/test1.map sample/goal.goal
 for (( i=1; i <= "$#"; i++ )); do
 
     if [ ${!i} == "-v" ]; then
-        if [ $((i+1)) -le "$#" ]; then
-            var=$((i+1))
-            test=${!var}
-
-            v="TRUE"
-
-            simulator+=("-m")
-            simulator+=("$path$test.map")
-            planner+=("-m")
-            planner+=("$path$test.map")
-            simulator+=("-g")
-            simulator+=("$path$test.goal")
-            planner+=("-g")
-            planner+=("$path$test.goal")
-            simulator+=("-af")
-            simulator+=("$path$test.asv")
-            simulator+=("-dynamic")
-            simulator+=("$path$test.dynamic")
-            istest="TRUE"
-        fi
+        v="TRUE"
     fi
     #test
     if [ ${!i} == "-test" ]; then
@@ -47,6 +28,8 @@ for (( i=1; i <= "$#"; i++ )); do
             simulator+=("$path$test.asv")
             simulator+=("-dynamic")
             simulator+=("$path$test.dynamic")
+            vis+=("$path$test.map")
+            vis+=("$path$test.goal")
             istest="TRUE"
         fi
     fi
@@ -61,6 +44,7 @@ for (( i=1; i <= "$#"; i++ )); do
             simulator+=("$path$map")
             planner+=("-m")
             planner+=("$path$map")
+            vis+=("$path$map")
         fi
     fi
 
@@ -72,6 +56,7 @@ for (( i=1; i <= "$#"; i++ )); do
             simulator+=("$path$goal")
             planner+=("-g")
             planner+=("$path$goal")
+            vis+=("$path$goal")
         fi
     fi
 
@@ -144,14 +129,22 @@ for (( i=1; i <= "$#"; i++ )); do
     fi
 
 done
+if [ "$v" = "TRUE" ]; then
+    cd simulator
+    ./dynamic_obs_sim_3.py "${simulator[@]}" &
+    cd -
+    cd executive
+    ./shim.py "${planner[@]}" 2>&1>/dev/null | ./../visualizer/test.py  "${vis[@]}"
+    cd -
+else
+    cd simulator
+    ./dynamic_obs_sim_3.py "${simulator[@]}" &
+    cd -
+    cd executive
+    ./shim.py "${planner[@]}"
+    cd -
+fi
 
-
-cd simulator
-./dynamic_obs_sim_3.py "${simulator[@]}" &
-cd -
-cd executive
-./shim.py "${planner[@]}"
-cd -
 
 
 # if [[ $map1 ]] && [[ $goal1 ]] && [[ $nbos ]]; then
