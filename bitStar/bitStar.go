@@ -1008,7 +1008,7 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		e.end.currentCostIsSet = true
 		// if bestVertex == nil || e.end.CurrentCost() + e.end.UpdateApproxToGo(nil) < bestVertex.CurrentCost(){
 
-		PrintDebug(e.end.state, "cost =", e.end.CurrentCost(), "color = 1 shape = boat")
+		// PrintDebug(e.end.state, "cost =", e.end.CurrentCost(), "color = 1 shape = boat")
 		// PrintDebug("done")
 
 		heap.Push(qV, e.end)
@@ -1165,6 +1165,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		PrintLog("Couldn't find a plan any better than staying put.")
 	}
 	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
+	PrintDebug("done")
 	return
 }
 
