@@ -7,7 +7,7 @@ using namespace std;
 
 bool box = true;
 bool round1 = false;
-bool square = false;
+bool square = true;
 
 double getCurrentTime()
 {

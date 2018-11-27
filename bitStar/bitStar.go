@@ -152,8 +152,8 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	// 	float64(len(parent.uncovered))*coveragePenalty
 
 	// switching to TSP heuristic (inadmissible)
-	approxToGo := solver.Solve(v.state.X, v.state.Y, parent.uncovered)/maxSpeed*timePenalty -
-		float64(len(parent.uncovered))*coveragePenalty
+	approxToGo := solver.Solve(v.state.X, v.state.Y, parent.uncovered) / maxSpeed * timePenalty //-
+	//float64(len(parent.uncovered))*coveragePenalty
 
 	// if we're updating without specifying a parent we can cache it, but not otherwise
 	if parentNil {
@@ -266,8 +266,9 @@ func (e *Edge) UpdateTrueCost() float64 {
 		// TODO -- maybe make this more efficient... it shouldn't happen that much though
 		e.end.uncovered = *(e.end.uncovered.Without(c))
 	}
+	timeFromStart := e.end.state.Time - start.Time
 	// update e's true cost
-	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*coveragePenalty
+	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*(coveragePenalty-timeFromStart)
 
 	// update e.end's current cost
 	// Not doing this anymore. Could be a mistake who knows
