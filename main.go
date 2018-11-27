@@ -24,10 +24,6 @@ const (
 
 //endregion
 
-//region Util
-
-//endregion
-
 //region main
 
 // globals

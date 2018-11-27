@@ -624,6 +624,13 @@ func getPlan(edge *Edge) (plan *common.Plan) {
 	callback := func(q *[3]float64, inc float64) int {
 		t = inc/maxSpeed + plan.Start.Time
 		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
+
+		// this is for debugging and can be removed in production
+		s.CollisionProbability = o.CollisionExistsWithArray(*q, t)
+		if grid.IsBlocked(q[0], q[1]) {
+			s.CollisionProbability = 1
+		}
+
 		plan.AppendState(s)
 		return 0
 	}
@@ -1122,7 +1129,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 			// for m := 0; m < bitStarSamples; m++ {
 			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, math.MaxFloat64)}
 		}
-		totalSampleCount += bitStarSamples
+		totalSampleCount += currentSampleCount
 		// allSamples = append(allSamples, samples...)
 		allSamples = samples
 		if verbose {
@@ -1156,7 +1163,9 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if verbose {
 			PrintLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
-		currentSampleCount = len(samples)
+		//currentSampleCount = len(samples)
+		currentSampleCount += currentSampleCount
+		//PrintLog(currentSampleCount)
 	}
 	if verbose {
 		PrintLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))

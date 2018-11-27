@@ -311,7 +311,7 @@ func TestFindAStarPlan3(t *testing.T) {
 	solver := tsp.NewSolver(p)
 	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
-	for i := 0; i < 60; i++ {
+	for i := 0; i < 10; i++ {
 		s := randomState(50, 100, 0, 20)
 		s.Time = float64(i)
 		plan := FindAStarPlan(*s, &p, 0.09, *o1)

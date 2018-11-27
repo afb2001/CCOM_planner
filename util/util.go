@@ -2,7 +2,7 @@ package util
 
 import "log"
 
-const debugVis bool = true
+const debugVis bool = false
 
 type ErrorPolicy int
 
