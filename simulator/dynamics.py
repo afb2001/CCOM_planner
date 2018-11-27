@@ -80,7 +80,7 @@ class Dynamics:
                 self.rpm += rcr*delta_t
 
         prop_rpm = self.model['prop_ratio']*self.rpm
-        prop_speed = prop_rpm/self.model['prop_pitch']
+        prop_speed = max(prop_rpm/self.model['prop_pitch'],0)
 
         rudder_speed = max(math.sqrt(prop_speed),self.speed)
 

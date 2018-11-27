@@ -332,15 +332,13 @@ class DynamicObsSim:
                 self.future_heading = []
                 for i in range(0,n):
                     data = self.soc.recv(4096)
-                    if data.strip():
-                        data1 = data.split(' ');
-                        self.future_x.append(float(data1[0]))
-                        self.future_y.append(float(data1[1]))
-                        self.future_heading.append(float(data1[2]))
-                data = self.soc.recv(4096)
-                if data.strip():
                     data1 = data.split(' ');
-                    self.estimateStart = (float(data1[0]),float(data1[1]),float(data1[2]))
+                    self.future_x.append(float(data1[0]))
+                    self.future_y.append(float(data1[1]))
+                    self.future_heading.append(float(data1[2]))
+                data = self.soc.recv(4096)
+                data1 = data.split(' ');
+                self.estimateStart = (float(data1[0]),float(data1[1]),float(data1[2]))
                 data = self.soc.recv(4096)
                 print('***************', data, '*******************')
                 dummy = data.decode('utf-8').split(",")

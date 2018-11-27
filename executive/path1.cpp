@@ -3,10 +3,11 @@
 #include <cmath>
 
 using namespace std;
-#define maxspeed 1
+#define maxspeed 1.75
 
 bool box = true;
 bool round1 = false;
+bool square = false;
 
 double getCurrentTime()
 {
@@ -68,6 +69,7 @@ int main()
         double h = -0.8;
         double h1 = 1.57;
         double h2 = 0;
+        double h3 = 0;
         double ot = getCurrentTime();
         int count = 0;
         double s = 0;
@@ -83,7 +85,7 @@ int main()
                 }
                 heading = h;
             }
-            else
+            else if(square)
             {
                 if (n % 40 == 0)
                 {
@@ -91,6 +93,12 @@ int main()
                     h2 = fmod(h2, M_PI * 2);
                 }
                 heading = h2;
+            }
+            else
+            {
+                h3 += M_PI/45;
+                h3 = fmod(h3, M_PI * 2);
+                heading = h3;
             }
             // if(n < 20)
             // {
