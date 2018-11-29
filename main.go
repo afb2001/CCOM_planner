@@ -85,9 +85,9 @@ func main() {
 		HandleError(err, LogErr)
 		ReadObstacles(reader, o, nObstacles)
 
-		// plan := makePlan(grid, start, *path, o)
-		// plan := bitStar.BitStar(*start, timeToPlan, o)
 		PrintLog("Planning...")
+		//plan := makePlan(grid, start, *path, o)
+		//plan := bitStar.BitStar(*start, path, timeToPlan, o)
 		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
 		if plan == nil {
 			PrintLog("Couldn't find a plan.")

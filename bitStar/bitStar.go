@@ -813,10 +813,10 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 /**
 Alg 1 (obviously)
 */
-func BitStar(startState common.State, toCover *common.Path, timeRemaining float64, o1 *common.Obstacles) *common.Plan {
+func BitStar(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) *common.Plan {
 	endTime := timeRemaining + now()
 	// setup
-	o, start = *o1, startState // assign globals
+	o, start = o1, startState // assign globals
 	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: *toCover}
 	// TODO! -- verify that startV.currentCost = 0
 	startV.currentCostIsSet = true
@@ -846,7 +846,9 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 				PrintLog("Starting sampling")
 			}
 			samples = make([]*Vertex, bitStarSamples)
-			PrintLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
+			if verbose {
+				PrintLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
+			}
 			for m := 0; m < bitStarSamples; m++ {
 				samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, bestVertex.CurrentCost())}
 			}
@@ -961,30 +963,31 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 	}
 	PrintLog("Done with the main loop. Now to trace the tree...")
 	PrintLog("But first: samples!")
-	PrintLog(showSamples(vertices, allSamples, &grid, &start, *toCover))
+	//PrintLog(showSamples(vertices, allSamples, &grid, &start, *toCover))
 	PrintLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, len(vertices)))
 
-	// figure out the plan I guess
-	// turn tree into slice
-	branch := make([]*Edge, 0)
-	for cur := bestVertex; cur != startV; cur = cur.parentEdge.start {
-		branch = append(branch, cur.parentEdge)
-	}
-
-	// reverse the plan order (this might look dumb)
-	s := branch
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
-	branch = s
-
-	p := new(common.Plan)
-	p.Start = start
-	p.AppendState(&start) // yes this is necessary
-	for _, e := range branch {
-		p.AppendState(e.end.state)
-		p.AppendPlan(e.plan) // should be fully calculate by now
-	}
+	//// figure out the plan I guess
+	//// turn tree into slice
+	//branch := make([]*Edge, 0)
+	//for cur := bestVertex; cur != startV; cur = cur.parentEdge.start {
+	//	branch = append(branch, cur.parentEdge)
+	//}
+	//
+	//// reverse the plan order (this might look dumb)
+	//s := branch
+	//for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+	//	s[i], s[j] = s[j], s[i]
+	//}
+	//branch = s
+	//
+	//p := new(common.Plan)
+	//p.Start = start
+	//p.AppendState(&start) // yes this is necessary
+	//for _, e := range branch {
+	//	p.AppendState(e.end.state)
+	//	p.AppendPlan(e.plan) // should be fully calculate by now
+	//}
+	p := TracePlan(bestVertex)
 	return p
 }
 

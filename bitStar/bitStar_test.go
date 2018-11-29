@@ -251,7 +251,7 @@ func TestBitStar(t *testing.T) {
 	t.SkipNow()
 	t.Log("Testing BIT* in a small world")
 	o1 := new(common.Obstacles)
-	plan := BitStar(start, &p, 0.09, o1)
+	plan := BitStar(start, &p, 0.09, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -259,17 +259,41 @@ func TestBitStar(t *testing.T) {
 }
 
 func TestBitStar2(t *testing.T) {
-	t.SkipNow()
+	//t.SkipNow()
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
 	var p = bigPath()
 	solver := tsp.NewSolver(p)
 	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
-	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, &p, 0.09, o1)
+	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, &p, 0.09, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
+	}
+}
+
+func TestBitStar3(t *testing.T) {
+	t.SkipNow() // this takes a while (almost a minute
+	t.Log("Testing BIT* a bunch of times in a row from random states")
+	rand.Seed(time.Now().UnixNano())
+	// redo setup
+	var p = bigPath()
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
+	o1 := new(common.Obstacles)
+	for i := 0; i < 60; i++ {
+		s := randomState(50, 100, 0, 20)
+		s.Time = float64(i)
+		plan := BitStar(*s, &p, 0.09, *o1)
+		if plan == nil || plan.States == nil {
+			if !grid.IsBlocked(s.X, s.Y) {
+				t.Errorf("Empty plan for unblocked state")
+				break
+			} else {
+				PrintLog("Sampled blocked state " + s.String())
+			}
+		}
 	}
 }
 
