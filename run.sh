@@ -2,6 +2,8 @@
 planner=()
 simulator=("-p TRUE")
 v=""
+v1=""
+v2=""
 vis=()
 path="../"
 
@@ -9,6 +11,14 @@ for (( i=1; i <= "$#"; i++ )); do
 
     if [ ${!i} == "-vis" ]; then
         v="TRUE"
+    fi
+
+    if [ ${!i} == "-vis1" ]; then
+        v1="TRUE"
+    fi
+
+    if [ ${!i} == "-vis2" ]; then
+        v2="TRUE"
     fi
     #test
     if [ ${!i} == "-test" ]; then
@@ -135,6 +145,20 @@ if [ "$v" = "TRUE" ]; then
     cd -
     cd executive
     ./shim.py "${planner[@]}" 2>&1>/dev/null | ./../visualizer/test.py  "${vis[@]}"
+    cd -
+elif [ "$v1" = "TRUE" ]; then
+    cd simulator
+    ./dynamic_obs_sim_3.py "${simulator[@]}" &
+    cd -
+    cd executive
+    ./shim.py "${planner[@]}" 2>&1>/dev/null | ./../visualizer/test.py  "${vis[@]}"
+    cd -
+elif [ "$v2" = "TRUE" ]; then
+    cd simulator
+    ./dynamic_obs_sim_3.py "${simulator[@]}" &
+    cd -
+    cd executive
+    ./shim.py "${planner[@]}" 2>&1>/dev/null | ./../visualizer/visualizer2.py  "${vis[@]}"
     cd -
 else
     cd simulator

@@ -81,8 +81,8 @@ class PLOT:
         self.F_goal_location = []
         self.future_heading = []
         self.estimateStart = (0, 0, 0)
-        self.triangleX = (0, -2, 2)
-        self.triangleY = (-5, 5, 5)
+        self.triangleX = (0, -5, 5)
+        self.triangleY = (-10, 10, 10)
         self.static_obs = static_obs
         self.maxColor = -10000000
         self.minColor = 100000000
@@ -262,8 +262,9 @@ class PLOT:
             self.draw_static_obs(Color_Red, *obs)
         for index in range(self.nobs):
             if self.shapeobs[index] == 1:
-                self.draw_vehicle(
+                yy = self.draw_vehicle(
                     self.hobs[index], self.getColor(self.costobs[index]), *self.scale_item(self.xobs[index], self.yobs[index]))
+                self.draw_text_cost(self.costobs[index],self.heauristicobs[index],self.scale_item(self.xobs[index], self.yobs[index])[0],yy)
             else:
                 self.drawCircle(self.getColor(self.costobs[index]),*self.scale_item(self.xobs[index], self.yobs[index]))
                 # self.draw_dot(colors[self.colorsobs[index]],self.xobs[index], self.yobs[index])
@@ -299,12 +300,25 @@ class PLOT:
             tY.append(self.triangleX[i]*s + self.triangleY[i]*c + y)
         pygame.draw.polygon(self.display, color, ((
             tX[0], tY[0]), (tX[1], tY[1]), (tX[2], tY[2])))
+        return min(tY[0],tY[1],tY[2])
     def drawCircle(self,color, x, y):
         pygame.draw.circle(self.display, color, (int(x),int(y)), 2)
 
-    def draw_text_cost(self,cost,x,y):
-        text = str( int(cost) )
-        textsurface = self.myfont1.render(text, True, (0, 0, 0))
+    def draw_text_cost(self,cost,heauristic,x,y):
+        text = "f " + str( int(cost+heauristic) )
+        textsurface = self.myfont.render(text, True, (0, 0, 0))
+        y += textsurface.get_height()
+        self.display.blit(textsurface, (x, y))
+        
+        text = "c " + str( int(cost) ) 
+        textsurface = self.myfont.render(text, True, (0, 0, 0))
+        y += textsurface.get_height()
+        self.display.blit(textsurface, (x, y))
+        
+
+        text = "h " + str( int(heauristic) )
+        textsurface = self.myfont.render(text, True, (0, 0, 0))
+        y += textsurface.get_height()
         self.display.blit(textsurface, (x, y))
             # text = str(int(self.moveX+(self.lines - i + 1)
             #                * self.maxX/(self.lines + 1)))
