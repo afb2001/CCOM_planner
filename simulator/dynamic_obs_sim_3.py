@@ -602,7 +602,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
                         help='File for goal location')
     parser.add_argument('-e', '--environment', dest='environment', action='store', default='False',
-                        help='File for enviroment affect, either true with defalt 1,90 or true,[speed],[direction]')
+                        help='File for enviroment affect, either true with defalt 1,90,0 or true,[speed],[direction],[variance]')
 
     parser.add_argument('-model', '--boatmodel', dest='model', action='store', default='cw4',
                         help='File for name for model')
@@ -638,9 +638,8 @@ if __name__ == '__main__':
     if args.environment.lower() != 'false':
         data = args.environment.lower().split(',')
         if(len(data) > 1):
-            print data[2]
             try:
-                environment = ev.Environment(float(data[1]),float(data[2]))
+                environment = ev.Environment(float(data[1]),float(data[2]),float(data[3]))
             except:
                 print "WRONG argument, No current affect is given"
         else:
