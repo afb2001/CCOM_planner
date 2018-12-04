@@ -434,7 +434,7 @@ class DynamicObsSim:
 
         if self.plotaxes == None:
             # start_time = time.time()
-            self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.future_x,self.future_y,self.future_heading,self.estimateStart)
+            self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.vobs,self.future_x,self.future_y,self.future_heading,self.estimateStart)
             self.plot_draw.update()
             # print("--- %s seconds ---" % ((time.time() - start_time)*1000))
             # self.plotaxes = plt.plot(self.xx, self.yy, ".b")
@@ -526,7 +526,7 @@ class DynamicObsSim:
         
     
         if self.plot_boolean:
-            self.plot_draw.on_execute(self.curr_x, self.curr_y, self.start_heading, self.nobs, self.xobs, self.yobs, self.hobs)
+            self.plot_draw.on_execute(self.curr_x, self.curr_y, self.start_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.vobs)
             self.plot_draw.update()
         
         update_thread = threading.Thread(target=self.update_th)
@@ -536,7 +536,7 @@ class DynamicObsSim:
         try:
             if self.plot_boolean:
                 while True:
-                    self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.future_x,self.future_y,self.future_heading,self.estimateStart,self.goal_location)
+                    self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.vobs,self.future_x,self.future_y,self.future_heading,self.estimateStart,self.goal_location)
                     self.plot_draw.update()
                     time.sleep(0.05)
                 update_thread.join(timeout=1000)
