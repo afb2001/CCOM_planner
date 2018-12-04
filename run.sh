@@ -144,7 +144,7 @@ if [ "$v" = "TRUE" ]; then
     ./dynamic_obs_sim_3.py "${simulator[@]}" &
     cd -
     cd executive
-    ./shim.py "${planner[@]}" 2>&1>/dev/null | ./../visualizer/test.py  "${vis[@]}"
+    ./shim.py "${planner[@]}" 2>&1>/dev/null | tee >/dev/null >(../visualizer/test.py  "${vis[@]}") >(../visualizer/visualizer2.py  "${vis[@]}")
     cd -
 elif [ "$v1" = "TRUE" ]; then
     cd simulator
