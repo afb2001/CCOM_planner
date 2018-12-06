@@ -77,6 +77,7 @@ class PLOT:
         self.pStaticHit = None
         self.dynamicMap = {}
         self.dynamicAction = {}
+        self.pause = False
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
@@ -118,8 +119,6 @@ class PLOT:
         return -math.atan2(p0[0]-p1[0],p0[1]-p1[1])
 
     def selects(self):
-        
-            
         self.mutex.acquire()
         try:
             for key, value in self.dynamicAction.iteritems():
@@ -134,6 +133,16 @@ class PLOT:
                         index = 0
                     self.dynamicAction[key] = (self.angle(self.dynamicOBS[key],l[index]),3,index)
             s = self.dynamicAction
+        finally:
+            self.mutex.release()
+        return s
+    def getPause(self):
+        self.mutex.acquire()
+        try:
+            if self.pause:
+                s = "pause"
+            else:
+                s = "start"
         finally:
             self.mutex.release()
         return s
@@ -242,6 +251,9 @@ class PLOT:
                     ((int(self.curr_x) / d) * d / float(self.maxX))
                 self.moveY = (int(self.curr_y) / d) * d
                 self.moveX = (int(self.curr_x) / d) * d
+            elif event.key == pygame.K_RSHIFT or event.key == pygame.K_LSHIFT:
+                self.pause = not self.pause
+                
 
     def on_loop(self):
         pass

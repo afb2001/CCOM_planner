@@ -137,9 +137,11 @@ void requestWorldInformation()
         else if (!strncmp(locationString, "pause", 5))
         {
             pause_all = true;
+            cerr<< "pause" << endl;
         }
         else if (!strncmp(locationString, "start", 5))
         {
+            cerr<< "start" << endl;
             pause_all = false;
         }
         else
