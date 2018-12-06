@@ -18,6 +18,7 @@ var p1, p2 = common.State{X: 0.5, Y: 1.5}, common.State{X: 0.5, Y: 2.5}
 var p = common.Path{p1, p2}
 
 func setUp() {
+	DebugVis = false
 	g.BlockRange(1, 1, 1)
 	solver := tsp.NewSolver(p)
 	InitGlobals(g, 0.5, 0.20, solver)
@@ -155,9 +156,9 @@ func TestEdge_UpdateStart(t *testing.T) {
 func TestStaticCollision(t *testing.T) {
 	t.Log("Testing edge through obstacle...")
 	toCover := p.Without(p2) // so we can have just one point to cover
-	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: *toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
-	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
+	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 1.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -259,7 +260,7 @@ func TestBitStar(t *testing.T) {
 }
 
 func TestBitStar2(t *testing.T) {
-	//t.SkipNow()
+	t.SkipNow()
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
 	var p = bigPath()
@@ -327,7 +328,7 @@ func TestFindAStarPlan2(t *testing.T) {
 }
 
 func TestFindAStarPlan3(t *testing.T) {
-	// t.SkipNow() // this takes a while (almost a minute
+	// t.SkipNow() // this takes a while
 	t.Log("Testing A* a bunch of times in a row from random states")
 	rand.Seed(time.Now().UnixNano())
 	// redo setup

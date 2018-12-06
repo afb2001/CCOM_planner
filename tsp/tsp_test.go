@@ -20,4 +20,7 @@ func TestSolver_Solve(t *testing.T) {
 	if d := solver.Solve(0, 0, *path); d != 15 {
 		t.Errorf("Expected %f, got %f", float64(15), d)
 	}
+	if d := solver.Solve(1, 0, *path); d != 14 {
+		t.Errorf("Expected %f, got %f", float64(14), d)
+	}
 }

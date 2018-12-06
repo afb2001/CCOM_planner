@@ -66,7 +66,7 @@ func TestPath_Remove(t *testing.T) {
 	s1 := State{X: 0, Y: 0, Heading: 0, Speed: 0, Time: 0}
 	s2 := State{X: 0.5, Y: 0.5, Heading: 0, Speed: 0, Time: 12.46}
 	p := &Path{s1, s2}
-	p = p.Without(s1)
+	*p = p.Without(s1)
 	if !reflect.DeepEqual(*p, Path{s2}) {
 		t.Errorf("Removal failed: expected %v, got %v", Path{s2}, *p)
 	}

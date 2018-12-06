@@ -1,14 +1,18 @@
 package util
 
-import "log"
+import (
+	"fmt"
+	"log"
+)
 
-const debugVis bool = true
+var DebugVis = true
 
 type ErrorPolicy int
 
 const (
 	IgnoreErr ErrorPolicy = iota
 	LogErr
+	ParseErr
 	FatalErr
 )
 
@@ -30,9 +34,16 @@ func PrintLog(v ...interface{}) {
 Print a debug visualization for the planner.
 */
 func PrintDebug(v ...interface{}) {
-	if debugVis {
+	if DebugVis {
 		log.Println(append([]interface{}{"Planner visualization:"}, v...)...)
 	}
+}
+
+/**
+Show a vertex in the specified visualizer with the specified shape.
+*/
+func PrintDebugVertex(vertex string, shape string, vis int) {
+	PrintDebug(vertex, fmt.Sprintf("shape = %s vis = vis%d", shape, vis))
 }
 
 /**
@@ -44,10 +55,10 @@ func HandleError(err error, policy ErrorPolicy) {
 	}
 	switch policy {
 	case IgnoreErr:
-		return
 	case LogErr:
 		PrintLog("Encountered an error:", err)
-		return
+	case ParseErr:
+		fallthrough
 	case FatalErr:
 		PrintError(err)
 	}

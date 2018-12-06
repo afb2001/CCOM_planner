@@ -128,7 +128,7 @@ type Path []State
 /**
 Remove the given state from the Path. Modifies the original Path.
 */
-func (p Path) Without(s State) *Path {
+func (p Path) Without(s State) Path {
 	b := Path{}
 	for _, x := range p {
 		if s.X != x.X || s.Y != x.Y {
@@ -136,7 +136,7 @@ func (p Path) Without(s State) *Path {
 		}
 	}
 	//*p = b
-	return &b
+	return b
 }
 
 func (p Path) MaxDistanceFrom(s State) (max float64) {
@@ -204,13 +204,7 @@ func (p *Plan) AppendState(s *State) {
 			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
 			p.States[len(p.States)-1].TimeUntil(s) >= planTimeDensity) {
 		p.States = append(p.States, s)
-		var color int
-		if s.CollisionProbability > 0.5 {
-			color = 2
-		} else {
-			color = 1
-		}
-		util.PrintDebug(s.String(), "cost =", 0, "color =", color, "shape = boat")
+		util.PrintDebug(s.String(), "g =", 0, "h =", 0, "shape = boat vis = vis1")
 	}
 }
 
@@ -331,6 +325,11 @@ func (g *Grid) IsBlocked(x float64, y float64) bool {
 //endregion
 
 //region Obstacles
+
+type Obstacle struct {
+	Initial State
+	Stddev  float64
+}
 
 /**
 Type alias for (dynamic) obstacle collection.
