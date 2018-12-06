@@ -20,7 +20,6 @@
 // #include "xtiffio.h"
 // #include "geotiffio.h"
 
-int update2 = 250;//50;
 
 using namespace std;
 
@@ -28,7 +27,9 @@ int running = 1;
 int request_start = 0;
 
 Path path;
-bool debug = false;
+bool debug = true;
+
+bool pause_all = false;
 
 Communitcation communication_With_Planner, communication_With_Controler;
 
@@ -64,6 +65,11 @@ void requestPath()
 
     while (running)
     {
+        if(debug && pause_all)
+        {
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            continue;
+        }
         if (path.finish())
         {
             this_thread::sleep_for(chrono::milliseconds(1000));
@@ -128,6 +134,14 @@ void requestWorldInformation()
             } while (update);
             path.unlock_obs();
         }
+        else if (!strncmp(locationString, "pause", 5))
+        {
+            pause_all = true;
+        }
+        else if (!strncmp(locationString, "start", 5))
+        {
+            pause_all = false;
+        }
         else
         {
             cerr << "EXECUTIVE::ERROR REQUEST" << endl;
@@ -144,11 +158,15 @@ void sendAction()
     string send_string;
     while (running)
     {
-
+        if(debug && pause_all)
+        {
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            continue;
+        }
         path.sendAction(send_string, sleep);
         if (send_string != "")
             communication_With_Controler.cwrite(send_string);
-        this_thread::sleep_for(std::chrono::milliseconds(update2));
+        this_thread::sleep_for(std::chrono::milliseconds(50));
         checkTerminate();
     }
 }
