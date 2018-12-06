@@ -377,7 +377,7 @@ def update():
                 continue
             if s[4].strip().lower() == 'done':
                 break
-            if len(s) > 20 and s[20].strip().lower() != 'vis2':
+            if len(s) > 20 and s[20].strip().lower() != 'vis1':
                 continue
             nobs += 1
             xobs.append(float(s[4]))
