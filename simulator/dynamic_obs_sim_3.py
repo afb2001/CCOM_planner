@@ -21,6 +21,11 @@ import socket
 import datetime
 #import matplotlib.animation as animation
 # from matplotlib import rcParams, cycler
+# period = 0.05
+# waitTime = 0.015
+period = 0.5
+waitTime = 0.15
+
 
 
 class DynamicObsSim:
@@ -62,7 +67,7 @@ class DynamicObsSim:
         self.curr_heading = self.start_heading
 
         # Loop at some rate
-        self.period = 0.05
+        self.period = period
 
         self.last_update_time = None
 
@@ -685,17 +690,17 @@ if __name__ == '__main__':
     sim.port = 9000
 
     try:
-        sim.soc.settimeout(0.015)  # needs to be lower then self.period
+        sim.soc.settimeout(waitTime)  # needs to be lower then self.period
         sim.soc.bind((sim.host, sim.port))
     except socket.error as e:
         exit("unable to bind to: %s:%s" % (sim.host, sim.port))
     print("socket to receive desired ASV state: %s %s" % sim.soc.getsockname())
 
     # Send to UDP server (via UDP client) the current ASV state
-    sim.soc_asv_out.settimeout(0.015)  # needs to be lower then self.period
+    sim.soc_asv_out.settimeout(waitTime)  # needs to be lower then self.period
 
     # Send to UDP server (via UDP client) the current Obstacles states
-    sim.soc_obs_out.settimeout(0.015)
+    sim.soc_obs_out.settimeout(waitTime)
 
     try:
         sim.run()

@@ -20,6 +20,8 @@
 // #include "xtiffio.h"
 // #include "geotiffio.h"
 
+int update2 = 250;//50;
+
 using namespace std;
 
 int running = 1;
@@ -146,7 +148,7 @@ void sendAction()
         path.sendAction(send_string, sleep);
         if (send_string != "")
             communication_With_Controler.cwrite(send_string);
-        this_thread::sleep_for(std::chrono::milliseconds(50));
+        this_thread::sleep_for(std::chrono::milliseconds(update2));
         checkTerminate();
     }
 }

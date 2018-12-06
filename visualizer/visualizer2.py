@@ -310,7 +310,7 @@ class PLOT:
         y += textsurface.get_height()
         self.display.blit(textsurface, (x, y))
         
-        text = "c " + str( int(cost) ) 
+        text = "g " + str( int(cost) ) 
         textsurface = self.myfont.render(text, True, (0, 0, 0))
         y += textsurface.get_height()
         self.display.blit(textsurface, (x, y))
