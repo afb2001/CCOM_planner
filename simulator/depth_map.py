@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-# import gdal
+import gdal
 
 class BathyGrid:
     def __init__(self, fname):
@@ -19,7 +19,6 @@ class BathyGrid:
         self.x2 = lrx;
         self.y1 = lry;
         self.y2 = uly;
-        print ulx,lrx,lry,uly
         
 
     def getBound(self):
@@ -27,11 +26,13 @@ class BathyGrid:
     def getDepth(self,x,y):
         xi = self.inverseGeoTransorm[0]+x*self.inverseGeoTransorm[1]+y*self.inverseGeoTransorm[2]
         yi = self.inverseGeoTransorm[3]+x*self.inverseGeoTransorm[4]+y*self.inverseGeoTransorm[5]
-        #print xi,yi
+        # print y,x,int(yi),int(xi)
         try:
             return self.data[int(yi),int(xi)]
         except IndexError:
             return None
+    def getGrid(self):
+        return self.data
 
 if __name__ == '__main__':
 

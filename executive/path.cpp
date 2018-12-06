@@ -202,7 +202,7 @@ void Path::getDynamicObs(string &s)
     int dynamic_obs_size = dyamic_obstacles.size();
     s += "dynamic obs " + to_string(dynamic_obs_size);
     for (int i = 0; i < dynamic_obs_size; i++)
-        s += "\n" + to_string(i) + " " + dyamic_obstacles[i].toString();
+        s += "\n" + to_string(i) + " " + dyamic_obstacles[i].toString();// + initialVariance;
     mtx_obs.unlock();
 }
 

@@ -25,6 +25,7 @@ import datetime
 DEBUGMODE = True;
 
 
+
 class DynamicObsSim:
     def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None, geotiff = None,boat_model = cw4.cw4,dynamic_obs=''):
         self.debug = False
@@ -65,6 +66,8 @@ class DynamicObsSim:
 
         # Loop at some rate
         self.period = 0.05
+        self.decreaserate = 0.0
+        
 
         self.last_update_time = None
 
@@ -272,16 +275,21 @@ class DynamicObsSim:
         while True:
             count += 1
             timetoexecute = t + count*period
-            timetosleeep = max(t + count*period - time.time(), 0)
+            timetosleeep = max(t + count*period - time.time() + self.decreaserate, 0)
             yield timetoexecute, timetosleeep
 
     def do_every(self, period, f, *args):
         g = self.g_tick(period)
         previous = "start"
+        start = 0.0
         while True and getattr(threading.current_thread(), 'do_run'):
             s = self.plot_draw.getPause()
             if DEBUGMODE:
                 if previous != s:
+                    if previous == "pause":
+                        self.decreaserate += time.time() - start
+                    else:
+                        start = time.time()
                     previous = s
                     print s
                     self.soc_asv_out.sendto(s.encode('utf-8'), ('localhost', 9012))
