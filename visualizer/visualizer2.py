@@ -28,8 +28,8 @@ Color_GREEN_dark = (0, 155, 0)
 Color_PURPLE_dark = (155, 0, 155)
 Color_CYAN_dark = (0, 155, 155)
 
-colorbase = 50
-colorrange = 205
+colorbase = 10
+colorrange = 245
 
 colors = [Color_Red, Color_BLUE, Color_GREEN, Color_PURPLE, Color_CYAN, Color_Red_dark,
           Color_BLUE_dark, Color_GREEN_dark, Color_PURPLE_dark, Color_CYAN_dark]

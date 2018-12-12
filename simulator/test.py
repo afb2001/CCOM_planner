@@ -7,6 +7,7 @@ import sys
 import math
 import os
 import glob
+import time
 
 
 obs_radius = 1.5
@@ -78,6 +79,7 @@ class PLOT:
         self.dynamicMap = {}
         self.dynamicAction = {}
         self.pause = False
+        self.previosTIMECOLLISION = 0
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
@@ -300,13 +302,19 @@ class PLOT:
                 collision = False
             if collision:
                 sprites.add(Explosion((x,y), self.exp_img))
-                self.collision += 0 if self.pStaticHit == (x1,y1) else 1
+                ti = time.time()
+                if self.previosTIMECOLLISION < ti - 0.1:
+                    self.previosTIMECOLLISION = ti
+                    self.collision += 1
                 self.pStaticHit = (x1,y1)
                 return
             for i in range(0, self.nobs):
                 if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
                     sprites.add(Explosion((x,y), self.exp_img))
-                    self.collision += 0 if self.pDynamicHit == i else 1
+                    ti = time.time()
+                    if self.previosTIMECOLLISION < ti - 0.1:
+                        self.previosTIMECOLLISION = ti
+                        self.collision += 1
                     self.pDynamicHit = i
                     return
 
