@@ -956,7 +956,7 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 	//	p.AppendState(e.end.state)
 	//	p.AppendPlan(e.plan) // should be fully calculate by now
 	//}
-	p := TracePlan(bestVertex)
+	p := TracePlan(bestVertex, true)
 	return p
 }
 
@@ -1024,7 +1024,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 	return
 }
 
-func TracePlan(v *Vertex) *common.Plan {
+func TracePlan(v *Vertex, smoothing bool) *common.Plan {
 	branch := make([]*Edge, 0)
 	if v == nil {
 		return nil
@@ -1035,8 +1035,11 @@ func TracePlan(v *Vertex) *common.Plan {
 	if v.parentEdge.start == nil {
 		PrintError("Nil parent edge start")
 	}
-	// smoothing
-	v.parentEdge.Smooth()
+
+	if smoothing {
+		// smoothing
+		v.parentEdge.Smooth()
+	}
 
 	// only cycle should be in start vertex
 	for cur := v; cur.parentEdge.start != cur; cur = cur.parentEdge.start {
@@ -1120,7 +1123,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if bestVertex == nil || (v != nil && v.currentCost+v.ApproxToGo() < bestVertex.currentCost+bestVertex.ApproxToGo()) {
 			// PrintLog("Found a plan")
 			bestVertex = v
-			bestPlan = TracePlan(bestVertex)
+			bestPlan = TracePlan(bestVertex, true)
 			if verbose {
 				PrintLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
 				PrintLog("Current best plan:")
@@ -1150,6 +1153,21 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	}
 	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
 	return
+}
+
+func PointToPointPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
+	start = startState
+	var cur, prev *Vertex
+	cur = &Vertex{state: &startState}
+	cur.parentEdge = &Edge{start: cur, end: cur}
+	for _, p := range *toCover {
+		prev = cur
+		p1 := p
+		cur = &Vertex{state: &p1}
+		cur.parentEdge = &Edge{start: prev, end: cur}
+		cur.parentEdge.UpdateTrueCost()
+	}
+	return TracePlan(cur, false)
 }
 
 //endregion
