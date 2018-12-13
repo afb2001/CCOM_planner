@@ -312,7 +312,7 @@ class PLOT:
                     if self.distance(self.previosLOC,(self.curr_x,self.curr_y)) > 0.1:
                         self.previosLOC = (self.curr_x,self.curr_y)
                         self.collision += 1
-                    self.pDynamicHit = i
+                    self.pDynamicHit = i 
                     return
 
     def dist(self, x, x1, y, y1):
