@@ -128,7 +128,7 @@ void Path::update_covered()
     {
         float x = it->x - current.x;
         float y = it->y - current.y;
-        if (x * x + y * y <= 10)
+        if (x * x + y * y <= 20)
         {
             auto it1 = it;
             newcover.push_back(*it);
