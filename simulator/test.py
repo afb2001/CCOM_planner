@@ -301,7 +301,7 @@ class PLOT:
                 collision = False
             if collision:
                 sprites.add(Explosion((x,y), self.exp_img))
-                if self.distance(self.previosLOC,(x1,self.curr_y)) > 0.1:
+                if self.distance(self.previosLOC,(self.curr_x,self.curr_y)) > 0.1:
                     self.previosLOC = (self.curr_x,self.curr_y)
                     self.collision += 1
                 self.pStaticHit = (self.curr_x,self.curr_y)
