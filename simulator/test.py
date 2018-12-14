@@ -295,11 +295,13 @@ class PLOT:
         # if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
         x1 = int(self.curr_x)
         y1 = int(self.curr_y)
-            
-        try:
-            collision = self.static_obs[x1][y1]
-        except:
+        if x1 < 0 or y1 < 0 or self.curr_x > self.xlim or self.curr_y > self.ylim:
             collision = False
+        else:
+            try:
+                collision = self.static_obs[x1][y1]
+            except:
+                collision = False
         if collision:
             sprites.add(Explosion((x,y), self.exp_img))
                 
