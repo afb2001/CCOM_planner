@@ -28,8 +28,8 @@ double rudder_distance = 2.0;
 double mass = 2000.0;
 double max_power = 8948.4;
 double max_speed = 2.75;
-double probability[4] = {0.5,0.3,0.15,0.05};
-//double probability[4] = {0.1,0.1,0.1,0.7};
+//double probability[4] = {0.5,0.3,0.15,0.05};
+double probability[4] = {1,0,0,0};
 bool debug = true;
 
 

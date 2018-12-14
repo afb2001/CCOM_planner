@@ -361,7 +361,7 @@ int main(int argc, char *argv[])
     thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
 
     communication_With_Planner.cwrite("Start");
-    communication_With_Planner.cwrite("max speed 2.5");
+    communication_With_Planner.cwrite("max speed 2.3");
     communication_With_Planner.cwrite("max turning radius 8");
 
     // if (tiffmap != "NOFILE")
