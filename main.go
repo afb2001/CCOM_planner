@@ -41,6 +41,7 @@ func main() {
 	solver := tsp.NewSolver(*path)
 
 	bitStar.InitGlobals(*grid, maxSpeed, maxTurningRadius, solver)
+	//rrt.SetBoatConstants(maxSpeed, maxTurningRadius)
 
 	fmt.Println("ready")
 
@@ -73,13 +74,15 @@ func main() {
 
 		PrintLog("Planning...")
 		//plan := bitStar.BitStar(*start, path, timeToPlan, o)
-		//plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
-		plan := bitStar.PointToPointPlan(*start, path, timeToPlan, o)
-		if plan == nil {
+		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
+		//plan := bitStar.PointToPointPlan(*start, path, timeToPlan, o)
+		//plan := rrt.MakePlan(grid, start, *path, &o, timeToPlan)
+		if plan == nil || len(plan.States) == 0 {
 			PrintLog("Couldn't find a plan.")
 			fmt.Println(common.DefaultPlan(start))
 		} else {
 			fmt.Println(plan.String())
+			PrintLog(plan.String())
 		}
 
 		PrintLog("ready to plan")
