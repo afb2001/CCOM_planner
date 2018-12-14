@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-var DebugVis = true
+var DebugVis = false
 
 type ErrorPolicy int
 

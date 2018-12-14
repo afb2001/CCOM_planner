@@ -73,7 +73,8 @@ func main() {
 
 		PrintLog("Planning...")
 		//plan := bitStar.BitStar(*start, path, timeToPlan, o)
-		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
+		//plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
+		plan := bitStar.PointToPointPlan(*start, path, timeToPlan, o)
 		if plan == nil {
 			PrintLog("Couldn't find a plan.")
 			fmt.Println(common.DefaultPlan(start))

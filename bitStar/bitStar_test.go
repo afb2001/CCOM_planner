@@ -306,7 +306,7 @@ func TestFindAStarPlan(t *testing.T) {
 	solver := tsp.NewSolver(p)
 	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
+	plan := PointToPointPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -340,6 +340,29 @@ func TestFindAStarPlan3(t *testing.T) {
 		s := randomState(50, 100, 0, 20)
 		s.Time = float64(i)
 		plan := FindAStarPlan(*s, &p, 0.09, *o1)
+		if plan == nil || plan.States == nil {
+			if !grid.IsBlocked(s.X, s.Y) {
+				t.Errorf("Empty plan for unblocked state")
+				break
+			} else {
+				PrintLog("Sampled blocked state " + s.String())
+			}
+		}
+	}
+}
+
+func TestPointToPointPlan(t *testing.T) {
+	t.Log("Testing the Point to Point planner a bunch of times in a row from random states")
+	rand.Seed(time.Now().UnixNano())
+	// redo setup
+	var p = bigPath()
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
+	o1 := new(common.Obstacles)
+	for i := 0; i < 60; i++ {
+		s := randomState(50, 100, 0, 20)
+		s.Time = float64(i)
+		plan := PointToPointPlan(*s, &p, 0.09, *o1)
 		if plan == nil || plan.States == nil {
 			if !grid.IsBlocked(s.X, s.Y) {
 				t.Errorf("Empty plan for unblocked state")
