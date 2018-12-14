@@ -292,28 +292,29 @@ class PLOT:
 
     def checkCollision(self):
         x,y = self.scale_item(self.curr_x, self.curr_y)
-        if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
-            x1 = int(self.curr_x)
-            y1 = int(self.curr_y)
-            try:
-                collision = self.static_obs[x1][y1]
-            except:
-                collision = False
-            if collision:
+        # if  self.startw <= x < self.startw + self.scalew and self.starth <= x < self.starth + self.scaleh:
+        x1 = int(self.curr_x)
+        y1 = int(self.curr_y)
+            
+        try:
+            collision = self.static_obs[x1][y1]
+        except:
+            collision = False
+        if collision:
+            sprites.add(Explosion((x,y), self.exp_img))
+                
+            if self.distance(self.previosLOC,(self.curr_x,self.curr_y)) > 0.1:
+                self.previosLOC = (self.curr_x,self.curr_y)
+                self.collision += 1
+            return
+        for i in range(0, self.nobs):
+            if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
                 sprites.add(Explosion((x,y), self.exp_img))
                 if self.distance(self.previosLOC,(self.curr_x,self.curr_y)) > 0.1:
                     self.previosLOC = (self.curr_x,self.curr_y)
                     self.collision += 1
-                self.pStaticHit = (self.curr_x,self.curr_y)
+                self.pDynamicHit = i 
                 return
-            for i in range(0, self.nobs):
-                if 2.25 > self.dist(self.xobs[i], self.curr_x, self.yobs[i], self.curr_y):
-                    sprites.add(Explosion((x,y), self.exp_img))
-                    if self.distance(self.previosLOC,(self.curr_x,self.curr_y)) > 0.1:
-                        self.previosLOC = (self.curr_x,self.curr_y)
-                        self.collision += 1
-                    self.pDynamicHit = i 
-                    return
 
     def dist(self, x, x1, y, y1):
         return (x - x1)**2 + (y - y1)**2
