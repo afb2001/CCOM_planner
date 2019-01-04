@@ -29,7 +29,10 @@ def recv_asv():
     while getattr(threading.current_thread(), 'do_run'):
         data = s1.recv(4096)
         data = data.decode('utf-8')
-        print("Location:\n%s [%s] " % (data, len(data)))
+        if data.strip() == "pause" or data.strip() == "start":
+            print(data.strip())
+        else:
+            print("Location:\n%s [%s] " % (data, len(data)))
         print("\0")
         sys.stdout.flush()
 

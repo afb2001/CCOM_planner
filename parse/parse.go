@@ -27,7 +27,8 @@ Read the map from stdin and build the corresponding grid.
 func BuildGridOld(reader *bufio.Reader) *common.Grid {
 	PrintLog("Reading map dimensions")
 	var width, height, resolution int
-	fmt.Sscanf(GetLine(reader), "map %d %d %d", &resolution, &width, &height)
+	_, err := fmt.Sscanf(GetLine(reader), "map %d %d %d", &resolution, &width, &height)
+	HandleError(err, ParseErr)
 	PrintLog("Building grid")
 	grid := common.NewGrid(width*resolution, height*resolution)
 	for y := height - 1; y >= 0; y-- {
@@ -45,7 +46,8 @@ func BuildGridOld(reader *bufio.Reader) *common.Grid {
 func BuildGrid(reader *bufio.Reader) *common.Grid {
 	PrintLog("Reading map dimensions")
 	var width, height, resolution int
-	fmt.Sscanf(GetLine(reader), "map %d %d %d", &resolution, &width, &height)
+	_, err := fmt.Sscanf(GetLine(reader), "map %d %d %d", &resolution, &width, &height)
+	HandleError(err, ParseErr)
 	PrintLog("Building grid")
 	grid := common.NewGrid(width*resolution, height*resolution)
 	for y := height - 1; y >= 0; y-- {
@@ -80,7 +82,8 @@ Turns heading into angle.
 */
 func ParseState(line string) *common.State {
 	var x, y, heading, speed, t float64
-	fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
+	_, err := fmt.Sscanf(line, "%f %f %f %f %f", &x, &y, &heading, &speed, &t)
+	HandleError(err, ParseErr)
 	return &common.State{X: x, Y: y, Heading: (heading * -1) + math.Pi/2, Speed: speed, Time: t}
 }
 
@@ -88,10 +91,12 @@ func ReadPath(reader *bufio.Reader, maxSpeed float64) *common.Path {
 	p := new(common.Path)
 	var pathLength int
 	PrintLog("Reading path to cover")
-	fmt.Sscanf(GetLine(reader), "path to cover %d", &pathLength)
+	_, err := fmt.Sscanf(GetLine(reader), "path to cover %d", &pathLength)
+	HandleError(err, ParseErr)
 	var x, y float64
 	for l := 0; l < pathLength; l++ {
-		fmt.Sscanf(GetLine(reader), "%f %f", &x, &y)
+		_, err := fmt.Sscanf(GetLine(reader), "%f %f", &x, &y)
+		HandleError(err, ParseErr)
 		s := common.State{X: x, Y: y, Speed: maxSpeed}
 		*p = append(*p, s)
 		if l > 0 {
@@ -100,6 +105,19 @@ func ReadPath(reader *bufio.Reader, maxSpeed float64) *common.Path {
 		}
 	}
 	return p
+}
+
+func UpdatePath(reader *bufio.Reader, path *common.Path) {
+	PrintLog("Reading newly covered path")
+	var covered int
+	_, err := fmt.Sscanf(GetLine(reader), "newly covered %d", &covered)
+	HandleError(err, ParseErr)
+	var x, y float64
+	for i := 0; i < covered; i++ {
+		_, err := fmt.Sscanf(GetLine(reader), "%f %f", &x, &y)
+		HandleError(err, ParseErr)
+		*path = path.Without(common.State{X: x, Y: y})
+	}
 }
 
 /**
@@ -111,7 +129,8 @@ func ReadObstacles(reader *bufio.Reader, o common.Obstacles, n int) {
 		var id int
 		var x, y, heading, speed, t float64
 		var line string = GetLine(reader)
-		fmt.Sscanf(line, "%d %f %f %f %f %f", &id, &x, &y, &heading, &speed, &t)
+		_, err := fmt.Sscanf(line, "%d %f %f %f %f %f", &id, &x, &y, &heading, &speed, &t)
+		HandleError(err, ParseErr)
 		s := &common.State{X: x, Y: y, Heading: (heading * -1) + math.Pi/2, Speed: speed, Time: t}
 		// this is a change from when o was a map
 		o[i] = s

@@ -13,22 +13,9 @@ import (
 	"strings"
 )
 
-// region Constants
 const (
-	verbose               = true
-	rrtInc        float64 = 0.5
-	timeToPlan    float64 = 0.09 // make parameter (why is it off by a factor of 10??)
-	dubinsDensity float64 = 1    // factor of dubinsInc
-
+	timeToPlan float64 = 0.09 // make parameter (why is it off by a factor of 10??)
 )
-
-//endregion
-
-//region Util
-
-//endregion
-
-//region main
 
 // globals
 var maxSpeed, maxTurningRadius float64
@@ -40,8 +27,10 @@ func main() {
 	var line string
 	GetLine(reader) // start
 
-	fmt.Sscanf(GetLine(reader), "max speed %f", &maxSpeed)
-	fmt.Sscanf(GetLine(reader), "max turning radius %f", &maxTurningRadius)
+	_, err := fmt.Sscanf(GetLine(reader), "max speed %f", &maxSpeed)
+	HandleError(err, ParseErr)
+	_, err = fmt.Sscanf(GetLine(reader), "max turning radius %f", &maxTurningRadius)
+	HandleError(err, ParseErr)
 
 	var grid = BuildGrid(reader)
 
@@ -52,6 +41,7 @@ func main() {
 	solver := tsp.NewSolver(*path)
 
 	bitStar.InitGlobals(*grid, maxSpeed, maxTurningRadius, solver)
+	//rrt.SetBoatConstants(maxSpeed, maxTurningRadius)
 
 	fmt.Println("ready")
 
@@ -63,14 +53,7 @@ func main() {
 			continue
 		}
 
-		PrintLog("Reading newly covered path")
-		var covered int
-		fmt.Sscanf(GetLine(reader), "newly covered %d", &covered)
-		var x, y int
-		for i := 0; i < covered; i++ {
-			fmt.Sscanf(GetLine(reader), "%d %d", &x, &y)
-			path = path.Without(common.State{X: float64(x), Y: float64(y)})
-		}
+		UpdatePath(reader, path)
 		// bitStar.UpdatePath(path)
 		line = GetLine(reader)
 		line = strings.TrimPrefix(line, "start state ")
@@ -89,19 +72,19 @@ func main() {
 		HandleError(err, LogErr)
 		ReadObstacles(reader, o, nObstacles)
 
-		// plan := makePlan(grid, start, *path, o)
-		// plan := bitStar.BitStar(*start, timeToPlan, o)
 		PrintLog("Planning...")
+		//plan := bitStar.BitStar(*start, path, timeToPlan, o)
 		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
-		if plan == nil {
+		//plan := bitStar.PointToPointPlan(*start, path, timeToPlan, o)
+		//plan := rrt.MakePlan(grid, start, *path, &o, timeToPlan)
+		if plan == nil || len(plan.States) == 0 {
 			PrintLog("Couldn't find a plan.")
 			fmt.Println(common.DefaultPlan(start))
 		} else {
 			fmt.Println(plan.String())
+			PrintLog(plan.String())
 		}
 
 		PrintLog("ready to plan")
 	}
 }
-
-//endregion

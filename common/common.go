@@ -10,7 +10,7 @@ import (
 const (
 	planDistanceDensity float64 = 1
 	planTimeDensity     float64 = 0.5
-	TimeHorizon         float64 = 30 // not used as intended yet
+	TimeHorizon         float64 = 30
 	coverageThreshold   float64 = 3
 	collisionDistance   float64 = 1.8
 )
@@ -128,7 +128,7 @@ type Path []State
 /**
 Remove the given state from the Path. Modifies the original Path.
 */
-func (p Path) Without(s State) *Path {
+func (p Path) Without(s State) Path {
 	b := Path{}
 	for _, x := range p {
 		if s.X != x.X || s.Y != x.Y {
@@ -136,7 +136,7 @@ func (p Path) Without(s State) *Path {
 		}
 	}
 	//*p = b
-	return &b
+	return b
 }
 
 func (p Path) MaxDistanceFrom(s State) (max float64) {
@@ -204,7 +204,7 @@ func (p *Plan) AppendState(s *State) {
 			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
 			p.States[len(p.States)-1].TimeUntil(s) >= planTimeDensity) {
 		p.States = append(p.States, s)
-		util.PrintDebug(s.String(), "cost =", 0, "color = 1 shape = boat")
+		util.PrintDebug(s.String(), "g =", 0, "h =", 0, "shape = boat vis = vis1")
 	}
 }
 
@@ -326,6 +326,11 @@ func (g *Grid) IsBlocked(x float64, y float64) bool {
 
 //region Obstacles
 
+type Obstacle struct {
+	Initial State
+	Stddev  float64
+}
+
 /**
 Type alias for (dynamic) obstacle collection.
 */
@@ -359,6 +364,7 @@ func (o *Obstacles) CollisionExists(state *State) float64 {
 func (o *Obstacles) CollisionExistsWithArray(state [3]float64, t float64) float64 {
 	for _, s := range *o {
 		if s.Project(t - s.Time).CollidesWithArray(state) {
+			util.PrintLog("Collision exists")
 			return 1.0
 		}
 	}

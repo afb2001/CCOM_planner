@@ -110,7 +110,7 @@ class Path
     int pathindex, dummy, byteREAD, dummyindex;
 
     ObjectPar actions[4];
-
+    string initialVariance = " 1.7";
     double tempx, tempy, tempspeed, temptime, tempheading;
 
     //function

@@ -3,11 +3,11 @@
 #include <cmath>
 
 using namespace std;
-#define maxspeed 1.75
+#define maxspeed 1.4
 
 bool box = true;
 bool round1 = false;
-bool square = false;
+bool square = true;
 
 double getCurrentTime()
 {

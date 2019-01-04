@@ -28,8 +28,10 @@ double rudder_distance = 2.0;
 double mass = 2000.0;
 double max_power = 8948.4;
 double max_speed = 2.75;
-double probability[4] = {0.5,0.3,0.15,0.05};
-//double probability[4] = {0.1,0.1,0.1,0.7};
+//double probability[4] = {0.5,0.3,0.15,0.05};
+double probability[4] = {0,1,0,0};
+bool debug = true;
+
 
 struct pointc
 {
@@ -200,6 +202,10 @@ void MPC(double &r, double &t)
             estimate_effect_direction = fmod(estimate_effect_direction + M_PI * 10000, M_PI * 2);
         else if (estimate_effect_direction > 2 * M_PI)
             estimate_effect_direction = fmod(estimate_effect_direction, M_PI * 2);
+    }
+    if(debug)
+    {
+        estimate_effect_speed = 0;
     }
     //  estimate_effect_direction = 1.57;
     //     estimate_effect_speed = 1;

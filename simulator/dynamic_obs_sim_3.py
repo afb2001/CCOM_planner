@@ -22,6 +22,9 @@ import datetime
 #import matplotlib.animation as animation
 # from matplotlib import rcParams, cycler
 
+DEBUGMODE = True;
+
+
 
 class DynamicObsSim:
     def __init__(self, start_x=0.0, start_y=0.0, start_heading=0.0, start_speed=0.0, nobs=4, xlim=1000.0, ylim=1000.0, plot_bool=False, file_world='',goal_location = '',environment = None, geotiff = None,boat_model = cw4.cw4,dynamic_obs=''):
@@ -63,6 +66,8 @@ class DynamicObsSim:
 
         # Loop at some rate
         self.period = 0.05
+        self.decreaserate = 0.0
+        
 
         self.last_update_time = None
 
@@ -270,12 +275,27 @@ class DynamicObsSim:
         while True:
             count += 1
             timetoexecute = t + count*period
-            timetosleeep = max(t + count*period - time.time(), 0)
+            timetosleeep = max(t + count*period - time.time() + self.decreaserate, 0)
             yield timetoexecute, timetosleeep
 
     def do_every(self, period, f, *args):
         g = self.g_tick(period)
+        previous = "start"
+        start = 0.0
         while True and getattr(threading.current_thread(), 'do_run'):
+            s = self.plot_draw.getPause()
+            if DEBUGMODE:
+                if previous != s:
+                    if previous == "pause":
+                        self.decreaserate += time.time() - start
+                    else:
+                        start = time.time()
+                    previous = s
+                    print s
+                    self.soc_asv_out.sendto(s.encode('utf-8'), ('localhost', 9012))
+                if s == "pause":
+                    time.sleep(0.1)
+                    continue
             self.update_time, self.sleeptime = next(g)
             time.sleep(self.sleeptime)
             f(*args)
@@ -434,7 +454,7 @@ class DynamicObsSim:
 
         if self.plotaxes == None:
             # start_time = time.time()
-            self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.future_x,self.future_y,self.future_heading,self.estimateStart)
+            self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.vobs,self.future_x,self.future_y,self.future_heading,self.estimateStart)
             self.plot_draw.update()
             # print("--- %s seconds ---" % ((time.time() - start_time)*1000))
             # self.plotaxes = plt.plot(self.xx, self.yy, ".b")
@@ -526,7 +546,7 @@ class DynamicObsSim:
         
     
         if self.plot_boolean:
-            self.plot_draw.on_execute(self.curr_x, self.curr_y, self.start_heading, self.nobs, self.xobs, self.yobs, self.hobs)
+            self.plot_draw.on_execute(self.curr_x, self.curr_y, self.start_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.vobs)
             self.plot_draw.update()
         
         update_thread = threading.Thread(target=self.update_th)
@@ -536,7 +556,7 @@ class DynamicObsSim:
         try:
             if self.plot_boolean:
                 while True:
-                    self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.future_x,self.future_y,self.future_heading,self.estimateStart,self.goal_location)
+                    self.plot_draw.updateInformation(self.curr_x, self.curr_y, self.curr_heading, self.nobs, self.xobs, self.yobs, self.hobs,self.vobs,self.future_x,self.future_y,self.future_heading,self.estimateStart,self.goal_location)
                     self.plot_draw.update()
                     time.sleep(0.05)
                 update_thread.join(timeout=1000)
@@ -602,7 +622,7 @@ if __name__ == '__main__':
     parser.add_argument('-g', '--goal', dest='goal', action='store', default='',
                         help='File for goal location')
     parser.add_argument('-e', '--environment', dest='environment', action='store', default='False',
-                        help='File for enviroment affect, either true with defalt 1,90 or true,[speed],[direction]')
+                        help='File for enviroment affect, either true with defalt 1,90,0 or true,[speed],[direction],[variance]')
 
     parser.add_argument('-model', '--boatmodel', dest='model', action='store', default='cw4',
                         help='File for name for model')
@@ -638,9 +658,8 @@ if __name__ == '__main__':
     if args.environment.lower() != 'false':
         data = args.environment.lower().split(',')
         if(len(data) > 1):
-            print data[2]
             try:
-                environment = ev.Environment(float(data[1]),float(data[2]))
+                environment = ev.Environment(float(data[1]),float(data[2]),float(data[3]))
             except:
                 print "WRONG argument, No current affect is given"
         else:

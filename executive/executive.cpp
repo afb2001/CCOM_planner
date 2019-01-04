@@ -20,13 +20,16 @@
 // #include "xtiffio.h"
 // #include "geotiffio.h"
 
+
 using namespace std;
 
 int running = 1;
 int request_start = 0;
 
 Path path;
-bool debug = false;
+bool debug = true;
+
+bool pause_all = false;
 
 Communitcation communication_With_Planner, communication_With_Controler;
 
@@ -62,6 +65,11 @@ void requestPath()
 
     while (running)
     {
+        if(debug && pause_all)
+        {
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            continue;
+        }
         if (path.finish())
         {
             this_thread::sleep_for(chrono::milliseconds(1000));
@@ -99,12 +107,12 @@ void requestPath()
 
 void requestWorldInformation()
 {
-    char locationString[8192];
+    char locationString[81920];
     double x, y, heading, speed, otime;
     int index, h, oldbytesRead, bytesRead, count, update;
     while (running)
     {
-        read(STDIN_FILENO, locationString, 8192);
+        read(STDIN_FILENO, locationString, 81920);
         if (!strncmp(locationString, "Location", 8))
         {
             request_start = 1;
@@ -126,6 +134,16 @@ void requestWorldInformation()
             } while (update);
             path.unlock_obs();
         }
+        else if (!strncmp(locationString, "pause", 5))
+        {
+            pause_all = true;
+            cerr<< "pause" << endl;
+        }
+        else if (!strncmp(locationString, "start", 5))
+        {
+            cerr<< "start" << endl;
+            pause_all = false;
+        }
         else
         {
             cerr << "EXECUTIVE::ERROR REQUEST" << endl;
@@ -142,7 +160,11 @@ void sendAction()
     string send_string;
     while (running)
     {
-
+        if(debug && pause_all)
+        {
+            this_thread::sleep_for(chrono::milliseconds(1000));
+            continue;
+        }
         path.sendAction(send_string, sleep);
         if (send_string != "")
             communication_With_Controler.cwrite(send_string);
@@ -339,7 +361,7 @@ int main(int argc, char *argv[])
     thread thread_for_UDVOBS(thread([=] { requestWorldInformation(); }));
 
     communication_With_Planner.cwrite("Start");
-    communication_With_Planner.cwrite("max speed 2.5");
+    communication_With_Planner.cwrite("max speed 2.3");
     communication_With_Planner.cwrite("max turning radius 8");
 
     // if (tiffmap != "NOFILE")

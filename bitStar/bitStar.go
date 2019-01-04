@@ -35,6 +35,8 @@ var start common.State
 var grid common.Grid
 var o common.Obstacles
 
+var lastPlan []*Vertex
+
 // var toCover *common.Path
 var bestVertex *Vertex
 var maxSpeed, maxTurningRadius float64
@@ -73,18 +75,13 @@ func showSamples(nodes, allSamples []*Vertex, g *common.Grid, start *common.Stat
 			arrays[int(s.state.Y)][int(s.state.X)] = '.'
 		}
 	}
-	//PrintLog("All nodes sampled:")
 	for _, n := range nodes {
-		//PrintLog(n.state.String())
 		arrays[int(n.state.Y)][int(n.state.X)] = 'o'
 	}
 	arrays[int(start.Y)][int(start.X)] = '@'
 	for _, p := range path {
-		//PrintLog(p.X)
 		arrays[int(p.Y)][int(p.X)] = '*'
 	}
-	//arrays[int(goal.y)][int(goal.x)] = '*'
-	//PrintLog("Map:")
 	return string(bytes)
 }
 
@@ -112,7 +109,6 @@ func (v *Vertex) ApproxCost() float64 {
 			v.approxCost = dPath.Length() / maxSpeed * timePenalty
 		}
 	}
-	//PrintLog(fmt.Sprintf("Approx cost: %f", v.approxCost))
 	return v.approxCost
 }
 
@@ -132,7 +128,7 @@ func (v *Vertex) ApproxToGo() float64 {
 
 // update the cached heuristic value
 func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
-	// is the whole parent thing really necessary? Yeah it probably is. Damn.
+	// is the whole parent thing really necessary? Yeah it probably is.
 	parentNil := parent == nil
 	if parent == nil {
 		if v.parentEdge == nil {
@@ -165,6 +161,13 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 // This is really f_hat, which is g_hat + h_hat
 func (v *Vertex) fValue() float64 {
 	return v.ApproxCost() + v.UpdateApproxToGo(nil)
+}
+
+/**
+Create a string suitable for debug visualization
+*/
+func (v *Vertex) String() string {
+	return fmt.Sprintf("%s g = %f h = %f", v.state.String(), v.CurrentCost(), v.ApproxToGo())
 }
 
 // contains function for convenience.
@@ -234,8 +237,9 @@ func (e *Edge) UpdateStart(newStart *Vertex) {
 	e.dPath, e.plan = nil, nil
 }
 
+// unused
 func (e *Edge) UpdateEnd(newEnd *Vertex) {
-	// TODO! -- make sure this is right
+	// should make sure this is right
 	// PrintLog("Doing a questionable thing")
 	e.end.parentEdge = nil // I wanna know if someone tries to use the out of date edge
 	e.end = newEnd
@@ -253,21 +257,23 @@ func (e Edge) TrueCost() float64 {
 func (e *Edge) UpdateTrueCost() float64 {
 	var collisionPenalty float64
 	var newlyCovered common.Path
-	e.ApproxCost() // compute dPath if it isn't already done
+	// compute dPath if it isn't already done
+	if e.dPath == nil {
+		e.ApproxCost()
+	}
 	// compute the plan along the dubins path, the collision penalty, and the ending time
-	// NOTE: this does a lot of work
-	// e.plan, collisionPenalty, newlyCovered, e.end.state.Time = getSamplesAndPlan(e.dPath, e.start.state.Time, e.start.uncovered)
-	// don't make a plan yet, that's expensive
+	// don't make a plan yet, that's expensive, just sample for collision checking
 	collisionPenalty, newlyCovered, e.end.state.Time = getSamples(e.dPath, e.start.state.Time, e.start.uncovered)
-	// e.end.state.Time += e.start.state.Time // think I fixed that
 	// update the uncovered path in e.end
 	e.end.uncovered = e.start.uncovered
 	for _, c := range newlyCovered {
-		// TODO -- maybe make this more efficient... it shouldn't happen that much though
-		e.end.uncovered = *(e.end.uncovered.Without(c))
+		// maybe make this more efficient... it shouldn't happen that much though
+		e.end.uncovered = e.end.uncovered.Without(c)
 	}
+	timeFromStart := e.end.state.Time - start.Time
+	timeFromStart = 0 // remove for greediness
 	// update e's true cost
-	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*coveragePenalty
+	e.trueCost = e.netTime()*timePenalty + collisionPenalty - float64(len(newlyCovered))*(coveragePenalty-timeFromStart)
 
 	// update e.end's current cost
 	// Not doing this anymore. Could be a mistake who knows
@@ -391,18 +397,6 @@ func (h *VertexQueue) update(cost func(node *Vertex) float64) {
 	heap.Init(h)
 }
 
-// func (h *VertexQueue) prune(cost float64) {
-// 	newNodes := make([]*Vertex, len(h.nodes))
-// 	var j int
-// 	for i, j := 0, 0; i < len(h.nodes); i++ {
-// 		if n := h.nodes[i]; h.cost(n) < cost {
-// 			newNodes[j] = n
-// 			j++
-// 		}
-// 	}
-// 	h.nodes = newNodes[0:j]
-// }
-
 //endregion
 
 //region EdgeQueue
@@ -419,12 +413,10 @@ func (h EdgeQueue) Less(i, j int) bool {
 func (h EdgeQueue) Swap(i, j int) { h.nodes[i], h.nodes[j] = h.nodes[j], h.nodes[i] }
 
 func (h *EdgeQueue) Push(x interface{}) {
-	// PrintLog("Adding edge")
 	h.nodes = append(h.nodes, x.(*Edge))
 }
 
 func (h *EdgeQueue) Pop() interface{} {
-	// PrintLog("Popping edge")
 	old := *h
 	n := len(old.nodes)
 	x := old.nodes[n-1]
@@ -452,18 +444,6 @@ func (h *EdgeQueue) update(cost func(node *Edge) float64) {
 	heap.Init(h)
 }
 
-// func (h *EdgeQueue) prune(cost float64, vertexCost func(node *Vertex) float64) {
-// 	newNodes := make([]*Edge, len(h.nodes))
-// 	var j int
-// 	for i, j := 0, 0; i < len(h.nodes); i++ {
-// 		if n := h.nodes[i]; vertexCost(n.start) < cost || vertexCost(n.end) < cost { // this might be right?
-// 			newNodes[j] = n
-// 			j++
-// 		}
-// 	}
-// 	h.nodes = newNodes[0:j]
-// }
-
 //endregion
 
 // functions for queueing vertices and edges
@@ -483,6 +463,10 @@ func edgeCost(edge *Edge) float64 {
 
 //region State generation
 
+func chance(probability float64) bool {
+	return rand.Float64() < probability
+}
+
 /**
 Create a new state with random values.
 Time is unset (zero).
@@ -500,15 +484,10 @@ func randomState(xMin, xMax, yMin, yMax float64) *common.State {
 Create a random sample using the biasing constants.
 */
 func biasedRandomState(xMin, xMax, yMin, yMax float64) *common.State {
-	//verbose = false
 	s := randomState(xMin, xMax, yMin, yMax)
 	if r := rand.Float64(); r < maxSpeedBias {
 		s.Speed = maxSpeed
 	}
-	// if r := rand.Float64(); r < goalBias {
-	//verbose = true
-	// return goal
-	// }
 	return s
 }
 
@@ -531,30 +510,22 @@ func b(bounds common.Grid, point common.State, distance float64) *common.State {
 Sample a state whose euclidean distance to start is less than the given distance bound.
 */
 func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, cost float64) *common.State {
-	//if distance < 0 {
-	//	distance = 0
-	//}
-	//s := biasedRandomState(math.Max(0, start.X-distance),
-	//	math.Min(float64(bounds.Width), start.X+distance),
-	//	math.Max(0, start.Y-distance),
-	//	math.Min(float64(bounds.Height), start.Y+distance)) // TODO! -- path bias
-
 	distance := cost * maxSpeed
 	horizon := (common.TimeHorizon + 1) * maxSpeed
 	distance = math.Min(distance, horizon)
-	var s *common.State
-	var l int32 = int32(len(path))
-	if i := rand.Int31n(l + 1); i == l {
-		s = biasedRandomState(math.Max(0, start.X-distance),
-			math.Min(float64(bounds.Width), start.X+distance),
-			math.Max(0, start.Y-distance),
-			math.Min(float64(bounds.Height), start.Y+distance))
+	var s, point *common.State
+	var l = int32(len(path))
+	if i := rand.Int31n(l * 2); i >= l {
+		point = start
 	} else {
-		point := path[i]
-		s = biasedRandomState(math.Max(0, point.X-distance),
-			math.Min(float64(bounds.Width), point.X+distance),
-			math.Max(0, point.Y-distance),
-			math.Min(float64(bounds.Height), point.Y+distance))
+		point = &path[i]
+	}
+	s = biasedRandomState(math.Max(0, point.X-distance),
+		math.Min(float64(bounds.Width), point.X+distance),
+		math.Max(0, point.Y-distance),
+		math.Min(float64(bounds.Height), point.Y+distance))
+	if chance(goalBias) {
+		s.X, s.Y = point.X, point.Y
 	}
 	return s
 }
@@ -624,6 +595,13 @@ func getPlan(edge *Edge) (plan *common.Plan) {
 	callback := func(q *[3]float64, inc float64) int {
 		t = inc/maxSpeed + plan.Start.Time
 		s := &common.State{X: q[0], Y: q[1], Heading: q[2], Speed: maxSpeed, Time: t}
+
+		// this is for debugging and can be removed in production
+		s.CollisionProbability = o.CollisionExistsWithArray(*q, t)
+		if grid.IsBlocked(q[0], q[1]) {
+			s.CollisionProbability = 1
+		}
+
 		plan.AppendState(s)
 		return 0
 	}
@@ -804,10 +782,10 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 /**
 Alg 1 (obviously)
 */
-func BitStar(startState common.State, toCover *common.Path, timeRemaining float64, o1 *common.Obstacles) *common.Plan {
+func BitStar(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) *common.Plan {
 	endTime := timeRemaining + now()
 	// setup
-	o, start = *o1, startState // assign globals
+	o, start = o1, startState // assign globals
 	startV := &Vertex{state: &start, currentCostIsSet: true, uncovered: *toCover}
 	// TODO! -- verify that startV.currentCost = 0
 	startV.currentCostIsSet = true
@@ -837,7 +815,9 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 				PrintLog("Starting sampling")
 			}
 			samples = make([]*Vertex, bitStarSamples)
-			PrintLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
+			if verbose {
+				PrintLog(fmt.Sprintf("Sampling state with distance less than %f", bestVertex.CurrentCost()))
+			}
 			for m := 0; m < bitStarSamples; m++ {
 				samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, bestVertex.CurrentCost())}
 			}
@@ -952,30 +932,31 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 	}
 	PrintLog("Done with the main loop. Now to trace the tree...")
 	PrintLog("But first: samples!")
-	PrintLog(showSamples(vertices, allSamples, &grid, &start, *toCover))
+	//PrintLog(showSamples(vertices, allSamples, &grid, &start, *toCover))
 	PrintLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, len(vertices)))
 
-	// figure out the plan I guess
-	// turn tree into slice
-	branch := make([]*Edge, 0)
-	for cur := bestVertex; cur != startV; cur = cur.parentEdge.start {
-		branch = append(branch, cur.parentEdge)
-	}
-
-	// reverse the plan order (this might look dumb)
-	s := branch
-	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-		s[i], s[j] = s[j], s[i]
-	}
-	branch = s
-
-	p := new(common.Plan)
-	p.Start = start
-	p.AppendState(&start) // yes this is necessary
-	for _, e := range branch {
-		p.AppendState(e.end.state)
-		p.AppendPlan(e.plan) // should be fully calculate by now
-	}
+	//// figure out the plan I guess
+	//// turn tree into slice
+	//branch := make([]*Edge, 0)
+	//for cur := bestVertex; cur != startV; cur = cur.parentEdge.start {
+	//	branch = append(branch, cur.parentEdge)
+	//}
+	//
+	//// reverse the plan order (this might look dumb)
+	//s := branch
+	//for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+	//	s[i], s[j] = s[j], s[i]
+	//}
+	//branch = s
+	//
+	//p := new(common.Plan)
+	//p.Start = start
+	//p.AppendState(&start) // yes this is necessary
+	//for _, e := range branch {
+	//	p.AppendState(e.end.state)
+	//	p.AppendPlan(e.plan) // should be fully calculate by now
+	//}
+	p := TracePlan(bestVertex, true)
 	return p
 }
 
@@ -1008,8 +989,9 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 		e.end.currentCostIsSet = true
 		// if bestVertex == nil || e.end.CurrentCost() + e.end.UpdateApproxToGo(nil) < bestVertex.CurrentCost(){
 
-		// PrintDebug(e.end.state, "cost =", e.end.CurrentCost(), "color = 1 shape = boat")
-		// PrintDebug("done")
+		e.end.UpdateApproxToGo(nil)
+
+		PrintDebugVertex(e.end.String(), "boat", 2)
 
 		heap.Push(qV, e.end)
 		// TracePlan(e.end)
@@ -1042,7 +1024,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 	return
 }
 
-func TracePlan(v *Vertex) *common.Plan {
+func TracePlan(v *Vertex, smoothing bool) *common.Plan {
 	branch := make([]*Edge, 0)
 	if v == nil {
 		return nil
@@ -1053,8 +1035,11 @@ func TracePlan(v *Vertex) *common.Plan {
 	if v.parentEdge.start == nil {
 		PrintError("Nil parent edge start")
 	}
-	// smoothing
-	v.parentEdge.Smooth()
+
+	if smoothing {
+		// smoothing
+		v.parentEdge.Smooth()
+	}
 
 	// only cycle should be in start vertex
 	for cur := v; cur.parentEdge.start != cur; cur = cur.parentEdge.start {
@@ -1079,8 +1064,10 @@ func TracePlan(v *Vertex) *common.Plan {
 
 	p := new(common.Plan)
 	p.Start = start
+	lastPlan = make([]*Vertex, len(branch))
 	// p.AppendState(&start) // yes this is necessary
-	for _, e := range branch {
+	for i, e := range branch {
+		lastPlan[i] = e.end
 		p.AppendPlan(getPlan(e))
 		p.AppendState(e.end.state)
 	}
@@ -1088,6 +1075,7 @@ func TracePlan(v *Vertex) *common.Plan {
 }
 
 func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
+	PrintDebug("done") // reset visuals
 	resetGlobals()
 	// PrintLog("\n\n\n\n\n")
 	// defer profile.Start().Stop()
@@ -1122,23 +1110,20 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 			// for m := 0; m < bitStarSamples; m++ {
 			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, math.MaxFloat64)}
 		}
-		totalSampleCount += bitStarSamples
+		totalSampleCount += currentSampleCount
+		// also sample on the last best plan
+		samples = append(samples, lastPlan...)
 		// allSamples = append(allSamples, samples...)
 		allSamples = samples
 		if verbose {
 			PrintLog("Finished sampling")
 		}
 		v := AStar(qV, &samples, endTime)
-		// if v == nil && now() < endTime  {
-		// 	PrintError("Got nil from AStar with time left")
-		// }
-		// if v == nil {
-		// 	PrintLog("Got nil from AStar")
-		// }
-		if bestVertex == nil || (v != nil && v.currentCost < bestVertex.currentCost) {
+		// Assume the approx to go has been calculated
+		if bestVertex == nil || (v != nil && v.currentCost+v.ApproxToGo() < bestVertex.currentCost+bestVertex.ApproxToGo()) {
 			// PrintLog("Found a plan")
 			bestVertex = v
-			bestPlan = TracePlan(bestVertex)
+			bestPlan = TracePlan(bestVertex, true)
 			if verbose {
 				PrintLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
 				PrintLog("Current best plan:")
@@ -1156,7 +1141,9 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if verbose {
 			PrintLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
-		currentSampleCount = len(samples)
+		//currentSampleCount = len(samples)
+		currentSampleCount += currentSampleCount
+		//PrintLog(currentSampleCount)
 	}
 	if verbose {
 		PrintLog(showSamples(make([]*Vertex, 0), allSamples, &grid, &start, *toCover))
@@ -1165,8 +1152,22 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		PrintLog("Couldn't find a plan any better than staying put.")
 	}
 	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
-	PrintDebug("done")
 	return
+}
+
+func PointToPointPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
+	start = startState
+	var cur, prev *Vertex
+	cur = &Vertex{state: &startState}
+	cur.parentEdge = &Edge{start: cur, end: cur}
+	for _, p := range *toCover {
+		prev = cur
+		p1 := p
+		cur = &Vertex{state: &p1}
+		cur.parentEdge = &Edge{start: prev, end: cur}
+		cur.parentEdge.UpdateTrueCost()
+	}
+	return TracePlan(cur, false)
 }
 
 //endregion

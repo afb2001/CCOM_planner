@@ -28,6 +28,9 @@ Color_GREEN_dark = (0, 155, 0)
 Color_PURPLE_dark = (155, 0, 155)
 Color_CYAN_dark = (0, 155, 155)
 
+colorbase = 10
+colorrange = 245
+
 colors = [Color_Red, Color_BLUE, Color_GREEN, Color_PURPLE, Color_CYAN, Color_Red_dark,
           Color_BLUE_dark, Color_GREEN_dark, Color_PURPLE_dark, Color_CYAN_dark]
 theApp = 0
@@ -81,6 +84,9 @@ class PLOT:
         self.triangleX = (0, -2, 2)
         self.triangleY = (-5, 5, 5)
         self.static_obs = static_obs
+        self.maxColor = -10000000
+        self.minColor = 100000000
+        self.displaynumber = 0
         pygame.font.init()
         try:
             self.myfont = pygame.font.Font("r.ttf", 15)
@@ -116,7 +122,7 @@ class PLOT:
         self.yobs = []
         self.hobs = []
         self.costobs = []
-        self.colorsobs = []
+        self.heauristicobs = []
         self.shapeobs = []
 
         # self.exp_img = [pygame.image.load(os.path.join('explosion', img)).convert_alpha()
@@ -207,7 +213,7 @@ class PLOT:
         if self.on_init() == False:
             self._running = False
         self.updateInformation(
-            nobs, xobs, yobs, hobs, [], [], [])
+            nobs, xobs, yobs, hobs, [], [], [],0)
         self.update()
 
     def dist(self, x, x1, y, y1):
@@ -231,14 +237,25 @@ class PLOT:
                 i * scalew, 0), self.scale_xy(i*scalew, self.scaleh))
             # self.draw_text(self.scalew,i * scaleh, i * self.maxX/(self.lines + 1) )
 
-    def updateInformation(self, nobs, xobs, yobs, hobs, costobs, colorsobs, shapeobs):
+    def updateInformation(self, nobs, xobs, yobs, hobs, costobs, heauristicobs, shapeobs, cost):
+        if nobs == 1:
+            self.maxColor = -1000000
+            self.minColor = 1000000
         self.nobs = nobs
         self.xobs = xobs
         self.yobs = yobs
         self.hobs = hobs
         self.costobs = costobs
-        self.colorsobs = colorsobs
+        self.heauristicobs = heauristicobs
         self.shapeobs = shapeobs
+        self.maxColor = max(self.maxColor,cost)
+        self.minColor = min(self.minColor,cost)
+        self.displaynumber = self.maxColor-self.minColor;
+        if self.displaynumber == 0:
+            self.displaynumber = 1
+    def getColor(self,cost):
+        return (0,0, 255-((cost - self.minColor)/self.displaynumber)*colorrange )
+
 
     def draw_obs(self):
         for obs in self.static_obs:
@@ -246,10 +263,9 @@ class PLOT:
         for index in range(self.nobs):
             if self.shapeobs[index] == 1:
                 self.draw_vehicle(
-                    self.hobs[index], colors[self.colorsobs[index]], *self.scale_item(self.xobs[index], self.yobs[index]))
-                self.draw_text_cost(self.costobs[index],*self.scale_item(self.xobs[index], self.yobs[index]))
+                    self.hobs[index], self.getColor(self.costobs[index]), *self.scale_item(self.xobs[index], self.yobs[index]))
             else:
-                self.drawCircle(colors[self.colorsobs[index]],*self.scale_item(self.xobs[index], self.yobs[index]))
+                self.drawCircle(self.getColor(self.costobs[index]),*self.scale_item(self.xobs[index], self.yobs[index]))
                 # self.draw_dot(colors[self.colorsobs[index]],self.xobs[index], self.yobs[index])
         for i in range(len(self.goal_location)):
             if(self.distSquare(self.curr_x, self.curr_y, *self.goal_location[i]) <= 10):
@@ -352,7 +368,7 @@ def update():
         yobs = []
         hobs = []
         costobs = []
-        colorsobs = []
+        heauristicobs = []
         shapeobs = []
         while True:
             info = sys.stdin.readline()
@@ -361,12 +377,14 @@ def update():
                 continue
             if s[4].strip().lower() == 'done':
                 break
+            if len(s) > 20 and s[20].strip().lower() != 'vis1':
+                continue
             nobs += 1
             xobs.append(float(s[4]))
             yobs.append(float(s[5]))
             hobs.append(float(s[6]))
-            costobs.append(int(float(s[11])))
-            colorsobs.append(int(s[14]))
+            costobs.append(float(s[11]))
+            heauristicobs.append(float(s[14]))
             if s[17].strip().lower() == 'dot':
                 shapeobs.append(0)
             else:
@@ -375,14 +393,14 @@ def update():
             mutex.acquire(True)
             try:
                 theApp.updateInformation(
-                    nobs, xobs, yobs, hobs, costobs, colorsobs, shapeobs)
+                    nobs, xobs, yobs, hobs, costobs, heauristicobs, shapeobs,float(s[11]))
             finally:
                 mutex.release()
 
         mutex.acquire(True)
         try:
             theApp.updateInformation(
-                0, [], [], [], [], [], [])
+                0, [], [], [], [], [], [],0)
         finally:
             mutex.release()
 

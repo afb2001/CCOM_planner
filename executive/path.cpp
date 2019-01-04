@@ -128,7 +128,7 @@ void Path::update_covered()
     {
         float x = it->x - current.x;
         float y = it->y - current.y;
-        if (x * x + y * y <= 10)
+        if (x * x + y * y <= 20)
         {
             auto it1 = it;
             newcover.push_back(*it);
@@ -202,7 +202,7 @@ void Path::getDynamicObs(string &s)
     int dynamic_obs_size = dyamic_obstacles.size();
     s += "dynamic obs " + to_string(dynamic_obs_size);
     for (int i = 0; i < dynamic_obs_size; i++)
-        s += "\n" + to_string(i) + " " + dyamic_obstacles[i].toString();
+        s += "\n" + to_string(i) + " " + dyamic_obstacles[i].toString();// + initialVariance;
     mtx_obs.unlock();
 }
 

@@ -18,6 +18,7 @@ var p1, p2 = common.State{X: 0.5, Y: 1.5}, common.State{X: 0.5, Y: 2.5}
 var p = common.Path{p1, p2}
 
 func setUp() {
+	DebugVis = false
 	g.BlockRange(1, 1, 1)
 	solver := tsp.NewSolver(p)
 	InitGlobals(g, 0.5, 0.20, solver)
@@ -155,9 +156,9 @@ func TestEdge_UpdateStart(t *testing.T) {
 func TestStaticCollision(t *testing.T) {
 	t.Log("Testing edge through obstacle...")
 	toCover := p.Without(p2) // so we can have just one point to cover
-	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: *toCover}
-	v1.parentEdge = &Edge{start: &v1, end: &v1}                // root vertex setup
-	v1.currentCost = -float64(len(*toCover)) * coveragePenalty // here too
+	v1 := Vertex{state: &common.State{X: 2.5, Y: 1.5, Heading: math.Pi}, uncovered: toCover}
+	v1.parentEdge = &Edge{start: &v1, end: &v1}               // root vertex setup
+	v1.currentCost = -float64(len(toCover)) * coveragePenalty // here too
 	v2 := Vertex{state: &common.State{X: 0.5, Y: 1.5, Heading: math.Pi}}
 	e := Edge{start: &v1, end: &v2}
 	v2.parentEdge = &e
@@ -251,7 +252,7 @@ func TestBitStar(t *testing.T) {
 	t.SkipNow()
 	t.Log("Testing BIT* in a small world")
 	o1 := new(common.Obstacles)
-	plan := BitStar(start, &p, 0.09, o1)
+	plan := BitStar(start, &p, 0.09, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -266,10 +267,34 @@ func TestBitStar2(t *testing.T) {
 	solver := tsp.NewSolver(p)
 	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
-	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, &p, 0.09, o1)
+	plan := BitStar(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 1}, &p, 0.09, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
+	}
+}
+
+func TestBitStar3(t *testing.T) {
+	t.SkipNow() // this takes a while (almost a minute
+	t.Log("Testing BIT* a bunch of times in a row from random states")
+	rand.Seed(time.Now().UnixNano())
+	// redo setup
+	var p = bigPath()
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
+	o1 := new(common.Obstacles)
+	for i := 0; i < 60; i++ {
+		s := randomState(50, 100, 0, 20)
+		s.Time = float64(i)
+		plan := BitStar(*s, &p, 0.09, *o1)
+		if plan == nil || plan.States == nil {
+			if !grid.IsBlocked(s.X, s.Y) {
+				t.Errorf("Empty plan for unblocked state")
+				break
+			} else {
+				PrintLog("Sampled blocked state " + s.String())
+			}
+		}
 	}
 }
 
@@ -281,7 +306,7 @@ func TestFindAStarPlan(t *testing.T) {
 	solver := tsp.NewSolver(p)
 	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
-	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
+	plan := PointToPointPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
@@ -303,8 +328,31 @@ func TestFindAStarPlan2(t *testing.T) {
 }
 
 func TestFindAStarPlan3(t *testing.T) {
-	// t.SkipNow() // this takes a while (almost a minute
+	// t.SkipNow() // this takes a while
 	t.Log("Testing A* a bunch of times in a row from random states")
+	rand.Seed(time.Now().UnixNano())
+	// redo setup
+	var p = bigPath()
+	solver := tsp.NewSolver(p)
+	InitGlobals(bigGrid(), 2.5, 0.75, solver)
+	o1 := new(common.Obstacles)
+	for i := 0; i < 10; i++ {
+		s := randomState(50, 100, 0, 20)
+		s.Time = float64(i)
+		plan := FindAStarPlan(*s, &p, 0.09, *o1)
+		if plan == nil || plan.States == nil {
+			if !grid.IsBlocked(s.X, s.Y) {
+				t.Errorf("Empty plan for unblocked state")
+				break
+			} else {
+				PrintLog("Sampled blocked state " + s.String())
+			}
+		}
+	}
+}
+
+func TestPointToPointPlan(t *testing.T) {
+	t.Log("Testing the Point to Point planner a bunch of times in a row from random states")
 	rand.Seed(time.Now().UnixNano())
 	// redo setup
 	var p = bigPath()
@@ -314,7 +362,7 @@ func TestFindAStarPlan3(t *testing.T) {
 	for i := 0; i < 60; i++ {
 		s := randomState(50, 100, 0, 20)
 		s.Time = float64(i)
-		plan := FindAStarPlan(*s, &p, 0.09, *o1)
+		plan := PointToPointPlan(*s, &p, 0.09, *o1)
 		if plan == nil || plan.States == nil {
 			if !grid.IsBlocked(s.X, s.Y) {
 				t.Errorf("Empty plan for unblocked state")
