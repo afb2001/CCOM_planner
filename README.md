@@ -35,6 +35,12 @@ For example, using sample map and goal files:
 ```
 ./run.sh -map sample/test1.map -goal sample/goal.goal -nobs 50
 ```
-The simulator and planner could also run separately by running <code>shim.py</code> in the executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py in the simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> 
+Alternatively, one of several pre-configured tests can be run using the <code>-test</code> flag:
+```
+./run.sh -test sample/sampleTest/ctest4
+```
+Those test configurations can be found in sample/sampleTest.
+
+The simulator and planner can also run separately by running <code>shim.py</code> in the executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py in the simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> 
 
 The sample directory contains examples of grid map and goal files.
