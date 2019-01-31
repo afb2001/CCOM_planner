@@ -1,5 +1,5 @@
-mkdir -p ~/go/src/github.com/afb2001/CCOM_planner/
-cp -r tsp parse util common dubins bitStar ~/go/src/github.com/afb2001/CCOM_planner/
+#mkdir -p ~/go/src/github.com/afb2001/CCOM_planner/
+#cp -r tsp parse util common dubins bitStar ~/go/src/github.com/afb2001/CCOM_planner/
 go build -o planner
 mv planner executive
 cd executive
