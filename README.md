@@ -3,7 +3,7 @@ Go planner for CCOM ASV
 
 ## Requirements
 I'm using go version <a href="https://golang.org/dl/">go1.10.3</a> and gccgo (GCC) 8.2.1, so those (or newer) should work for you.
-The Python files can run under python 2.7.
+The python files run under python 2.7. You'll need <code>numpy</code>,<code>bitarray</code> and <code>pygame</code>.
 
 ## Installation
 You can directly use the <code>go</code> tool to download the project into your <code>GOPATH</code>:
@@ -43,4 +43,4 @@ Those test configurations can be found in sample/sampleTest.
 
 The simulator and planner can also run separately by running <code>shim.py</code> in the executive folder  <code>./shim.py [-m gridmap] [-g goalfile]</code> and dynamic_obstacle_sim3.py in the simulator folder. <code>./dynamic_obstacle_sim3.py [-p plot] [-m gridmap] [-g goalfile] [-nobs number_of_dobs]</code> 
 
-The sample directory contains examples of grid map and goal files.
+The sample directory contains examples of grid, map and goal files.
