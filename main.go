@@ -43,6 +43,13 @@ func main() {
 	bitStar.InitGlobals(*grid, maxSpeed, maxTurningRadius, solver)
 	//rrt.SetBoatConstants(maxSpeed, maxTurningRadius)
 
+	visInputFile, err := os.OpenFile("../vis_input", os.O_CREATE|os.O_WRONLY, os.ModeAppend)
+	HandleError(err, LogErr)
+
+	defer visInputFile.Close()
+
+	VisWriter = bufio.NewWriter(visInputFile)
+
 	fmt.Println("ready")
 
 	// planning loop

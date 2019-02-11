@@ -204,7 +204,8 @@ func (p *Plan) AppendState(s *State) {
 			//(!(p.States[len(p.States)-1].DistanceTo(s) < planDistanceDensity) ||
 			p.States[len(p.States)-1].TimeUntil(s) >= planTimeDensity) {
 		p.States = append(p.States, s)
-		util.PrintDebug(s.String(), "g =", 0, "h =", 0, "shape = boat vis = vis1")
+		//util.PrintDebugVertex(s.String(), "boat", 2)
+		util.PrintDebug(s.String(), "g = 0 h = 0 shape = boat vis = vis1")
 	}
 }
 

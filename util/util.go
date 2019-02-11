@@ -1,11 +1,15 @@
 package util
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"strings"
 )
 
 var DebugVis = false
+var DebugToFile = true
+var VisWriter *bufio.Writer
 
 type ErrorPolicy int
 
@@ -33,9 +37,16 @@ func PrintLog(v ...interface{}) {
 /**
 Print a debug visualization for the planner.
 */
-func PrintDebug(v ...interface{}) {
+func PrintDebug(v ...string) {
+	v = append([]string{"Planner visualization:"}, v...)
 	if DebugVis {
-		log.Println(append([]interface{}{"Planner visualization:"}, v...)...)
+		log.Println(strings.Join(v, " "))
+	}
+	if DebugToFile && VisWriter != nil {
+		_, err := VisWriter.WriteString(strings.Join(v, " "))
+		_, err = VisWriter.WriteString("\n")
+		err = VisWriter.Flush()
+		HandleError(err, LogErr)
 	}
 }
 
@@ -57,6 +68,7 @@ func HandleError(err error, policy ErrorPolicy) {
 	case IgnoreErr:
 	case LogErr:
 		PrintLog("Encountered an error:", err)
+		PrintError(err)
 	case ParseErr:
 		fallthrough
 	case FatalErr:
