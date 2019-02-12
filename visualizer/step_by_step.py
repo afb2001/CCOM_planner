@@ -7,7 +7,6 @@ import sys
 import math
 import numpy as np
 
-
 Color_line = (0, 0, 0)
 Color_line_middle = (180, 180, 180)
 Color_line_path = (240, 0, 0)
@@ -41,12 +40,12 @@ def dist_square(x1, y1, x2, y2):
 
 
 class Obs:
-    def __init__(self, x, y, h, cost, shape):
+    def __init__(self, x, y, h, cost, tag):
         self.x = x
         self.y = y
         self.h = h
         self.cost = cost
-        self.shape = shape
+        self.tag = tag
         self.children = []
 
 
@@ -74,6 +73,8 @@ class PLOT:
         self.displayNumber = 0
         self.input_file_name = in_file_name
         self.obs = []
+        self.starts = []
+        self.startIndex = 0
         # declare stuff defined in on_init
         self.w, self.h, self.scaleW, self.scaleH, self.startW, self.startH = 0, 0, 0, 0, 0, 0
         self.curr_x, self.curr_y, self.start_heading, self.index = 0, 0, 0, 0
@@ -104,6 +105,12 @@ class PLOT:
         self.index = 0
         self.reset()
 
+    def getStartIndex(self):
+        if len(self.starts) == 0:
+            return 0
+        else:
+            return self.starts[self.startIndex]
+
     def on_event(self, event):
         if event.type == QUIT:
             pygame.quit()
@@ -129,12 +136,8 @@ class PLOT:
                 y = int(round(((1 - (y - self.startH) / self.scaleH) * 10), 5))
                 self.maxX += p
                 self.maxY += p
-                self.originY = self.scaleH * \
-                               ((int(self.curr_y) / d) * d / float(self.maxY)) - \
-                               y * self.scaleH / (self.lines + 1)
-                self.originX = -self.scaleW * \
-                               ((int(self.curr_x) / d) * d / float(self.maxX)) + \
-                               x * self.scaleW / (self.lines + 1)
+                self.originY = self.scaleH * ((int(self.curr_y) / d) * d / float(self.maxY)) - y * self.scaleH / (self.lines + 1)
+                self.originX = -self.scaleW * ((int(self.curr_x) / d) * d / float(self.maxX)) + x * self.scaleW / (self.lines + 1)
                 cy = (int(self.curr_y) / d) * d
                 cx = (int(self.curr_x) / d) * d
                 self.moveY = cy - y * self.maxY / (self.lines + 1)
@@ -148,12 +151,8 @@ class PLOT:
                     y = int(round(((1 - (y - self.startH) / self.scaleH) * 10), 5))
                     self.maxX -= p
                     self.maxY -= p
-                    self.originY = self.scaleH * \
-                                   ((int(self.curr_y) / d) * d / float(self.maxY)) - \
-                                   y * self.scaleH / (self.lines + 1)
-                    self.originX = -self.scaleW * \
-                                   ((int(self.curr_x) / d) * d / float(self.maxX)) + \
-                                   x * self.scaleW / (self.lines + 1)
+                    self.originY = self.scaleH * ((int(self.curr_y) / d) * d / float(self.maxY)) - y * self.scaleH / (self.lines + 1)
+                    self.originX = -self.scaleW * ((int(self.curr_x) / d) * d / float(self.maxX)) + x * self.scaleW / (self.lines + 1)
                     cy = (int(self.curr_y) / d) * d
                     cx = (int(self.curr_x) / d) * d
                     self.moveY = cy - y * self.maxY / (self.lines + 1)
@@ -170,7 +169,11 @@ class PLOT:
                 self.reset()
             elif event.key == pygame.K_n:
                 self.index += 1
+                if self.obs[self.index].tag == "start":
+                    self.startIndex += 1
             elif event.key == pygame.K_BACKSPACE or event.key == pygame.K_b:
+                if self.obs[self.index].tag == "start":
+                    self.startIndex -= 1
                 self.index -= 1
                 if self.index < 0:
                     self.index = 0
@@ -188,38 +191,39 @@ class PLOT:
         pygame.display.flip()
 
     def draw_line(self):
-        pygame.draw.line(self.display, Color_line, (self.startW,
-                                                    self.startH), (self.startW + self.scaleW, self.startH))
-        pygame.draw.line(self.display, Color_line, (self.startW,
-                                                    self.startH), (self.startW, self.startH + self.scaleH))
-        pygame.draw.line(self.display, Color_line, (self.startW, self.startH +
-                                                    self.scaleH),
-                         (self.startW + self.scaleW, self.startH + self.scaleH))
-        pygame.draw.line(self.display, Color_line, (self.startW + self.scaleW,
-                                                    self.startH),
-                         (self.startW + self.scaleW, self.startH + self.scaleH))
+        pygame.draw.line(self.display, Color_line, (self.startW, self.startH), (self.startW + self.scaleW, self.startH))
+        pygame.draw.line(self.display, Color_line, (self.startW, self.startH), (self.startW, self.startH + self.scaleH))
+        pygame.draw.line(self.display, Color_line, (self.startW, self.startH + self.scaleH), (self.startW + self.scaleW, self.startH + self.scaleH))
+        pygame.draw.line(self.display, Color_line, (self.startW + self.scaleW, self.startH), (self.startW + self.scaleW, self.startH + self.scaleH))
         scaleh = self.scaleH / (self.lines + 1)
         scalew = self.scaleW / (self.lines + 1)
         for i in range(1, self.lines + 1):
-            pygame.draw.line(self.display, Color_line_middle, self.scale_xy(
-                0, i * scaleh), self.scale_xy(self.scaleW, i * scaleh))
-            pygame.draw.line(self.display, Color_line_middle, self.scale_xy(
-                i * scalew, 0), self.scale_xy(i * scalew, self.scaleH))
+            pygame.draw.line(self.display, Color_line_middle, self.scale_xy(0, i * scaleh), self.scale_xy(self.scaleW, i * scaleh))
+            pygame.draw.line(self.display, Color_line_middle, self.scale_xy(i * scalew, 0), self.scale_xy(i * scalew, self.scaleH))
 
     def update_information(self, x, y, heading, h, cost, tag):
         if tag == "vertex":
-            self.obs.append(Obs(x, y, heading, cost + h, 1))
+            self.obs.append(Obs(x, y, heading, cost + h, tag))
         elif tag == "trajectory":
-            obs = Obs(x, y, heading, cost + h, 0)
-            self.obs[len(self.obs) - 1].children.append(obs)
-        if cost < 500:
+            obs = Obs(x, y, heading, cost + h, tag)
+            if len(self.obs) == 0 or self.obs[len(self.obs) - 1].tag != "trajectory":
+                self.obs.append(obs)
+            else:
+                self.obs[len(self.obs) - 1].children.append(obs)
+        elif tag == "plan":
+            if self.obs[len(self.obs) - 1].tag == "plan":
+                obs = Obs(x, y, heading, cost + h, tag)
+                self.obs[len(self.obs) - 1].children.append(obs)
+            else:
+                self.obs.append(Obs(x, y, heading, cost + h, tag))
+        if cost < 500 and tag == "vertex":
             self.maxColor = max(self.maxColor, cost)
             self.minColor = min(self.minColor, cost)
             self.displayNumber = self.maxColor - self.minColor
             if self.displayNumber == 0:
                 self.displayNumber = 1
 
-# TODO -- set color limits
+    # TODO -- set color limits
     def get_color(self, cost):
         if cost >= 500:
             return Color_BLACK
@@ -231,7 +235,7 @@ class PLOT:
     def draw(self):
         for obs in self.static_obs:
             self.draw_static_obs(Color_BLACK, *obs)
-        for index in range(self.index):
+        for index in range(self.getStartIndex(), self.index):
             self.draw_obs(self.obs[index], self.fValue(index))
         for i in range(len(self.goals)):
             if dist_square(self.curr_x, self.curr_y, *self.goals[i]) <= 10:
@@ -245,14 +249,19 @@ class PLOT:
             self.draw_static_obs((0, 255, 255), *goal)
 
     def draw_obs(self, obs, cost):
-        if obs.shape == 1:
+        if obs.tag == "vertex":
             yy = self.draw_vehicle(obs.h, self.get_color(cost), *self.scale_item(obs.x, obs.y))
             self.draw_text_cost(cost, self.scale_item(obs.x, obs.y)[0], yy)
+        elif obs.tag == "start":
+            self.draw_vehicle(obs.h, Color_BLUE, *self.scale_item(obs.x, obs.y))
+        elif obs.tag == "plan":
+            self.draw_circle(Color_CYAN, *self.scale_item(obs.x, obs.y))
         else:
             # TODO -- draw trajectory in same color as end vertex
             # self.draw_circle(self.get_color(cost), *self.scale_item(obs.x, obs.y))
-            self.draw_circle(Color_BLACK, *self.scale_item(obs.x, obs.y))
+            self.draw_circle(Color_BLUE, *self.scale_item(obs.x, obs.y))
         for index in range(len(obs.children)):
+            cost = cost if obs.children[index].cost == 0 else obs.children[index].cost
             self.draw_obs(obs.children[index], cost)
 
     def draw_static_obs(self, color, x, y):
@@ -351,10 +360,8 @@ class PLOT:
             costobs = (float(line[9]))
             heauristicobs = (float(line[12]))
             tag = line[15].strip().lower()
-            # if line[15].strip().lower() == 'dot':
-            #     shapeobs = 0
-            # else:
-            #     shapeobs = 1
+            if tag == "start":
+                self.starts.append(len(self.obs))
             theApp.update_information(xobs, yobs, hobs, heauristicobs, costobs, tag)
 
 
@@ -375,7 +382,8 @@ if __name__ == "__main__":
         goal_file_name = sys.argv[2]
 
     if len(sys.argv) != 4:
-        print 'Usage: "./step_by_step.py mapfile goalfile inputfile" or\n       "./step_by_step.py -test testname inputfile"\n'
+        print 'Usage: "./step_by_step.py mapfile goalfile inputfile" or\n       ' \
+              '"./step_by_step.py -test testname inputfile"\n'
         exit(0)
 
     input_file_name = sys.argv[3]

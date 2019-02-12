@@ -57,6 +57,10 @@ func PrintDebugVertex(vertex string, tag string) {
 	PrintDebug(vertex, fmt.Sprintf("tag = %s", tag))
 }
 
+func PrintTrajectoryState(x, y, h, cost float64){
+	PrintDebugVertex(fmt.Sprintf("%f %f %f 0 0 g = %f h = 0", x, y, h, cost), "trajectory")
+}
+
 /**
 Error handling
 */

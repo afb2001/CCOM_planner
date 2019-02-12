@@ -624,6 +624,9 @@ func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (pena
 			penalty += collisionPenalty * collisionProbability
 		}
 		newlyCovered = append(newlyCovered, toCover.NewlyCoveredArray(*q)...) // splash operator I guess
+
+		PrintTrajectoryState(q[0], q[1], q[2], (inc/maxSpeed*timePenalty)+penalty)
+
 		return 0
 	}
 	err := path.SampleMany(dubinsInc, callback)
@@ -1088,6 +1091,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	startV.parentEdge = &Edge{start: startV, end: startV}
 	bestVertex = nil
 	// bestVertex = startV
+	PrintDebugVertex(startV.String(), "start")
 	samples := make([]*Vertex, 0)
 	allSamples := make([]*Vertex, 0)
 	currentSampleCount := bitStarSamples
