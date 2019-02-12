@@ -1,17 +1,12 @@
 #!/usr/bin/env python
+
+import colorsys
 import pygame
 from pygame.locals import *
-# import threading
-# from threading import Lock
 import sys
 import math
-# import os
-# import glob
 import numpy as np
 
-# import time
-
-# mutex = Lock()
 
 Color_line = (0, 0, 0)
 Color_line_middle = (180, 180, 180)
@@ -29,8 +24,10 @@ Color_GREEN_dark = (0, 155, 0)
 Color_PURPLE_dark = (155, 0, 155)
 Color_CYAN_dark = (0, 155, 155)
 
+Color_BLACK = (0, 0, 0)
+
 color_base = 10
-color_range = 245
+color_range = 240
 
 colors = [Color_Red, Color_BLUE, Color_GREEN, Color_PURPLE, Color_CYAN, Color_Red_dark,
           Color_BLUE_dark, Color_GREEN_dark, Color_PURPLE_dark, Color_CYAN_dark]
@@ -43,11 +40,19 @@ def dist_square(x1, y1, x2, y2):
     return (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)
 
 
+class Obs:
+    def __init__(self, x, y, h, cost, shape):
+        self.x = x
+        self.y = y
+        self.h = h
+        self.cost = cost
+        self.shape = shape
+        self.children = []
+
+
 class PLOT:
     def __init__(self, blocked, xlim, ylim, goal, in_file_name):
-        self._running = True
         self.display = None
-        self._image_surf = None
         self.screenH = 800
         self.screenW = 600
         self.maxX = xlim
@@ -59,13 +64,8 @@ class PLOT:
         self.originY = 0
         self.moveX = 0
         self.moveY = 0
-        self.cost = 0
-        self.future_x = []
-        self.future_y = []
         self.goals = goal
         self.covered_goals = []
-        self.future_heading = []
-        self.estimateStart = (0, 0, 0)
         self.triangleX = (0, -5, 5)
         self.triangleY = (-10, 10, 10)
         self.static_obs = blocked
@@ -73,12 +73,10 @@ class PLOT:
         self.minColor = 100000000
         self.displayNumber = 0
         self.input_file_name = in_file_name
-        self.input_lines = []
-        self.input_index = 0
+        self.obs = []
         # declare stuff defined in on_init
         self.w, self.h, self.scaleW, self.scaleH, self.startW, self.startH = 0, 0, 0, 0, 0, 0
-        self.curr_x, self.curr_y, self.start_heading, self.nobs = 0, 0, 0, 0
-        self.xobs, self.yobs, self.hobs, self.costobs, self.heauristicobs, self.shapeobs = [], [], [], [], [], []
+        self.curr_x, self.curr_y, self.start_heading, self.index = 0, 0, 0, 0
         self.background = None
         pygame.font.init()
         try:
@@ -97,20 +95,13 @@ class PLOT:
         self.scaleH = self.h * 0.8
         self.startW = self.w * 0.1
         self.startH = self.h * 0.1
-        self._running = True
         self.background = pygame.Surface(self.display.get_size())
         self.background.fill((240, 240, 240))
         self.background = self.background.convert()
         self.curr_x = 0
         self.curr_y = 0
         self.start_heading = 0
-        self.nobs = 0
-        self.xobs = []
-        self.yobs = []
-        self.hobs = []
-        self.costobs = []
-        self.heauristicobs = []
-        self.shapeobs = []
+        self.index = 0
         self.reset()
 
     def on_event(self, event):
@@ -171,20 +162,18 @@ class PLOT:
                 d = 10 if self.maxX >= 100 and self.maxY >= 100 else 1
                 self.maxY = self.yLim
                 self.maxX = self.xLim
-                self.originY = self.scaleH * \
-                               ((int(self.curr_y) / d) * d / float(self.maxY))
-                self.originX = -self.scaleW * \
-                               ((int(self.curr_x) / d) * d / float(self.maxX))
+                self.originY = self.scaleH * ((int(self.curr_y) / d) * d / float(self.maxY))
+                self.originX = -self.scaleW * ((int(self.curr_x) / d) * d / float(self.maxX))
                 self.moveY = (int(self.curr_y) / d) * d
                 self.moveX = (int(self.curr_x) / d) * d
             elif event.key == pygame.K_r:
                 self.reset()
             elif event.key == pygame.K_n:
-                self.nobs += 1
-            elif event.key == pygame.K_BACKSPACE:
-                self.nobs -= 1
-                if self.nobs < 0:
-                    self.nobs = 0
+                self.index += 1
+            elif event.key == pygame.K_BACKSPACE or event.key == pygame.K_b:
+                self.index -= 1
+                if self.index < 0:
+                    self.index = 0
             elif event.key == pygame.K_ESCAPE:
                 pygame.quit()
                 exit(0)
@@ -193,13 +182,10 @@ class PLOT:
         self.display.blit(self.background, (0, 0))
         self.draw_line()
         self.draw_text()
-        self.draw_obs()
+        self.draw()
         sprites.draw(self.display)
         sprites.update()
         pygame.display.flip()
-
-    def on_cleanup(self):
-        pygame.quit()
 
     def draw_line(self):
         pygame.draw.line(self.display, Color_line, (self.startW,
@@ -219,39 +205,34 @@ class PLOT:
                 0, i * scaleh), self.scale_xy(self.scaleW, i * scaleh))
             pygame.draw.line(self.display, Color_line_middle, self.scale_xy(
                 i * scalew, 0), self.scale_xy(i * scalew, self.scaleH))
-            # self.draw_text(self.scalew,i * scaleh, i * self.maxX/(self.lines + 1) )
 
-    # TODO! -- why were there two "cost" parameters? (costobs, cost)
-    def update_information(self, x, y, heading, h, shape, cost):
-        # self.nobs += 1
-        self.xobs.append(x)
-        self.yobs.append(y)
-        self.hobs.append(heading)
-        self.costobs.append(cost)
-        self.heauristicobs.append(h)
-        self.shapeobs.append(shape)
-        self.maxColor = max(self.maxColor, cost)
-        self.minColor = min(self.minColor, cost)
-        self.displayNumber = self.maxColor - self.minColor
-        if self.displayNumber == 0:
-            self.displayNumber = 1
+    def update_information(self, x, y, heading, h, cost, tag):
+        if tag == "vertex":
+            self.obs.append(Obs(x, y, heading, cost + h, 1))
+        elif tag == "trajectory":
+            obs = Obs(x, y, heading, cost + h, 0)
+            self.obs[len(self.obs) - 1].children.append(obs)
+        if cost < 500:
+            self.maxColor = max(self.maxColor, cost)
+            self.minColor = min(self.minColor, cost)
+            self.displayNumber = self.maxColor - self.minColor
+            if self.displayNumber == 0:
+                self.displayNumber = 1
 
+# TODO -- set color limits
     def get_color(self, cost):
-        return 0, 0, 255 - ((cost - self.minColor) / self.displayNumber) * color_range
+        if cost >= 500:
+            return Color_BLACK
+        else:
+            r, g, b = colorsys.hsv_to_rgb(1 - ((cost - self.minColor) / self.displayNumber), 0.9, 0.75)
+            return r * 255, g * 255, b * 255
+            # return 0, 0, 255 - ((cost - self.minColor) / self.displayNumber) * color_range
 
-    def draw_obs(self):
+    def draw(self):
         for obs in self.static_obs:
-            self.draw_static_obs(Color_Red, *obs)
-        for index in range(self.nobs):
-            if self.shapeobs[index] == 1:
-                yy = self.draw_vehicle(
-                    self.hobs[index], self.get_color(self.costobs[index]),
-                    *self.scale_item(self.xobs[index], self.yobs[index]))
-                self.draw_text_cost(self.costobs[index], self.heauristicobs[index],
-                                    self.scale_item(self.xobs[index], self.yobs[index])[0], yy)
-            else:
-                self.draw_circle(self.get_color(self.costobs[index]),
-                                 *self.scale_item(self.xobs[index], self.yobs[index]))
+            self.draw_static_obs(Color_BLACK, *obs)
+        for index in range(self.index):
+            self.draw_obs(self.obs[index], self.fValue(index))
         for i in range(len(self.goals)):
             if dist_square(self.curr_x, self.curr_y, *self.goals[i]) <= 10:
                 self.covered_goals.append(self.goals.pop(i))
@@ -262,6 +243,17 @@ class PLOT:
 
         for goal in self.covered_goals:
             self.draw_static_obs((0, 255, 255), *goal)
+
+    def draw_obs(self, obs, cost):
+        if obs.shape == 1:
+            yy = self.draw_vehicle(obs.h, self.get_color(cost), *self.scale_item(obs.x, obs.y))
+            self.draw_text_cost(cost, self.scale_item(obs.x, obs.y)[0], yy)
+        else:
+            # TODO -- draw trajectory in same color as end vertex
+            # self.draw_circle(self.get_color(cost), *self.scale_item(obs.x, obs.y))
+            self.draw_circle(Color_BLACK, *self.scale_item(obs.x, obs.y))
+        for index in range(len(obs.children)):
+            self.draw_obs(obs.children[index], cost)
 
     def draw_static_obs(self, color, x, y):
         pygame.draw.polygon(self.display, color, (self.scale_item(x, y), self.scale_item(
@@ -291,18 +283,8 @@ class PLOT:
     def draw_circle(self, color, x, y):
         pygame.draw.circle(self.display, color, (int(x), int(y)), 2)
 
-    def draw_text_cost(self, cost, heuristic, x, y):
-        text = "f " + str(int(cost + heuristic))
-        text_surface = self.font.render(text, True, (0, 0, 0))
-        y += text_surface.get_height()
-        self.display.blit(text_surface, (x, y))
-
-        text = "g " + str(int(cost))
-        text_surface = self.font.render(text, True, (0, 0, 0))
-        y += text_surface.get_height()
-        self.display.blit(text_surface, (x, y))
-
-        text = "h " + str(int(heuristic))
+    def draw_text_cost(self, cost, x, y):
+        text = str(int(cost))
         text_surface = self.font.render(text, True, (0, 0, 0))
         y += text_surface.get_height()
         self.display.blit(text_surface, (x, y))
@@ -331,9 +313,6 @@ class PLOT:
         self.on_event(event)
         self.on_render()
 
-    def stop(self):
-        self.on_cleanup()
-
     def scale_xy(self, x, y):
         return self.startW + x, self.startH + y
 
@@ -347,19 +326,16 @@ class PLOT:
                 x / float(self.maxX)), self.originY + self.startH + self.scaleH - self.scaleH * (
                        y / float(self.maxY))
 
+    def fValue(self, n):
+        return self.obs[n].cost
+
     def reset(self):
         with open(self.input_file_name, "r") as input_file:
             input_lines = input_file.readlines()
-        self.input_index = 0
         self.maxColor = -1000000
         self.minColor = 1000000
-        self.nobs = 0
-        self.xobs = []
-        self.yobs = []
-        self.hobs = []
-        self.costobs = []
-        self.heauristicobs = []
-        self.shapeobs = []
+        self.index = 0
+        self.obs = []
         for line in input_lines:
             line = line.split(' ')
             if len(line) < 3 or line[0].strip().lower() != 'planner' or line[1].strip().lower() != 'visualization:':
@@ -367,18 +343,19 @@ class PLOT:
             if line[2].strip().lower() == 'done':
                 continue  # ignore "done" for now
                 # break
-            if len(line) > 18 and line[18].strip().lower() != 'vis2':
-                continue
+            # if len(line) > 18 and line[18].strip().lower() != 'vis2':
+            #     continue
             xobs = (float(line[2]))
             yobs = (float(line[3]))
             hobs = (float(line[4]))
             costobs = (float(line[9]))
             heauristicobs = (float(line[12]))
-            if line[15].strip().lower() == 'dot':
-                shapeobs = 0
-            else:
-                shapeobs = 1
-            theApp.update_information(xobs, yobs, hobs, heauristicobs, shapeobs, costobs)
+            tag = line[15].strip().lower()
+            # if line[15].strip().lower() == 'dot':
+            #     shapeobs = 0
+            # else:
+            #     shapeobs = 1
+            theApp.update_information(xobs, yobs, hobs, heauristicobs, costobs, tag)
 
 
 def dist(x, x1, y, y1):

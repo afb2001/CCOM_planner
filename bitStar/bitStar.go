@@ -18,8 +18,8 @@ const (
 	goalBias       float64 = 0.05
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
-	K              int     = 5   // number of closest states to consider for BIT*
-	bitStarSamples int     = 32  // (m in the paper) -- make this a parameter too
+	K              int     = 2   // number of closest states to consider for BIT*
+	bitStarSamples int     = 5  // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 60
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -991,7 +991,7 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 
 		e.end.UpdateApproxToGo(nil)
 
-		PrintDebugVertex(e.end.String(), "boat", 2)
+		PrintDebugVertex(e.end.String(), "vertex")
 
 		heap.Push(qV, e.end)
 		// TracePlan(e.end)

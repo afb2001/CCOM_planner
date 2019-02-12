@@ -53,8 +53,8 @@ func PrintDebug(v ...string) {
 /**
 Show a vertex in the specified visualizer with the specified shape.
 */
-func PrintDebugVertex(vertex string, shape string, vis int) {
-	PrintDebug(vertex, fmt.Sprintf("shape = %s vis = vis%d", shape, vis))
+func PrintDebugVertex(vertex string, tag string) {
+	PrintDebug(vertex, fmt.Sprintf("tag = %s", tag))
 }
 
 /**
