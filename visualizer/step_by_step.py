@@ -24,6 +24,7 @@ Color_PURPLE_dark = (155, 0, 155)
 Color_CYAN_dark = (0, 155, 155)
 
 Color_BLACK = (0, 0, 0)
+Color_WHITE = (255, 255, 255)
 
 color_base = 10
 color_range = 240
@@ -105,11 +106,19 @@ class PLOT:
         self.index = 0
         self.reset()
 
-    def getStartIndex(self):
+    def get_start_index(self):
         if len(self.starts) == 0:
             return 0
         else:
             return self.starts[self.startIndex]
+
+    def update_start_index(self, diff):
+        self.startIndex += diff
+        if self.startIndex < 0:
+            self.startIndex = 0
+        elif self.startIndex >= len(self.starts):
+            self.startIndex = len(self.starts) - 1
+        self.index = self.starts[self.startIndex]
 
     def on_event(self, event):
         if event.type == QUIT:
@@ -169,14 +178,20 @@ class PLOT:
                 self.reset()
             elif event.key == pygame.K_n:
                 self.index += 1
+                if self.index >= len(self.obs):
+                    self.index = len(self.obs) - 1
                 if self.obs[self.index].tag == "start":
-                    self.startIndex += 1
+                    self.update_start_index(1)
             elif event.key == pygame.K_BACKSPACE or event.key == pygame.K_b:
                 if self.obs[self.index].tag == "start":
-                    self.startIndex -= 1
+                    self.update_start_index(-1)
                 self.index -= 1
                 if self.index < 0:
                     self.index = 0
+            elif event.key == pygame.K_j:
+                self.update_start_index(-1)
+            elif event.key == pygame.K_k:
+                self.update_start_index(1)
             elif event.key == pygame.K_ESCAPE:
                 pygame.quit()
                 exit(0)
@@ -202,9 +217,7 @@ class PLOT:
             pygame.draw.line(self.display, Color_line_middle, self.scale_xy(i * scalew, 0), self.scale_xy(i * scalew, self.scaleH))
 
     def update_information(self, x, y, heading, h, cost, tag):
-        if tag == "vertex":
-            self.obs.append(Obs(x, y, heading, cost + h, tag))
-        elif tag == "trajectory":
+        if tag == "trajectory":
             obs = Obs(x, y, heading, cost + h, tag)
             if len(self.obs) == 0 or self.obs[len(self.obs) - 1].tag != "trajectory":
                 self.obs.append(obs)
@@ -216,6 +229,8 @@ class PLOT:
                 self.obs[len(self.obs) - 1].children.append(obs)
             else:
                 self.obs.append(Obs(x, y, heading, cost + h, tag))
+        else:
+            self.obs.append(Obs(x, y, heading, cost + h, tag))
         if cost < 500 and tag == "vertex":
             self.maxColor = max(self.maxColor, cost)
             self.minColor = min(self.minColor, cost)
@@ -235,7 +250,7 @@ class PLOT:
     def draw(self):
         for obs in self.static_obs:
             self.draw_static_obs(Color_BLACK, *obs)
-        for index in range(self.getStartIndex(), self.index):
+        for index in range(self.get_start_index(), self.index):
             self.draw_obs(self.obs[index], self.fValue(index))
         for i in range(len(self.goals)):
             if dist_square(self.curr_x, self.curr_y, *self.goals[i]) <= 10:
@@ -256,6 +271,8 @@ class PLOT:
             self.draw_vehicle(obs.h, Color_BLUE, *self.scale_item(obs.x, obs.y))
         elif obs.tag == "plan":
             self.draw_circle(Color_CYAN, *self.scale_item(obs.x, obs.y))
+        elif obs.tag == "goal":
+            self.draw_circle(Color_WHITE, *self.scale_item(obs.x, obs.y))
         else:
             # TODO -- draw trajectory in same color as end vertex
             # self.draw_circle(self.get_color(cost), *self.scale_item(obs.x, obs.y))

@@ -19,7 +19,7 @@ const (
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
 	K              int     = 2   // number of closest states to consider for BIT*
-	bitStarSamples int     = 5  // (m in the paper) -- make this a parameter too
+	bitStarSamples int     = 5   // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	coveragePenalty  float64 = 60
 	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
@@ -144,8 +144,8 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	// which is not a super unlikely scenario, making this heuristic not as horrible as it may seem.
 	// The parent's uncovered path is used because we probably don't know ours yet,
 	// and if we do it could be wrong.
-	// approxToGo := parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
-	// 	float64(len(parent.uncovered))*coveragePenalty
+	//approxToGo := parent.uncovered.MaxDistanceFrom(*v.state)/maxSpeed*timePenalty -
+	//	float64(len(parent.uncovered))*coveragePenalty
 
 	// switching to TSP heuristic (inadmissible)
 	approxToGo := solver.Solve(v.state.X, v.state.Y, parent.uncovered)/maxSpeed*timePenalty -
@@ -296,6 +296,10 @@ func (e *Edge) Smooth() {
 		// PrintLog(fmt.Sprintf("Smoothing edge %v to %v", *e, *smoothedEdge))
 		*e = *smoothedEdge
 		e.end.parentEdge = smoothedEdge
+
+		e.end.currentCost = e.start.currentCost + e.trueCost
+		e.end.currentCostIsSet = true
+
 		e.Smooth()
 	}
 }
@@ -984,8 +988,8 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 			PrintLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
 		}
 
-		// smoothing
-		// e.Smooth()
+		// aggressive smoothing
+		//e.Smooth()
 
 		// used to do these in UpdateTrueCost...
 		e.end.currentCost = e.start.currentCost + e.trueCost
@@ -1017,6 +1021,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 		}
 		Expand(vertex, qV, samples)
 		if vertex.state.Time > 30+start.Time {
+			PrintDebugVertex(vertex.String(), "goal")
 			return
 		}
 		if qV.Len() == 0 {
