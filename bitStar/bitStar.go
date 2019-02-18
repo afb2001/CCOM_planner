@@ -740,7 +740,7 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 samples doesn't have to be actual samples it can come from anywhere
 */
 func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edge) {
-	closest = make([]*Edge, K+1) // TODO! -- use heap
+	closest = make([]*Edge, K+1) // TODO! -- use heap!
 	var i int
 	var x *Vertex
 	// PrintLog(v.ApproxCost()) //debug
@@ -765,8 +765,10 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 				closest[j], x.parentEdge = newEdge, newEdge
 				break
 			} else if distance < edge.ApproxCost() {
+				tmp := closest[j]
 				closest[j], x.parentEdge = newEdge, newEdge
-				break
+				newEdge = tmp
+				//break
 			}
 		}
 	}
@@ -779,8 +781,12 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 			i += 1
 			return closest[0:i]
 		}
+	} else {
+		s := v.uncovered.GetClosest(*v.state)
+		closest[K] = &Edge{start: v, end: &Vertex{state: &s, uncovered: v.uncovered}}
+		closest[K].end.parentEdge = closest[K]
+		return
 	}
-	return
 }
 
 //endregion
