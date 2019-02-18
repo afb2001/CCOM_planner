@@ -8,7 +8,6 @@ import (
 	. "github.com/afb2001/CCOM_planner/parse"
 	"github.com/afb2001/CCOM_planner/tsp"
 	. "github.com/afb2001/CCOM_planner/util"
-	"math/rand"
 	"os"
 	"strings"
 )
@@ -22,7 +21,7 @@ var maxSpeed, maxTurningRadius float64
 var reader = bufio.NewReader(os.Stdin)
 
 func main() {
-	rand.Seed(4) // set seed for now
+	//rand.Seed(4) // set seed for now
 
 	var line string
 	GetLine(reader) // start

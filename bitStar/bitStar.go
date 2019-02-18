@@ -740,7 +740,7 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 samples doesn't have to be actual samples it can come from anywhere
 */
 func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edge) {
-	closest = make([]*Edge, K) // TODO! -- use heap
+	closest = make([]*Edge, K+1) // TODO! -- use heap
 	var i int
 	var x *Vertex
 	// PrintLog(v.ApproxCost()) //debug
@@ -761,23 +761,24 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 		}
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
-			// PrintLog("Here") //debug
 			if edge == nil {
-				// PrintLog("Edge was nil")
 				closest[j], x.parentEdge = newEdge, newEdge
 				break
 			} else if distance < edge.ApproxCost() {
-				// PrintLog("Found a better sample")
-				// edge.UpdateEnd(x)
-				// x.parentEdge = edge
-				closest[j], x.parentEdge = newEdge, newEdge // just use the new one
+				closest[j], x.parentEdge = newEdge, newEdge
 				break
 			}
 		}
 	}
-	// PrintLog(closest) //debug
 	if i < K {
-		return closest[0:i]
+		if len(v.uncovered) == 0 {
+			return closest[0:i]
+		} else {
+			s := v.uncovered.GetClosest(*v.state)
+			closest[i+1] = &Edge{start: v, end: &Vertex{state: &s, uncovered: v.uncovered}}
+			i += 1
+			return closest[0:i]
+		}
 	}
 	return
 }
@@ -1021,6 +1022,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 		}
 		Expand(vertex, qV, samples)
 		if vertex.state.Time > 30+start.Time {
+			// NOTE! -- this never seems to get hit
 			PrintDebugVertex(vertex.String(), "goal")
 			return
 		}
@@ -1029,6 +1031,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 		}
 		vertex = heap.Pop(qV).(*Vertex)
 	}
+	PrintDebugVertex(vertex.String(), "goal")
 	return
 }
 

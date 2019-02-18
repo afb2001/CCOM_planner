@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/afb2001/CCOM_planner/util"
 	"math"
+	"sort"
 	"strings"
 )
 
@@ -174,6 +175,29 @@ func (p Path) NewlyCoveredArray(s [3]float64) (covered Path) {
 		}
 	}
 	return
+}
+
+func (p Path) Len() int {
+	return len(p)
+}
+
+func (p Path) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+
+type byDistance struct {
+	Path
+	State
+}
+
+func (s byDistance) Less(i, j int) bool {
+	return s.Path[i].DistanceTo(&s.State) < s.Path[j].DistanceTo(&s.State)
+}
+
+func (p Path) GetClosest(s State) (closest State) {
+	b := byDistance{p, s}
+	sort.Sort(b)
+	return b.Path[0]
 }
 
 //endregion
