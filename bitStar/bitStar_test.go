@@ -84,6 +84,8 @@ func bigPath() common.Path {
 
 func TestMain(m *testing.M) {
 	setUp()
+	SetupDebugWriter()
+	defer CleanupDebugWriter()
 	retCode := m.Run()
 	os.Exit(retCode)
 }
@@ -260,7 +262,7 @@ func TestBitStar(t *testing.T) {
 }
 
 func TestBitStar2(t *testing.T) {
-	t.SkipNow()
+	//t.SkipNow()
 	t.Log("Testing BIT* on a larger world")
 	// redo setup
 	var p = bigPath()
@@ -306,10 +308,16 @@ func TestFindAStarPlan(t *testing.T) {
 	solver := tsp.NewSolver(p)
 	InitGlobals(bigGrid(), 2.5, 0.75, solver)
 	o1 := new(common.Obstacles)
-	plan := PointToPointPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 0.095, *o1)
+	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: -1.5, Speed: 0, Time: 100}, &p, 10e100, *o1)
 	fmt.Println(plan.String())
 	if len(plan.States) == 1 {
 		t.Errorf("Plan was only length 1")
+	}
+	for j, s := range plan.States {
+		if j < len(plan.States)-1 && s.DistanceTo(plan.States[j+1]) > 3 {
+			t.Error("Plan has states too far away")
+			return
+		}
 	}
 }
 
@@ -346,6 +354,12 @@ func TestFindAStarPlan3(t *testing.T) {
 				break
 			} else {
 				PrintLog("Sampled blocked state " + s.String())
+			}
+		}
+		for j, s := range plan.States {
+			if j < len(plan.States)-1 && s.DistanceTo(plan.States[j+1]) > 3 {
+				t.Error("Plan has states too far away")
+				return
 			}
 		}
 	}

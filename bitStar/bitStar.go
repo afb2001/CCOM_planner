@@ -14,16 +14,17 @@ import (
 )
 
 const (
-	verbose        bool    = false
+	verbose        bool    = true
 	goalBias       float64 = 0.05
 	maxSpeedBias   float64 = 1.0
 	dubinsInc      float64 = 0.1 // this might be low
-	K              int     = 2   // number of closest states to consider for BIT*
+	K              int     = 5   // number of closest states to consider for BIT*
 	bitStarSamples int     = 5   // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
-	coveragePenalty  float64 = 60
-	collisionPenalty float64 = 600 // this is suspect... may need to be lower because it will be summed
-	timePenalty      float64 = 1
+	coveragePenalty     float64 = 60
+	collisionPenalty    float64 = 600 // this is suspect... may need to be lower because it will be summed
+	timePenalty         float64 = 1
+	aggressiveSmoothing bool    = false
 )
 
 //region BIT* globals
@@ -284,6 +285,7 @@ func (e *Edge) UpdateTrueCost() float64 {
 }
 
 func (e *Edge) Smooth() {
+
 	// if e is the start (or somehow there's a cycle...)
 	if e.start.parentEdge == e {
 		return
@@ -743,11 +745,12 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 	closest = make([]*Edge, K+1) // TODO! -- use heap!
 	var i int
 	var x *Vertex
-	// PrintLog(v.ApproxCost()) //debug
-	// PrintLog(goalCost) //debug
 	for i, x = range samples {
 		if x == v {
 			continue // skip edges to the same sample
+		}
+		if x.parentEdge != nil {
+			PrintError("Reassigning parent edge")
 		}
 		newEdge := &Edge{start: v, end: x}
 		distance := newEdge.ApproxCost()
@@ -756,9 +759,11 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 		// This seems like a problematic assumption because h may depend on the branch
 		// of the tree we're connecting to (path covered so far?)
 		// No longer making that assumption but maybe we should in the future when h is more expensive?
+		// 2/22/19: This doesn't do anything for RHRSA* because it gets passed math.MaxFloat64 as goalCost
 		if !(v.ApproxCost()+distance+x.UpdateApproxToGo(v) < goalCost) {
 			continue // skip edges that can't contribute to a better solution
 		}
+
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
 			if edge == nil {
@@ -781,10 +786,12 @@ func getKClosest(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edg
 			i += 1
 			return closest[0:i]
 		}
-	} else {
+	} else if len(v.uncovered) > 0 {
 		s := v.uncovered.GetClosest(*v.state)
 		closest[K] = &Edge{start: v, end: &Vertex{state: &s, uncovered: v.uncovered}}
 		closest[K].end.parentEdge = closest[K]
+		return
+	} else {
 		return
 	}
 }
@@ -995,8 +1002,9 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*Vertex) {
 			PrintLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
 		}
 
-		// aggressive smoothing
-		//e.Smooth()
+		if aggressiveSmoothing {
+			e.Smooth()
+		}
 
 		// used to do these in UpdateTrueCost...
 		e.end.currentCost = e.start.currentCost + e.trueCost
@@ -1018,7 +1026,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 	if verbose {
 		PrintLog("Starting A*")
 	}
-	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < 30+start.Time; {
+	for vertex = heap.Pop(qV).(*Vertex); vertex.state.Time < common.TimeHorizon+start.Time; {
 		if now() > endTime {
 			return nil
 		}
@@ -1027,7 +1035,7 @@ func AStar(qV *VertexQueue, samples *[]*Vertex, endTime float64) (vertex *Vertex
 			PrintLog(fmt.Sprintf("f = g + h = %f + %f = %f", vertex.CurrentCost(), vertex.ApproxToGo(), vertex.CurrentCost()+vertex.ApproxToGo()))
 		}
 		Expand(vertex, qV, samples)
-		if vertex.state.Time > 30+start.Time {
+		if vertex.state.Time > common.TimeHorizon+start.Time {
 			// NOTE! -- this never seems to get hit
 			PrintDebugVertex(vertex.String(), "goal")
 			return
@@ -1127,6 +1135,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		for m := len(allSamples); m < len(allSamples)+currentSampleCount; m++ {
 			// for m := 0; m < bitStarSamples; m++ {
 			samples[m] = &Vertex{state: BoundedBiasedRandomState(&grid, *toCover, &start, math.MaxFloat64)}
+			PrintDebugVertex(samples[m].String(), "sample")
 		}
 		totalSampleCount += currentSampleCount
 		// also sample on the last best plan
@@ -1143,9 +1152,13 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 			bestVertex = v
 			bestPlan = TracePlan(bestVertex, true)
 			if verbose {
-				PrintLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
-				PrintLog("Current best plan:")
-				PrintLog(bestPlan.String())
+				if bestVertex == nil {
+					PrintLog(fmt.Sprintf("Couldn't find a plan this round."))
+				} else {
+					PrintLog(fmt.Sprintf("Cost of the current best plan: %f", bestVertex.CurrentCost()))
+					PrintLog("Current best plan:")
+					PrintLog(bestPlan.String())
+				}
 			}
 		}
 		// else {

@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 )
 
 var DebugVis = false
 var DebugToFile = true
 var VisWriter *bufio.Writer
+var visInputFile *os.File
 
 type ErrorPolicy int
 
@@ -24,7 +26,7 @@ const (
 Print a fatal error and die.
 */
 func PrintError(v ...interface{}) {
-	log.Fatal(append([]interface{}{"Planner error:"}, v...)...)
+	log.Fatal(append([]interface{}{"Planner error: "}, v...)...)
 }
 
 /**
@@ -57,8 +59,21 @@ func PrintDebugVertex(vertex string, tag string) {
 	PrintDebug(vertex, fmt.Sprintf("tag = %s", tag))
 }
 
-func PrintTrajectoryState(x, y, h, cost float64){
+func PrintTrajectoryState(x, y, h, cost float64) {
 	PrintDebugVertex(fmt.Sprintf("%f %f %f 0 0 g = %f h = 0", x, y, h, cost), "trajectory")
+}
+
+func SetupDebugWriter() {
+	err := os.Remove("../vis_input")
+	HandleError(err, LogErr)
+	visInputFile, err = os.OpenFile("../vis_input", os.O_CREATE|os.O_WRONLY, 0755)
+	HandleError(err, LogErr)
+	VisWriter = bufio.NewWriter(visInputFile)
+}
+
+func CleanupDebugWriter() {
+	err := visInputFile.Close()
+	HandleError(err, LogErr)
 }
 
 /**

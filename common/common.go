@@ -11,7 +11,7 @@ import (
 const (
 	planDistanceDensity float64 = 1
 	planTimeDensity     float64 = 0.5
-	TimeHorizon         float64 = 30
+	TimeHorizon         float64 = 10
 	coverageThreshold   float64 = 3
 	collisionDistance   float64 = 1.8
 )
@@ -342,7 +342,7 @@ Determine if a given point is within a static obstacle.
 */
 func (g *Grid) IsBlocked(x float64, y float64) bool {
 	if x < 0 || x > float64(g.Width) || y < 0 || y > float64(g.Height) {
-		return true
+		return false // everything outside the world is okay now
 	}
 	return g.get(int(x), int(y))
 }

@@ -25,6 +25,7 @@ Color_CYAN_dark = (0, 155, 155)
 
 Color_BLACK = (0, 0, 0)
 Color_WHITE = (255, 255, 255)
+Color_GREY = (160, 160, 160)
 
 color_base = 10
 color_range = 240
@@ -251,7 +252,7 @@ class PLOT:
         for obs in self.static_obs:
             self.draw_static_obs(Color_BLACK, *obs)
         for index in range(self.get_start_index(), self.index):
-            self.draw_obs(self.obs[index], self.fValue(index))
+            self.draw_obs(self.obs[index], self.f_value(index))
         for i in range(len(self.goals)):
             if dist_square(self.curr_x, self.curr_y, *self.goals[i]) <= 10:
                 self.covered_goals.append(self.goals.pop(i))
@@ -273,6 +274,8 @@ class PLOT:
             self.draw_circle(Color_CYAN, *self.scale_item(obs.x, obs.y))
         elif obs.tag == "goal":
             self.draw_circle(Color_WHITE, *self.scale_item(obs.x, obs.y))
+        elif obs.tag == "sample":
+            self.draw_circle(Color_GREY, *self.scale_item(obs.x, obs.y))
         else:
             # TODO -- draw trajectory in same color as end vertex
             # self.draw_circle(self.get_color(cost), *self.scale_item(obs.x, obs.y))
@@ -352,7 +355,7 @@ class PLOT:
                 x / float(self.maxX)), self.originY + self.startH + self.scaleH - self.scaleH * (
                        y / float(self.maxY))
 
-    def fValue(self, n):
+    def f_value(self, n):
         return self.obs[n].cost
 
     def reset(self):
