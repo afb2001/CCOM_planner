@@ -3,9 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/afb2001/CCOM_planner/bitStar"
 	"github.com/afb2001/CCOM_planner/common"
+	"github.com/afb2001/CCOM_planner/globals"
 	. "github.com/afb2001/CCOM_planner/parse"
+	"github.com/afb2001/CCOM_planner/rhrsaStar"
 	"github.com/afb2001/CCOM_planner/tsp"
 	. "github.com/afb2001/CCOM_planner/util"
 	"os"
@@ -39,7 +40,7 @@ func main() {
 
 	solver := tsp.NewSolver(*path)
 
-	bitStar.InitGlobals(*grid, maxSpeed, maxTurningRadius, solver)
+	globals.InitGlobals(*grid, maxSpeed, maxTurningRadius, solver)
 	//rrt.SetBoatConstants(maxSpeed, maxTurningRadius)
 
 	SetupDebugWriter()
@@ -76,7 +77,7 @@ func main() {
 
 		PrintLog("Planning...")
 		//plan := bitStar.BitStar(*start, path, timeToPlan, o)
-		plan := bitStar.FindAStarPlan(*start, path, timeToPlan, o)
+		plan := rhrsaStar.FindAStarPlan(*start, path, timeToPlan, o)
 		//plan := bitStar.PointToPointPlan(*start, path, timeToPlan, o)
 		//plan := rrt.MakePlan(grid, start, *path, &o, timeToPlan)
 		if plan == nil || len(plan.States) == 0 {
