@@ -50,12 +50,12 @@ func (e *Edge) UpdateEnd(newEnd *Vertex) {
 	e.DPath, e.Plan = nil, nil
 }
 
-// get the cached true Cost
+// get the cached true cost
 func (e Edge) TrueCost() float64 {
 	return e.trueCost
 }
 
-// Updates the cached true Cost of this edge.
+// Updates the cached true cost of this edge.
 // This is expensive.
 func (e *Edge) UpdateTrueCost() float64 {
 	var collisionPenalty float64
@@ -67,28 +67,28 @@ func (e *Edge) UpdateTrueCost() float64 {
 	// compute the Plan along the dubins path, the collision penalty, and the ending time
 	// don't make a Plan yet, that's expensive, just sample for collision checking
 	collisionPenalty, newlyCovered, e.End.State.Time = getSamples(e.DPath, e.Start.State.Time, e.Start.Uncovered)
-	// update the Uncovered path in e.End
+	// update the uncovered path in e.End
 	e.End.Uncovered = e.Start.Uncovered
 	for _, c := range newlyCovered {
 		// maybe make this more efficient... it shouldn't happen that much though
 		e.End.Uncovered = e.End.Uncovered.Without(c)
 	}
-	timeFromStart := e.End.State.Time - Start.Time
-	timeFromStart = 0 // remove for greediness
+	//timeFromStart := e.End.State.Time - Start.Time
+	//timeFromStart = 0 // remove for greediness
 	// update e's true Cost
-	e.trueCost = e.netTime()*TimePenalty + collisionPenalty - float64(len(newlyCovered))*(CoveragePenalty-timeFromStart)
+	e.trueCost = e.netTime()*TimePenalty + collisionPenalty //- float64(len(newlyCovered))*(CoveragePenalty-timeFromStart)
 
-	// update e.End's current Cost
+	// update e.End's current cost
 	// Not doing this anymore. Could be a mistake who knows
-	// e.End.CurrentCost = e.Start.CurrentCost + e.trueCost
-	// e.End.CurrentCostIsSet = true
+	e.End.CurrentCost = e.Start.CurrentCost + e.trueCost
+	e.End.CurrentCostIsSet = true
 
 	return e.trueCost
 }
 
 func (e *Edge) Smooth() {
 
-	// if e is the Start (or somehow there's a cycle...)
+	// if e is the start (or somehow there's a cycle...)
 	if e.Start.ParentEdge == e {
 		return
 	}

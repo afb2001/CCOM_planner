@@ -60,17 +60,21 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 			parent = v.ParentEdge.Start
 		}
 	}
-	// max euclidean distance to an Uncovered point - coverage penalty for covering all of them
+	// Note about MaxD heuristic:
+	// Max euclidean distance to an uncovered point - coverage penalty for covering all of them
 	// This is actually accurate if they're all in a straight line from your current heading,
 	// which is not a super unlikely scenario, making this heuristic not as horrible as it may seem.
-	// The parent's Uncovered path is used because we probably don't know ours yet,
+	// The parent's uncovered path is used because we probably don't know ours yet,
 	// and if we do it could be wrong.
-	//approxToGo := parent.Uncovered.MaxDistanceFrom(*v.State)/maxSpeed*timePenalty -
-	//	float64(len(parent.Uncovered))*coveragePenalty
+	var approxToGo float64
 
-	// switching to TSP heuristic (inadmissible)
-	approxToGo := Solver.Solve(v.State.X, v.State.Y, parent.Uncovered)/MaxSpeed*TimePenalty -
-		float64(len(parent.Uncovered))*CoveragePenalty
+	if Heuristic == "tsp" {
+		approxToGo = Solver.Solve(v.State.X, v.State.Y, parent.Uncovered) / MaxSpeed * TimePenalty //-
+		//float64(len(parent.Uncovered))*CoveragePenalty
+	} else {
+		approxToGo = parent.Uncovered.MaxDistanceFrom(*v.State)/MaxSpeed*TimePenalty -
+			float64(len(parent.Uncovered))*CoveragePenalty
+	}
 
 	// if we're updating without specifying a parent we can cache it, but not otherwise
 	if parentNil {

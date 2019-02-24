@@ -12,7 +12,7 @@ import (
 /**
 samples doesn't have to be actual samples it can come from anywhere
 */
-func GetKClosest_old(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edge) {
+func GetKClosestVertices(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edge) {
 	closest = make([]*Edge, K+1) // TODO! -- use heap!
 	var i int
 	var x *Vertex
@@ -67,7 +67,7 @@ func GetKClosest_old(v *Vertex, samples []*Vertex, goalCost float64) (closest []
 	}
 }
 
-func GetKClosest(v *Vertex, samples []*common.State, goalCost float64) (closest []*Edge) {
+func GetKClosest(v *Vertex, samples []*common.State) (closest []*Edge) {
 	closest = make([]*Edge, K+1) // TODO! -- use heap!
 	var i int
 	var sample *common.State
@@ -75,18 +75,9 @@ func GetKClosest(v *Vertex, samples []*common.State, goalCost float64) (closest 
 		if sample == v.State {
 			continue // skip edges to the same sample
 		}
-		x := &Vertex{State: sample, Uncovered: v.Uncovered}
+		x := &Vertex{State: sample}
 		newEdge := &Edge{Start: v, End: x}
 		distance := newEdge.ApproxCost()
-		// PrintLog(v.ApproxCost()+distance+x.UpdateApproxToGo(v) < goalCost) //debug
-		// Can we assume that h has been calculated for all x we're being given?
-		// This seems like a problematic assumption because h may depend on the branch
-		// of the tree we're connecting to (path covered so far?)
-		// No longer making that assumption but maybe we should in the future when h is more expensive?
-		// 2/22/19: This doesn't do anything for RHRSA* because it gets passed math.MaxFloat64 as goalCost
-		if !(v.ApproxCost()+distance+x.UpdateApproxToGo(v) < goalCost) {
-			continue // skip edges that can't contribute to a better solution
-		}
 
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
@@ -97,7 +88,6 @@ func GetKClosest(v *Vertex, samples []*common.State, goalCost float64) (closest 
 				tmp := closest[j]
 				closest[j], x.ParentEdge = newEdge, newEdge
 				newEdge = tmp
-				//break
 			}
 		}
 	}
@@ -106,13 +96,13 @@ func GetKClosest(v *Vertex, samples []*common.State, goalCost float64) (closest 
 			return closest[0:i]
 		} else {
 			s := v.Uncovered.GetClosest(*v.State)
-			closest[i+1] = &Edge{Start: v, End: &Vertex{State: &s, Uncovered: v.Uncovered}}
+			closest[i+1] = &Edge{Start: v, End: &Vertex{State: &s}}
 			i += 1
 			return closest[0:i]
 		}
 	} else if len(v.Uncovered) > 0 {
 		s := v.Uncovered.GetClosest(*v.State)
-		closest[K] = &Edge{Start: v, End: &Vertex{State: &s, Uncovered: v.Uncovered}}
+		closest[K] = &Edge{Start: v, End: &Vertex{State: &s}}
 		closest[K].End.ParentEdge = closest[K]
 		return
 	} else {

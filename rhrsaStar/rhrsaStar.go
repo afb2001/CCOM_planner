@@ -27,7 +27,7 @@ func ResetGlobals() {
 //region Expand
 
 func Expand(v *Vertex, qV *VertexQueue, samples *[]*common.State) {
-	for _, e := range GetKClosest(v, *samples, math.MaxFloat64) {
+	for _, e := range GetKClosest(v, *samples) {
 		if e == nil {
 			continue
 		}
@@ -39,7 +39,7 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		}
 		e.UpdateTrueCost()
 		if Verbose {
-			PrintLog(fmt.Sprintf("Cost: %f", e.TrueCost()))
+			PrintLog(fmt.Sprintf("Edge Cost: %f", e.TrueCost()))
 		}
 
 		if AggressiveSmoothing {
@@ -49,14 +49,18 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		// used to do these in UpdateTrueCost...
 		e.End.CurrentCost = e.Start.CurrentCost + e.TrueCost()
 		e.End.CurrentCostIsSet = true
+		// is this pruning?
 		// if BestVertex == nil || e.End.GetCurrentCost() + e.End.UpdateApproxToGo(nil) < BestVertex.GetCurrentCost(){
 
 		e.End.UpdateApproxToGo(nil)
 
+		if Verbose {
+			PrintLog(fmt.Sprintf("Destination vertex f value is: %f", e.End.FValue()))
+		}
+
 		PrintDebugVertex(e.End.String(), "vertex")
 
 		heap.Push(qV, e.End)
-		// TracePlan(e.End)
 		// }
 
 	}
@@ -64,20 +68,20 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*common.State) {
 
 //endregion
 
-func RHRSAStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *Vertex) {
+func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *Vertex) {
 	if Verbose {
 		PrintLog("Starting A*")
 	}
-	for vertex = heap.Pop(qV).(*Vertex); vertex.State.Time < common.TimeHorizon+Start.Time; {
+	for vertex = heap.Pop(qV).(*Vertex); ; {
 		if Now() > endTime {
 			return nil
 		}
 		if Verbose {
 			PrintLog("Popping vertex at " + vertex.State.String())
-			PrintLog(fmt.Sprintf("f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
+			PrintLog(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
 		}
 		Expand(vertex, qV, samples)
-		if vertex.State.Time > common.TimeHorizon+Start.Time {
+		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
 			// NOTE! -- this never seems to get hit
 			PrintDebugVertex(vertex.String(), "goal")
 			return
@@ -87,8 +91,8 @@ func RHRSAStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vert
 		}
 		vertex = heap.Pop(qV).(*Vertex)
 	}
-	PrintDebugVertex(vertex.String(), "goal")
-	return
+	//PrintDebugVertex(vertex.String(), "goal")
+	//return
 }
 
 func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
@@ -101,7 +105,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	Obst, Start = o1, startState // assign globals
 	startV := &Vertex{State: &Start, CurrentCostIsSet: true, Uncovered: *toCover}
 	startV.CurrentCostIsSet = true
-	startV.CurrentCost = float64(len(*toCover)) * CoveragePenalty
+	//startV.CurrentCost = float64(len(*toCover)) * CoveragePenalty
 	startV.ParentEdge = &Edge{Start: startV, End: startV}
 	BestVertex = nil
 	// BestVertex = startV
@@ -138,10 +142,10 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if Verbose {
 			PrintLog("Finished sampling")
 		}
-		v := RHRSAStar(qV, &samples, endTime)
+		v := AStar(qV, &samples, endTime)
 		// Assume the approx to go has been calculated
 		if BestVertex == nil || (v != nil && v.CurrentCost+v.ApproxToGo() < BestVertex.CurrentCost+BestVertex.ApproxToGo()) {
-			// PrintLog("Found a Plan")
+			// found a plan
 			BestVertex = v
 			bestPlan = TracePlan(BestVertex, true)
 			if Verbose {
@@ -154,20 +158,10 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 				}
 			}
 		}
-		// else {
-		// 	PrintLog("Did not find a better Plan than the incumbent: ")
-		// 	if BestVertex != nil {
-		// 		PrintLog(fmt.Sprintf("Cost of the current best Plan: %f", BestVertex.GetCurrentCost()))
-		// 	} else {
-		// 		PrintLog("Infinity (incumbent is nil)")
-		// 	}
-		// }
 		if Verbose {
 			PrintLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		}
-		//currentSampleCount = len(samples)
 		currentSampleCount += currentSampleCount
-		//PrintLog(currentSampleCount)
 	}
 	if Verbose {
 		PrintLog(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))

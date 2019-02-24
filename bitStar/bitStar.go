@@ -110,8 +110,8 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 	// already should have popped v from qV
 	// PrintLog(qV.nodes)
 	// find k nearest samples and make edges (Alg 2 lines 2-3)
-	for _, e := range GetKClosest_old(v, samples, goalCost) {
-		if e == nil { // TODO -- fix bug in GetKClosest_old that's letting nil values get put in
+	for _, e := range GetKClosestVertices(v, samples, goalCost) {
+		if e == nil { // TODO -- fix bug in GetKClosestVertices that's letting nil values get put in
 			continue
 		}
 		// PrintLog("Line 2.2, 2.3")
@@ -121,7 +121,7 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 
 	// find k nearest vertices already in the tree? (Alg 2 lines 4-6)
 	if !containsVertex(vOld, v) {
-		closest := GetKClosest_old(v, vertices, goalCost)
+		closest := GetKClosestVertices(v, vertices, goalCost)
 		for _, e := range closest {
 			if e == nil {
 				// PrintError("Added nil edge to queue")
@@ -133,7 +133,7 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 					if e.Start == e.End {
 						PrintError("Adding cycle to edge queue!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 					}
-					// line 6.2 is in GetKClosest_old
+					// line 6.2 is in GetKClosestVertices
 					// PrintLog("Line 2.6.2")
 					qE.Push(e)
 				}

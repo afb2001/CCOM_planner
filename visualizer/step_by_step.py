@@ -72,7 +72,6 @@ class PLOT:
         self.static_obs = blocked
         self.maxColor = -10000000
         self.minColor = 100000000
-        self.displayNumber = 0
         self.input_file_name = in_file_name
         self.obs = []
         self.starts = []
@@ -218,9 +217,9 @@ class PLOT:
             pygame.draw.line(self.display, Color_line_middle, self.scale_xy(i * scalew, 0), self.scale_xy(i * scalew, self.scaleH))
 
     def update_information(self, x, y, heading, h, cost, tag):
-        if tag == "trajectory":
+        if tag == "trajectory" or tag == "sample":
             obs = Obs(x, y, heading, cost + h, tag)
-            if len(self.obs) == 0 or self.obs[len(self.obs) - 1].tag != "trajectory":
+            if len(self.obs) == 0 or self.obs[len(self.obs) - 1].tag != tag:
                 self.obs.append(obs)
             else:
                 self.obs[len(self.obs) - 1].children.append(obs)
@@ -233,18 +232,16 @@ class PLOT:
         else:
             self.obs.append(Obs(x, y, heading, cost + h, tag))
         if cost < 500 and tag == "vertex":
-            self.maxColor = max(self.maxColor, cost)
-            self.minColor = min(self.minColor, cost)
-            self.displayNumber = self.maxColor - self.minColor
-            if self.displayNumber == 0:
-                self.displayNumber = 1
+            self.maxColor = max(self.maxColor, cost + h)
+            self.minColor = min(self.minColor, cost + h)
 
     # TODO -- set color limits
     def get_color(self, cost):
         if cost >= 500:
             return Color_BLACK
         else:
-            r, g, b = colorsys.hsv_to_rgb(1 - ((cost - self.minColor) / self.displayNumber), 0.9, 0.75)
+            assert self.minColor <= cost <= self.maxColor
+            r, g, b = colorsys.hsv_to_rgb(1 - ((cost - self.minColor) / self.maxColor), 0.9, 0.75)
             return r * 255, g * 255, b * 255
             # return 0, 0, 255 - ((cost - self.minColor) / self.displayNumber) * color_range
 
