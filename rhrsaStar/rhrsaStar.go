@@ -26,8 +26,8 @@ func ResetGlobals() {
 
 //region Expand
 
-func Expand(v *Vertex, qV *VertexQueue, samples *[]*common.State) {
-	for _, e := range GetKClosest(v, *samples) {
+func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
+	for _, e := range GetKClosest(sourceVertex, *samples) {
 		if e == nil {
 			continue
 		}
@@ -46,21 +46,23 @@ func Expand(v *Vertex, qV *VertexQueue, samples *[]*common.State) {
 			e.Smooth()
 		}
 
-		// used to do these in UpdateTrueCost...
-		e.End.CurrentCost = e.Start.CurrentCost + e.TrueCost()
-		e.End.CurrentCostIsSet = true
-		// is this pruning?
-		// if BestVertex == nil || e.End.GetCurrentCost() + e.End.UpdateApproxToGo(nil) < BestVertex.GetCurrentCost(){
+		destinationVertex := e.End
 
-		e.End.UpdateApproxToGo(nil)
+		// used to do these in UpdateTrueCost...
+		destinationVertex.CurrentCost = e.Start.CurrentCost + e.TrueCost()
+		destinationVertex.CurrentCostIsSet = true
+		// is this pruning?
+		// if BestVertex == nil || destinationVertex.GetCurrentCost() + destinationVertex.UpdateApproxToGo(nil) < BestVertex.GetCurrentCost(){
+
+		destinationVertex.UpdateApproxToGo(nil)
 
 		if Verbose {
-			PrintLog(fmt.Sprintf("Destination vertex f value is: %f", e.End.FValue()))
+			PrintLog(fmt.Sprintf("Destination vertex f value is: %f", destinationVertex.FValue()))
 		}
 
-		PrintDebugVertex(e.End.String(), "vertex")
+		PrintDebugVertex(destinationVertex.String(), "vertex")
 
-		heap.Push(qV, e.End)
+		heap.Push(qV, destinationVertex)
 		// }
 
 	}
@@ -80,19 +82,16 @@ func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *
 			PrintLog("Popping vertex at " + vertex.State.String())
 			PrintLog(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
 		}
-		Expand(vertex, qV, samples)
 		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
-			// NOTE! -- this never seems to get hit
 			PrintDebugVertex(vertex.String(), "goal")
 			return
 		}
+		Expand(vertex, qV, samples)
 		if qV.Len() == 0 {
 			return nil
 		}
 		vertex = heap.Pop(qV).(*Vertex)
 	}
-	//PrintDebugVertex(vertex.String(), "goal")
-	//return
 }
 
 func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining float64, o1 common.Obstacles) (bestPlan *common.Plan) {
@@ -147,7 +146,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if BestVertex == nil || (v != nil && v.CurrentCost+v.ApproxToGo() < BestVertex.CurrentCost+BestVertex.ApproxToGo()) {
 			// found a plan
 			BestVertex = v
-			bestPlan = TracePlan(BestVertex, true)
+			bestPlan = TracePlan(BestVertex, false)
 			if Verbose {
 				if BestVertex == nil {
 					PrintLog(fmt.Sprintf("Couldn't find a Plan this round."))

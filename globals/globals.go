@@ -9,7 +9,7 @@ const (
 	GoalBias       float64 = 0.05
 	MaxSpeedBias   float64 = 1.0
 	DubinsInc      float64 = 0.1 // this might be low
-	K              int     = 5   // number of closest states to consider for BIT*
+	K              int     = 3   // number of closest states to consider for BIT*
 	BitStarSamples int     = 32  // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	CoveragePenalty     float64 = 10

@@ -78,15 +78,16 @@ func GetKClosest(v *Vertex, samples []*common.State) (closest []*Edge) {
 		x := &Vertex{State: sample}
 		newEdge := &Edge{Start: v, End: x}
 		distance := newEdge.ApproxCost()
+		x.ParentEdge = newEdge
 
 		// iterate through current best edges and replace the first one that's worse than this
 		for j, edge := range closest {
 			if edge == nil {
-				closest[j], x.ParentEdge = newEdge, newEdge
+				closest[j] = newEdge
 				break
 			} else if distance < edge.ApproxCost() {
 				tmp := closest[j]
-				closest[j], x.ParentEdge = newEdge, newEdge
+				closest[j] = newEdge
 				newEdge = tmp
 			}
 		}

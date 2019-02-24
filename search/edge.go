@@ -80,8 +80,8 @@ func (e *Edge) UpdateTrueCost() float64 {
 
 	// update e.End's current cost
 	// Not doing this anymore. Could be a mistake who knows
-	e.End.CurrentCost = e.Start.CurrentCost + e.trueCost
-	e.End.CurrentCostIsSet = true
+	//e.End.CurrentCost = e.Start.CurrentCost + e.trueCost
+	//e.End.CurrentCostIsSet = true
 
 	return e.trueCost
 }

@@ -11,7 +11,7 @@ import (
 const (
 	planDistanceDensity float64 = 1
 	planTimeDensity     float64 = 0.5
-	TimeHorizon         float64 = 10
+	TimeHorizon         float64 = 30
 	coverageThreshold   float64 = 3
 	collisionDistance   float64 = 1.8
 )
