@@ -34,13 +34,10 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		// remove the sample from the list (could be more efficient)
 		//removeSample(samples, e.End.State)
 
-		if Verbose {
-			PrintLog(fmt.Sprintf("Connected to vertex at %s", e.End.State.String()))
-		}
+		PrintVerbose(fmt.Sprintf("Connected to vertex at %s", e.End.State.String()))
+
 		e.UpdateTrueCost()
-		if Verbose {
-			PrintLog(fmt.Sprintf("Edge Cost: %f", e.TrueCost()))
-		}
+		PrintVerbose(fmt.Sprintf("Edge Cost: %f", e.TrueCost()))
 
 		if AggressiveSmoothing {
 			e.Smooth()
@@ -56,10 +53,7 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 
 		destinationVertex.UpdateApproxToGo(nil)
 
-		if Verbose {
-			PrintLog(fmt.Sprintf("Destination vertex f value is: %f", destinationVertex.FValue()))
-		}
-
+		PrintVerbose(fmt.Sprintf("Destination vertex f value is: %f", destinationVertex.FValue()))
 		PrintDebugVertex(destinationVertex.String(), "vertex")
 
 		heap.Push(qV, destinationVertex)
@@ -71,17 +65,13 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 //endregion
 
 func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *Vertex) {
-	if Verbose {
-		PrintLog("Starting A*")
-	}
+	PrintVerbose("Starting A*")
 	for vertex = heap.Pop(qV).(*Vertex); ; {
 		if Now() > endTime {
 			return nil
 		}
-		if Verbose {
-			PrintLog("Popping vertex at " + vertex.State.String())
-			PrintLog(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
-		}
+		PrintVerbose("Popping vertex at " + vertex.State.String())
+		PrintVerbose(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
 		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
 			PrintDebugVertex(vertex.String(), "goal")
 			return
@@ -120,9 +110,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	for Now() < endTime {
 		qV.Nodes = make([]*Vertex, 0) // wipe out old nodes
 		heap.Push(qV, startV)
-		if Verbose {
-			PrintLog("Starting sampling")
-		}
+		PrintVerbose("Starting sampling")
 		samples = make([]*common.State, len(allSamples)+currentSampleCount)
 		// samples = make([]*Vertex, BitStarSamples)
 		copy(samples, allSamples)
@@ -138,9 +126,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 
 		// allSamples = append(allSamples, samples...)
 		allSamples = samples
-		if Verbose {
-			PrintLog("Finished sampling")
-		}
+		PrintVerbose("Finished sampling")
 		v := AStar(qV, &samples, endTime)
 		// Assume the approx to go has been calculated
 		if BestVertex == nil || (v != nil && v.CurrentCost+v.ApproxToGo() < BestVertex.CurrentCost+BestVertex.ApproxToGo()) {
@@ -149,24 +135,20 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 			bestPlan = TracePlan(BestVertex, false)
 			if Verbose {
 				if BestVertex == nil {
-					PrintLog(fmt.Sprintf("Couldn't find a Plan this round."))
+					PrintLog(fmt.Sprintf("Couldn't find a plan this round."))
 				} else {
-					PrintLog(fmt.Sprintf("Cost of the current best Plan: %f", BestVertex.GetCurrentCost()))
-					PrintLog("Current best Plan:")
+					PrintLog(fmt.Sprintf("Cost of the current best plan: %f", BestVertex.GetCurrentCost()))
+					PrintLog("Current best plan:")
 					PrintLog(bestPlan.String())
 				}
 			}
 		}
-		if Verbose {
-			PrintLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
-		}
+		PrintVerbose("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 		currentSampleCount += currentSampleCount
 	}
-	if Verbose {
-		PrintLog(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))
-	}
+	PrintVerbose(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))
 	if BestVertex == startV {
-		PrintLog("Couldn't find a Plan any better than staying put.")
+		PrintLog("Couldn't find a plan any better than staying put.")
 	}
 	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
 	return

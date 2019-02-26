@@ -194,3 +194,16 @@ func ShowSamples(nodes []*Vertex, allSamples []*common.State, g *common.Grid, st
 	}
 	return string(bytes)
 }
+
+/**
+Verify a branch ending in the given vertex. Throws an error on failure.
+*/
+func VerifyBranch(vertex *Vertex) {
+	if vertex.ParentEdge == nil {
+		PrintError("Vertex at", vertex.String(), "had nil parent")
+		return
+	}
+	// verify that time diff does not exceed cost
+	// verify that we eventually hit start?
+	// do we need to verify that start has not changed time?
+}

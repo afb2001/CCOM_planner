@@ -104,9 +104,7 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 	samples []*Vertex, vertices []*Vertex, edges []*Edge,
 	vOld []*Vertex, goalCost float64) {
 
-	if Verbose {
-		PrintLog(fmt.Sprintf("Expanding vertex %v", v.State.String()))
-	}
+	PrintVerbose(fmt.Sprintf("Expanding vertex %v", v.State.String()))
 	// already should have popped v from qV
 	// PrintLog(qV.nodes)
 	// find k nearest samples and make edges (Alg 2 lines 2-3)
@@ -131,7 +129,7 @@ func ExpandVertex(v *Vertex, qV *VertexQueue, qE *EdgeQueue,
 				// PrintLog(e == nil)
 				if v.GetCurrentCost()+e.ApproxCost() < e.End.GetCurrentCost() {
 					if e.Start == e.End {
-						PrintError("Adding cycle to edge queue!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+						PrintError("Adding cycle to edge queue!")
 					}
 					// line 6.2 is in GetKClosestVertices
 					// PrintLog("Line 2.6.2")
@@ -180,21 +178,15 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 			// line 5
 			Prune(&samples, &vertices, &edges, BestVertex.GetCurrentCost())
 			// line 6
-			if Verbose {
-				PrintLog("Starting sampling")
-			}
+			PrintVerbose("Starting sampling")
 			samples = make([]*Vertex, BitStarSamples)
-			if Verbose {
-				PrintLog(fmt.Sprintf("Sampling State with distance less than %f", BestVertex.GetCurrentCost()))
-			}
+			PrintVerbose(fmt.Sprintf("Sampling State with distance less than %f", BestVertex.GetCurrentCost()))
 			for m := 0; m < BitStarSamples; m++ {
 				samples[m] = &Vertex{State: BoundedBiasedRandomState(&Grid, *toCover, &Start, BestVertex.GetCurrentCost())}
 			}
 			totalSampleCount += BitStarSamples
 			allSamples = append(allSamples, samples...)
-			if Verbose {
-				PrintLog("Finished sampling")
-			}
+			PrintVerbose("Finished sampling")
 			// line 7
 			// vOld is used in ExpandVertex to make sure we only add
 			vOld = append([]*Vertex(nil), vertices...)
@@ -248,9 +240,7 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 					PrintLog(fmt.Sprintf("g_T(x_m) = %f", xM.GetCurrentCost()))
 				}
 				if vM.GetCurrentCost()+edge.TrueCost() < xM.GetCurrentCost() { // xM.CurrentCost is up to date
-					if Verbose {
-						PrintLog("Made it through third IF ********************************")
-					}
+					PrintVerbose("Made it through third IF ********************************")
 					// This is different:
 					// Update the cached current cost of xM
 					xM.CurrentCost, xM.CurrentCostIsSet = vM.GetCurrentCost()+edge.TrueCost(), true
@@ -288,43 +278,17 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 				}
 			}
 		} else {
-			if Verbose {
-				PrintLog("Resetting queues")
-			}
+			PrintVerbose("Resetting queues")
 			// line 25
 			qV.Nodes = make([]*Vertex, 0)
 			qE.Nodes = make([]*Edge, 0)
 		}
-		if Verbose {
-			PrintLog("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
-		}
+		PrintVerbose("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
 	}
 	PrintLog("Done with the main loop. Now to trace the tree...")
 	PrintLog("But first: samples!")
 	//PrintLog(ShowSamples(vertices, allSamples, &Grid, &Start, *toCover))
 	PrintLog(fmt.Sprintf("%d total samples, %d vertices connected", totalSampleCount, len(vertices)))
-
-	//// figure out the Plan I guess
-	//// turn tree into slice
-	//branch := make([]*Edge, 0)
-	//for cur := BestVertex; cur != startV; cur = cur.ParentEdge.Start {
-	//	branch = append(branch, cur.ParentEdge)
-	//}
-	//
-	//// reverse the Plan order (this might look dumb)
-	//s := branch
-	//for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
-	//	s[i], s[j] = s[j], s[i]
-	//}
-	//branch = s
-	//
-	//p := new(common.Plan)
-	//p.Start = Start
-	//p.AppendState(&Start) // yes this is necessary
-	//for _, e := range branch {
-	//	p.AppendState(e.End.State)
-	//	p.AppendPlan(e.Plan) // should be fully calculate by Now
-	//}
 	p := TracePlan(BestVertex, true)
 	return p
 }

@@ -3,6 +3,7 @@ package util
 import (
 	"bufio"
 	"fmt"
+	"github.com/afb2001/CCOM_planner/globals"
 	"log"
 	"os"
 	"strings"
@@ -34,6 +35,15 @@ LogErr a message to stderr.
 */
 func PrintLog(v ...interface{}) {
 	log.Println(append([]interface{}{"Planner message:"}, v...)...)
+}
+
+/**
+Logs a message only in verbose mode.
+*/
+func PrintVerbose(v ...interface{}) {
+	if globals.Verbose {
+		PrintLog(v...)
+	}
 }
 
 /**
