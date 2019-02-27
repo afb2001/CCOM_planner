@@ -21,7 +21,7 @@ const (
 
 // make sure to set these before you call BitStar() or FindAStarPlan
 var (
-	Verbose          = true
+	//Verbose          = true
 	MaxTurningRadius float64
 	MaxSpeed         float64
 	// these should be immutable so no pointers necessary

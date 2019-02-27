@@ -3,7 +3,6 @@ package util
 import (
 	"bufio"
 	"fmt"
-	"github.com/afb2001/CCOM_planner/globals"
 	"log"
 	"os"
 	"strings"
@@ -13,6 +12,7 @@ var DebugVis = false
 var DebugToFile = true
 var VisWriter *bufio.Writer
 var visInputFile *os.File
+var Verbose = true
 
 type ErrorPolicy int
 
@@ -41,7 +41,7 @@ func PrintLog(v ...interface{}) {
 Logs a message only in verbose mode.
 */
 func PrintVerbose(v ...interface{}) {
-	if globals.Verbose {
+	if Verbose {
 		PrintLog(v...)
 	}
 }
@@ -97,7 +97,7 @@ func HandleError(err error, policy ErrorPolicy) {
 	case IgnoreErr:
 	case LogErr:
 		PrintLog("Encountered an error:", err)
-		PrintError(err)
+		//PrintError(err)
 	case ParseErr:
 		fallthrough
 	case FatalErr:
