@@ -75,7 +75,7 @@ func GetKClosest(v *Vertex, samples []*common.State) (closest []*Edge) {
 		if sample == v.State {
 			continue // skip edges to the same sample
 		}
-		x := &Vertex{State: sample}
+		x := &Vertex{State: &common.State{X: sample.X, Y: sample.Y, Heading: sample.Heading, Speed: sample.Speed}}
 		newEdge := &Edge{Start: v, End: x}
 		distance := newEdge.ApproxCost()
 		x.ParentEdge = newEdge
@@ -203,7 +203,23 @@ func VerifyBranch(vertex *Vertex) {
 		PrintError("Vertex at", vertex.String(), "had nil parent")
 		return
 	}
+	parent := vertex.ParentEdge.Start
+	if parent == vertex {
+		if *vertex.State == Start {
+			// we hit the start so we're valid
+			return
+		} else {
+			PrintError("Detected a (small) cycle verifying the tree")
+		}
+	}
 	// verify that time diff does not exceed cost
-	// verify that we eventually hit start?
+	timeDiff := vertex.State.Time - parent.State.Time
+	costDiff := vertex.CurrentCost - parent.CurrentCost
+	if timeDiff*TimePenalty > costDiff {
+		PrintError("Time difference cost exceeds cost difference")
+	}
 	// do we need to verify that start has not changed time?
+
+	// validate parent
+	VerifyBranch(parent)
 }

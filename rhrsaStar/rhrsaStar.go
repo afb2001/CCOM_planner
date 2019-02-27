@@ -57,6 +57,8 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		PrintDebugVertex(destinationVertex.String(), "vertex")
 
 		heap.Push(qV, destinationVertex)
+
+		//VerifyBranch(destinationVertex)
 		// }
 
 	}
