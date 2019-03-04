@@ -72,7 +72,7 @@ func GetKClosest(v *Vertex, samples []*common.State) (closest []*Edge) {
 	var i int
 	var sample *common.State
 	for i, sample = range samples {
-		if sample == v.State {
+		if sample.IsSamePosition(v.State) {
 			continue // skip edges to the same sample
 		}
 		x := &Vertex{State: &common.State{X: sample.X, Y: sample.Y, Heading: sample.Heading, Speed: sample.Speed}}
@@ -193,6 +193,19 @@ func ShowSamples(nodes []*Vertex, allSamples []*common.State, g *common.Grid, st
 		arrays[int(p.Y)][int(p.X)] = '*'
 	}
 	return string(bytes)
+}
+
+func RemoveSample(samples *[]*common.State, s *common.State) {
+	if samples == nil {
+		return
+	}
+	b := (*samples)[:0]
+	for _, x := range *samples {
+		if s != x {
+			b = append(b, x)
+		}
+	}
+	*samples = b
 }
 
 /**

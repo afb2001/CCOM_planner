@@ -55,8 +55,8 @@ func b(bounds common.Grid, point common.State, distance float64) *common.State {
 /**
 Sample a State whose euclidean distance to Start is less than the given distance bound.
 */
-func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, cost float64) *common.State {
-	distance := cost * MaxSpeed
+func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *common.State, distance float64) *common.State {
+	//distance := cost * MaxSpeed
 	horizon := (common.TimeHorizon + 1) * MaxSpeed
 	distance = math.Min(distance, horizon)
 	var s, point *common.State

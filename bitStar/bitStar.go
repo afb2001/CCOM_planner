@@ -51,19 +51,6 @@ func removeVertex(vertices *[]*Vertex, v *Vertex) {
 	})
 }
 
-func removeSample(samples *[]*common.State, s *common.State) {
-	if samples == nil {
-		return
-	}
-	b := (*samples)[:0]
-	for _, x := range *samples {
-		if s != x {
-			b = append(b, x)
-		}
-	}
-	*samples = b
-}
-
 //region Algorithm 3 (Prune)
 
 /**
@@ -182,7 +169,7 @@ func BitStar(startState common.State, toCover *common.Path, timeRemaining float6
 			samples = make([]*Vertex, BitStarSamples)
 			PrintVerbose(fmt.Sprintf("Sampling State with distance less than %f", BestVertex.GetCurrentCost()))
 			for m := 0; m < BitStarSamples; m++ {
-				samples[m] = &Vertex{State: BoundedBiasedRandomState(&Grid, *toCover, &Start, BestVertex.GetCurrentCost())}
+				samples[m] = &Vertex{State: BoundedBiasedRandomState(&Grid, *toCover, &Start, BestVertex.GetCurrentCost()*MaxSpeed)}
 			}
 			totalSampleCount += BitStarSamples
 			allSamples = append(allSamples, samples...)

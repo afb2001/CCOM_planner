@@ -10,13 +10,14 @@ const (
 	MaxSpeedBias   float64 = 1.0
 	DubinsInc      float64 = 0.1 // this might be low
 	K              int     = 3   // number of closest states to consider for BIT*
-	BitStarSamples int     = 32  // (m in the paper) -- make this a parameter too
+	BitStarSamples int     = 10  // (m in the paper) -- make this a parameter too
 	// BIT* penalties (should all be made into parameters)
 	CoveragePenalty     float64 = 10
-	CollisionPenalty    float64 = 600 // this is suspect... may need to be lower because it will be summed
+	CollisionPenalty    float64 = 600
 	TimePenalty         float64 = 1
 	AggressiveSmoothing bool    = false
 	Heuristic                   = "tsp"
+	Weight                      = 1.0
 )
 
 // make sure to set these before you call BitStar() or FindAStarPlan

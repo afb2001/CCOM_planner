@@ -114,7 +114,7 @@ func EdgeCost(edge *Edge) float64 {
 	// NOTE: when the heuristic function becomes more expensive this will need to get changed
 	return edge.Start.GetCurrentCost() +
 		edge.ApproxCost() +
-		edge.End.UpdateApproxToGo(edge.Start)
+		edge.End.UpdateApproxToGo(nil)
 }
 
 //endregion

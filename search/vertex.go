@@ -57,9 +57,16 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 			// assume we're a sample... hopefully we are
 			parent = &Vertex{State: &Start} // this is correct, right?
 		} else {
-			parent = v.ParentEdge.Start
+			// if we've already done collision checking to this vertex then we can use this vertex's
+			// uncovered rather than the parent's
+			if v.CurrentCostIsSet {
+				parent = v
+			} else {
+				parent = v.ParentEdge.Start
+			}
 		}
 	}
+
 	// Note about MaxD heuristic:
 	// Max euclidean distance to an uncovered point - coverage penalty for covering all of them
 	// This is actually accurate if they're all in a straight line from your current heading,
@@ -75,6 +82,8 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 		approxToGo = parent.Uncovered.MaxDistanceFrom(*v.State)/MaxSpeed*TimePenalty -
 			float64(len(parent.Uncovered))*CoveragePenalty
 	}
+
+	approxToGo = approxToGo * Weight // for weighted A*
 
 	// if we're updating without specifying a parent we can cache it, but not otherwise
 	if parentNil {

@@ -32,7 +32,7 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 			continue
 		}
 		// remove the sample from the list (could be more efficient)
-		//removeSample(samples, e.End.State)
+		RemoveSample(samples, e.End.State)
 
 		PrintVerbose(fmt.Sprintf("Connected to vertex at %s", e.End.State.String()))
 
@@ -58,7 +58,7 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 
 		heap.Push(qV, destinationVertex)
 
-		//VerifyBranch(destinationVertex)
+		VerifyBranch(destinationVertex)
 		// }
 
 	}
@@ -90,7 +90,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	PrintDebug("done") // reset visuals
 	ResetGlobals()
 	// PrintLog("\n\n\n\n\n")
-	// defer profile.Start().Stop()
+	//defer profile.Start().Stop()
 	endTime := timeRemaining + Now()
 	// setup
 	Obst, Start = o1, startState // assign globals
@@ -151,6 +151,9 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	PrintVerbose(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))
 	if BestVertex == startV {
 		PrintLog("Couldn't find a plan any better than staying put.")
+	}
+	if BestVertex == nil {
+		PrintLog("Couldn't find a plan at all")
 	}
 	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
 	return
