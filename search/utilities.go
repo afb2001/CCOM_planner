@@ -228,7 +228,7 @@ func VerifyBranch(vertex *Vertex) {
 	// verify that time diff does not exceed cost
 	timeDiff := vertex.State.Time - parent.State.Time
 	costDiff := vertex.CurrentCost - parent.CurrentCost
-	if timeDiff*TimePenalty > costDiff {
+	if timeDiff*TimePenalty-costDiff > 0.00000001 {
 		PrintError("Time difference cost exceeds cost difference")
 	}
 	// do we need to verify that start has not changed time?

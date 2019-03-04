@@ -9,8 +9,10 @@ import (
 	"github.com/afb2001/CCOM_planner/rhrsaStar"
 	"github.com/afb2001/CCOM_planner/tsp"
 	. "github.com/afb2001/CCOM_planner/util"
+	"math/rand"
 	"os"
 	"strings"
+	"time"
 )
 
 const (
@@ -45,6 +47,10 @@ func main() {
 
 	SetupDebugWriter()
 	defer CleanupDebugWriter()
+
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
+	PrintLog("Seed:", seed)
 
 	fmt.Println("ready")
 

@@ -64,20 +64,22 @@ func (s Solver) Solve(x, y float64, toCover common.Path) float64 {
 	if len(toCover) == 0 {
 		return 0
 	}
-	points := make([]point, len(toCover))
+	points := map[point]bool{}
 	// This is inefficient but I want to be able to do reference comparison later
 	// Oh, and hashing. Mostly hashing
-	for i, x := range toCover {
+	for _, x := range toCover {
 		for _, p := range s.points {
 			if x.X == p.x && x.Y == p.y {
-				points[i] = p
+				points[p] = true
 			}
 		}
 	}
 	start := point{x: x, y: y}
 	list := make([]pointDistance, len(points)) // distances list for starting point
-	for i, p := range points {
+	var i int
+	for p := range points {
 		list[i] = start.getPointDistance(p)
+		i++
 	}
 	sort.Sort(byDistance(list))
 	var covered = map[point]bool{}
@@ -89,7 +91,7 @@ begin:
 	covered[current.point] = true
 	var p pointDistance
 	for _, p = range s.distances[current.point] {
-		if !covered[p.point] {
+		if !covered[p.point] && points[p.point] {
 			current = p
 			goto begin
 		}

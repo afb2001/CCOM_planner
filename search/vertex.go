@@ -5,6 +5,7 @@ import (
 	"github.com/afb2001/CCOM_planner/common"
 	"github.com/afb2001/CCOM_planner/dubins"
 	. "github.com/afb2001/CCOM_planner/globals"
+	. "github.com/afb2001/CCOM_planner/util"
 	"math"
 )
 
@@ -92,9 +93,29 @@ func (v *Vertex) UpdateApproxToGo(parent *Vertex) float64 {
 	return approxToGo
 }
 
+// This version calculates the h value of this vertex assuming its uncovered has been set.
+// While this should work for RHRSA* it won't for BIT*
+func (v *Vertex) HValue() float64 {
+	if v.Uncovered == nil {
+		PrintError("Calculating heuristic with nil uncovered")
+	}
+	if len(v.Uncovered) == 0 {
+		return 0
+	}
+	if Heuristic == "tsp" {
+		v.approxToGo = Solver.Solve(v.State.X, v.State.Y, v.Uncovered) / MaxSpeed * TimePenalty //-
+		//float64(len(parent.Uncovered))*CoveragePenalty
+	} else {
+		v.approxToGo = v.Uncovered.MaxDistanceFrom(*v.State)/MaxSpeed*TimePenalty -
+			float64(len(v.Uncovered))*CoveragePenalty
+	}
+	v.approxToGo = v.approxToGo * Weight // for weighted A*
+	return v.approxToGo
+}
+
 // This is really f_hat, which is g_hat + h_hat
 func (v *Vertex) FValue() float64 {
-	return v.ApproxCost() + v.UpdateApproxToGo(nil)
+	return v.ApproxCost() + v.HValue()
 }
 
 /**

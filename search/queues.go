@@ -106,7 +106,7 @@ func (h *EdgeQueue) Update(cost func(node *Edge) float64) {
 
 // functions for queueing vertices and edges
 func VertexCost(v *Vertex) float64 {
-	return v.GetCurrentCost() + v.UpdateApproxToGo(nil)
+	return v.FValue()
 }
 
 func EdgeCost(edge *Edge) float64 {
@@ -114,7 +114,7 @@ func EdgeCost(edge *Edge) float64 {
 	// NOTE: when the heuristic function becomes more expensive this will need to get changed
 	return edge.Start.GetCurrentCost() +
 		edge.ApproxCost() +
-		edge.End.UpdateApproxToGo(nil)
+		edge.End.HValue()
 }
 
 //endregion

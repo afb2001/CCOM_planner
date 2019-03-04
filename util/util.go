@@ -12,7 +12,7 @@ var DebugVis = false
 var DebugToFile = true
 var VisWriter *bufio.Writer
 var visInputFile *os.File
-var Verbose = true
+var Verbose = false
 
 type ErrorPolicy int
 

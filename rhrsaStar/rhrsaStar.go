@@ -51,7 +51,7 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		// is this pruning?
 		// if BestVertex == nil || destinationVertex.GetCurrentCost() + destinationVertex.UpdateApproxToGo(nil) < BestVertex.GetCurrentCost(){
 
-		destinationVertex.UpdateApproxToGo(nil)
+		destinationVertex.HValue()
 
 		PrintVerbose(fmt.Sprintf("Destination vertex f value is: %f", destinationVertex.FValue()))
 		PrintDebugVertex(destinationVertex.String(), "vertex")
@@ -74,11 +74,13 @@ func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *
 		}
 		PrintVerbose("Popping vertex at " + vertex.State.String())
 		PrintVerbose(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
-		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
+
+		Expand(vertex, qV, samples)
+
+		if vertex.State.Time > common.TimeHorizon+Start.Time {
 			PrintDebugVertex(vertex.String(), "goal")
 			return
 		}
-		Expand(vertex, qV, samples)
 		if qV.Len() == 0 {
 			return nil
 		}
@@ -107,7 +109,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	var totalSampleCount int
 	qV := new(VertexQueue)
 	qV.Cost = func(v *Vertex) float64 {
-		return v.CurrentCost + v.UpdateApproxToGo(nil)
+		return v.FValue()
 	}
 	for Now() < endTime {
 		qV.Nodes = make([]*Vertex, 0) // wipe out old nodes
