@@ -57,8 +57,8 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		PrintDebugVertex(destinationVertex.String(), "vertex")
 
 		heap.Push(qV, destinationVertex)
-
-		VerifyBranch(destinationVertex)
+		//qV.Verify()
+		//VerifyBranch(destinationVertex)
 		// }
 
 	}
@@ -74,16 +74,15 @@ func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *
 		}
 		PrintVerbose("Popping vertex at " + vertex.State.String())
 		PrintVerbose(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
-
-		Expand(vertex, qV, samples)
-
-		if vertex.State.Time > common.TimeHorizon+Start.Time {
+		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
 			PrintDebugVertex(vertex.String(), "goal")
 			return
 		}
+		Expand(vertex, qV, samples)
 		if qV.Len() == 0 {
 			return nil
 		}
+
 		vertex = heap.Pop(qV).(*Vertex)
 	}
 }

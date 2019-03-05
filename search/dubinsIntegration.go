@@ -101,7 +101,9 @@ func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (pena
 		}
 		newlyCovered = append(newlyCovered, toCover.NewlyCoveredArray(*q)...) // splash operator I guess
 
-		PrintTrajectoryState(q[0], q[1], q[2], (inc/MaxSpeed*TimePenalty)+penalty)
+		if DebugToFile {
+			PrintTrajectoryState(q[0], q[1], q[2], (inc/MaxSpeed*TimePenalty)+penalty)
+		}
 
 		return 0
 	}

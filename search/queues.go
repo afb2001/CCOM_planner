@@ -55,6 +55,15 @@ func (h *VertexQueue) Update(cost func(node *Vertex) float64) {
 	heap.Init(h)
 }
 
+// A costly (O(n)) operation that verifies the item in spot 0 is the smallest.
+func (qV *VertexQueue) Verify() {
+	for _, n := range qV.Nodes {
+		if qV.Nodes[0].FValue() > n.FValue() {
+			PrintError("Popped wrong value from queue")
+		}
+	}
+}
+
 //endregion
 
 //region EdgeQueue

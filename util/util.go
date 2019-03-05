@@ -66,7 +66,9 @@ func PrintDebug(v ...string) {
 Show a vertex in the specified visualizer with the specified shape.
 */
 func PrintDebugVertex(vertex string, tag string) {
-	PrintDebug(vertex, fmt.Sprintf("tag = %s", tag))
+	if DebugToFile {
+		PrintDebug(vertex, fmt.Sprintf("tag = %s", tag))
+	}
 }
 
 func PrintTrajectoryState(x, y, h, cost float64) {

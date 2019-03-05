@@ -94,12 +94,12 @@ func TestMain(m *testing.M) {
 func TestFindAStarPlan(t *testing.T) {
 	t.Log("Testing A* on a large world")
 	seed := time.Now().UnixNano()
-	rand.Seed(1551724267362385641)
+	rand.Seed(seed)
 	PrintLog("Seed:", seed)
 	// redo setup
 	var p = bigPath()
 	solver := tsp.NewSolver(p)
-	InitGlobals(bigGrid(), 2.5, 0.75, solver)
+	InitGlobals(bigGrid(), 2.5, 12, solver)
 	o1 := new(common.Obstacles)
 	plan := FindAStarPlan(common.State{X: 95, Y: 5, Heading: 4.75, Speed: 0, Time: 100}, &p, 0.095, *o1)
 	if plan == nil {
@@ -136,13 +136,14 @@ func TestFindAStarPlan3(t *testing.T) {
 	// t.SkipNow() // this takes a while
 	t.Log("Testing A* a bunch of times in a row from random states")
 	seed := time.Now().UnixNano()
-	rand.Seed(1551724267362385641)
+	rand.Seed(seed)
 	PrintLog("Seed:", seed)
 	// redo setup
 	var p = bigPath()
 	solver := tsp.NewSolver(p)
-	InitGlobals(bigGrid(), 2.5, 0.75, solver)
+	InitGlobals(bigGrid(), 2.5, 12, solver)
 	o1 := new(common.Obstacles)
+	//defer profile.Start().Stop()
 	for i := 0; i < 10; i++ {
 		s := RandomState(50, 100, 0, 20)
 		s.Time = float64(i)

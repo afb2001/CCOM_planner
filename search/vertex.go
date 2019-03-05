@@ -39,6 +39,7 @@ func (v *Vertex) GetCurrentCost() float64 {
 	if v.CurrentCostIsSet {
 		return v.CurrentCost
 	} else {
+		PrintError("Using current cost before it's set")
 		return math.MaxFloat64
 	}
 }
@@ -115,7 +116,7 @@ func (v *Vertex) HValue() float64 {
 
 // This is really f_hat, which is g_hat + h_hat
 func (v *Vertex) FValue() float64 {
-	return v.ApproxCost() + v.HValue()
+	return v.GetCurrentCost() + v.HValue()
 }
 
 /**
