@@ -98,12 +98,11 @@ Creates a new state.
 
 Meant to be used with future times but should work either way.
 */
-func (s *State) Project(time float64) *State {
-	deltaT := time - s.Time
+func (s *State) Project(deltaT float64) *State {
 	magnitude := deltaT * s.Speed
 	deltaX := math.Cos(s.Heading) * magnitude
 	deltaY := math.Sin(s.Heading) * magnitude
-	return &State{X: s.X + deltaX, Y: s.Y + deltaY, Heading: s.Heading, Speed: s.Speed, Time: time}
+	return &State{X: s.X + deltaX, Y: s.Y + deltaY, Heading: s.Heading, Speed: s.Speed, Time: s.Time + deltaT}
 }
 
 /**
@@ -389,7 +388,6 @@ func (o *Obstacles) CollisionExists(state *State) float64 {
 func (o *Obstacles) CollisionExistsWithArray(state [3]float64, t float64) float64 {
 	for _, s := range *o {
 		if s.Project(t - s.Time).CollidesWithArray(state) {
-			util.PrintLog("Collision exists")
 			return 1.0
 		}
 	}

@@ -165,6 +165,28 @@ func TestFindAStarPlan3(t *testing.T) {
 	}
 }
 
+func TestFindAStarPlan4(t *testing.T) {
+	t.Log("Testing A* to make sure we don't hit moving boats")
+	seed := time.Now().UnixNano()
+	rand.Seed(1552072292808295915)
+	PrintLog("Seed:", seed)
+	p := common.Path{common.State{X: 20, Y: 35}}
+	solver := tsp.NewSolver(p)
+	grid := common.NewGrid(60, 60)
+	o1 := common.Obstacles{
+		&common.State{X: 35, Y: 20, Heading: -3.14, Speed: 2, Time: 100},
+		&common.State{X: 0, Y: 25, Heading: 0, Speed: 2, Time: 100},
+	}
+	InitGlobals(grid, 2, 12, solver)
+	plan := FindAStarPlan(common.State{X: 20, Y: 5, Heading: 1.57, Speed: 2, Time: 100}, &p, 0.095, o1)
+	PrintLog(plan.String())
+	for _, s := range plan.States {
+		if o1.CollisionExists(s) > 0.5 {
+			t.Errorf("Ran into obstacle at state %s", s.String())
+		}
+	}
+}
+
 func TestPointToPointPlan(t *testing.T) {
 	t.Log("Testing the Point to Point planner a bunch of times in a row from random states")
 	rand.Seed(time.Now().UnixNano())
