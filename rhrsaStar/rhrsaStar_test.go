@@ -94,7 +94,7 @@ func TestMain(m *testing.M) {
 func TestFindAStarPlan(t *testing.T) {
 	t.Log("Testing A* on a large world")
 	seed := time.Now().UnixNano()
-	rand.Seed(seed)
+	rand.Seed(1552074223260131414)
 	PrintLog("Seed:", seed)
 	// redo setup
 	var p = bigPath()
@@ -135,23 +135,24 @@ func TestFindAStarPlan2(t *testing.T) {
 func TestFindAStarPlan3(t *testing.T) {
 	// t.SkipNow() // this takes a while
 	t.Log("Testing A* a bunch of times in a row from random states")
-	seed := time.Now().UnixNano()
-	rand.Seed(seed)
-	PrintLog("Seed:", seed)
+
 	// redo setup
 	var p = bigPath()
 	solver := tsp.NewSolver(p)
+	seed := time.Now().UnixNano()
+	rand.Seed(1552074223260131414)
+	PrintLog("Seed:", seed)
 	InitGlobals(bigGrid(), 2.5, 12, solver)
 	o1 := new(common.Obstacles)
 	//defer profile.Start().Stop()
-	for i := 0; i < 10; i++ {
-		s := RandomState(50, 100, 0, 20)
+	for i := 0; i < 60; i++ {
+		s := RandomState(50, 100, 0, 5)
 		s.Time = float64(i)
-		plan := FindAStarPlan(*s, &p, 0.09, *o1)
+		plan := FindAStarPlan(*s, &p, 0.095, *o1)
 		if plan == nil || plan.States == nil {
 			if !Grid.IsBlocked(s.X, s.Y) {
 				t.Errorf("Empty Plan for unblocked State")
-				break
+				continue
 			} else {
 				PrintLog("Sampled blocked State " + s.String())
 			}
@@ -159,7 +160,7 @@ func TestFindAStarPlan3(t *testing.T) {
 		for j, s := range plan.States {
 			if j < len(plan.States)-1 && s.DistanceTo(plan.States[j+1]) > 3 {
 				t.Error("Plan has states too far away")
-				return
+				//return
 			}
 		}
 	}

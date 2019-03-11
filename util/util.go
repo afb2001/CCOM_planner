@@ -9,7 +9,7 @@ import (
 )
 
 var DebugVis = false
-var DebugToFile = true
+var DebugToFile = false
 var VisWriter *bufio.Writer
 var visInputFile *os.File
 var Verbose = false

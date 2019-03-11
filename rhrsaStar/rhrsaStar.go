@@ -34,10 +34,14 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 		// remove the sample from the list (could be more efficient)
 		RemoveSample(samples, e.End.State)
 
-		PrintVerbose(fmt.Sprintf("Connected to vertex at %s", e.End.State.String()))
+		if Verbose {
+			PrintVerbose(fmt.Sprintf("Connected to vertex at %s", e.End.State.String()))
+		}
 
 		e.UpdateTrueCost()
-		PrintVerbose(fmt.Sprintf("Edge Cost: %f", e.TrueCost()))
+		if Verbose {
+			PrintVerbose(fmt.Sprintf("Edge Cost: %f", e.TrueCost()))
+		}
 
 		if AggressiveSmoothing {
 			e.Smooth()
@@ -53,8 +57,12 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 
 		destinationVertex.HValue()
 
-		PrintVerbose(fmt.Sprintf("Destination vertex f value is: %f", destinationVertex.FValue()))
-		PrintDebugVertex(destinationVertex.String(), "vertex")
+		if Verbose {
+			PrintVerbose(fmt.Sprintf("Destination vertex f value is: %f", destinationVertex.FValue()))
+		}
+		if DebugVis || DebugToFile {
+			PrintDebugVertex(destinationVertex.String(), "vertex")
+		}
 
 		heap.Push(qV, destinationVertex)
 		//qV.Verify()
@@ -67,15 +75,21 @@ func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
 //endregion
 
 func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *Vertex) {
-	PrintVerbose("Starting A*")
+	if Verbose {
+		PrintVerbose("Starting A*")
+	}
 	for vertex = heap.Pop(qV).(*Vertex); ; {
 		if Now() > endTime {
 			return nil
 		}
-		PrintVerbose("Popping vertex at " + vertex.State.String())
-		PrintVerbose(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
+		if Verbose {
+			PrintVerbose("Popping vertex at " + vertex.State.String())
+			PrintVerbose(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
+		}
 		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
-			PrintDebugVertex(vertex.String(), "goal")
+			if Verbose {
+				PrintDebugVertex(vertex.String(), "goal")
+			}
 			return
 		}
 		Expand(vertex, qV, samples)
@@ -113,7 +127,9 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	for Now() < endTime {
 		qV.Nodes = make([]*Vertex, 0) // wipe out old nodes
 		heap.Push(qV, startV)
-		PrintVerbose("Starting sampling")
+		if Verbose {
+			PrintVerbose("Starting sampling")
+		}
 		samples = make([]*common.State, len(allSamples)+currentSampleCount)
 		// samples = make([]*Vertex, BitStarSamples)
 		copy(samples, allSamples)
@@ -129,7 +145,9 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 
 		// allSamples = append(allSamples, samples...)
 		allSamples = samples
-		PrintVerbose("Finished sampling")
+		if Verbose {
+			PrintVerbose("Finished sampling")
+		}
 		v := AStar(qV, &samples, endTime)
 		// Assume the approx to go has been calculated
 		if BestVertex == nil || (v != nil && v.CurrentCost+v.ApproxToGo() < BestVertex.CurrentCost+BestVertex.ApproxToGo()) {
@@ -146,10 +164,14 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 				}
 			}
 		}
-		PrintVerbose("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
+		if Verbose {
+			PrintVerbose("++++++++++++++++++++++++++++++++++++++ Done iteration ++++++++++++++++++++++++++++++++++++++")
+		}
 		currentSampleCount += currentSampleCount
 	}
-	PrintVerbose(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))
+	if Verbose {
+		PrintVerbose(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))
+	}
 	if BestVertex == startV {
 		PrintLog("Couldn't find a plan any better than staying put.")
 	}
