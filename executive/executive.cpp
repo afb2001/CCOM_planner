@@ -248,6 +248,7 @@ void print_map(string file)
 
 void read_goal(string goal)
 {
+    cerr << "EXECUTIVE::GOAL::" << goal << endl;
     ifstream f(goal);
     if (goal != "NOFILE" && f.is_open())
     {
@@ -267,6 +268,7 @@ void read_goal(string goal)
     {
         path.add_covered(10, 10);
         path.add_covered(9, 0);
+        cerr << "EXECUTIVE::GOAL::DEFAULT" << endl;
     }
 }
 

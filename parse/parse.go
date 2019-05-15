@@ -52,6 +52,9 @@ func BuildGrid(reader *bufio.Reader) *common.Grid {
 	grid := common.NewGrid(width*resolution, height*resolution)
 	for y := height - 1; y >= 0; y-- {
 		line := strings.Fields(GetLine(reader))
+		if len(line) == 0 { // hit an error with this once
+			continue
+		}
 		block := line[0] == "#"
 		line = line[1:]
 		var x int
@@ -90,8 +93,8 @@ func ParseState(line string) *common.State {
 func ReadPath(reader *bufio.Reader, maxSpeed float64) *common.Path {
 	p := new(common.Path)
 	var pathLength int
-	PrintLog("Reading path to cover")
 	_, err := fmt.Sscanf(GetLine(reader), "path to cover %d", &pathLength)
+	PrintLog("Reading path to cover of length", pathLength)
 	HandleError(err, ParseErr)
 	var x, y float64
 	for l := 0; l < pathLength; l++ {
@@ -108,7 +111,7 @@ func ReadPath(reader *bufio.Reader, maxSpeed float64) *common.Path {
 }
 
 func UpdatePath(reader *bufio.Reader, path *common.Path) {
-	PrintLog("Reading newly covered path")
+	//PrintLog("Reading newly covered path")
 	var covered int
 	_, err := fmt.Sscanf(GetLine(reader), "newly covered %d", &covered)
 	HandleError(err, ParseErr)

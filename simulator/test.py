@@ -387,20 +387,20 @@ class PLOT:
             self.dynamicOBS[index] = self.scale_item(self.xobs[index], self.yobs[index])
             draw_estimate = self.draw_vehicle(
                 self.hobs[index], Color_Red, *self.dynamicOBS[index])
-            start_radius = obs_radius
-            sx= self.xobs[index]
-            sy = self.yobs[index]
-            c_color = 200
-            c_bright = 0
-            if draw_estimate:
-                for i in range(5):
-                    if i != 0:
-                        sx += self.vobs[index]*math.sin(self.hobs[index])*3
-                        sy += self.vobs[index]*math.cos(self.hobs[index])*3
-                        c_color += 10
-                        c_bright += 40
-                    self.drawCircle((c_color,c_bright,c_bright),start_radius,*self.scale_item(sx,sy))
-                    start_radius += obs_radius
+#            start_radius = obs_radius
+#            sx= self.xobs[index]
+#            sy = self.yobs[index]
+#            c_color = 200
+#            c_bright = 0
+#            if draw_estimate:
+#                for i in range(5):
+#                    if i != 0:
+#                        sx += self.vobs[index]*math.sin(self.hobs[index])*3
+#                        sy += self.vobs[index]*math.cos(self.hobs[index])*3
+#                        c_color += 10
+#                        c_bright += 40
+#                    self.drawCircle((c_color,c_bright,c_bright),start_radius,*self.scale_item(sx,sy))
+#                    start_radius += obs_radius
             
             
 

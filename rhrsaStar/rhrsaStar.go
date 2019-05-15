@@ -86,7 +86,8 @@ func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *
 			PrintVerbose("Popping vertex at " + vertex.State.String())
 			PrintVerbose(fmt.Sprintf(" whose cost is: f = g + h = %f + %f = %f", vertex.GetCurrentCost(), vertex.ApproxToGo(), vertex.GetCurrentCost()+vertex.ApproxToGo()))
 		}
-		if vertex.State.Time > common.TimeHorizon+Start.Time || len(vertex.Uncovered) == 0 {
+		if vertex.State.Time > common.TimeHorizon+Start.Time ||
+			(len(vertex.Uncovered) == 0 && vertex.State.Time > (common.TimeHorizon/6)+Start.Time) { // make sure we're at least 5 seconds out
 			if Verbose {
 				PrintDebugVertex(vertex.String(), "goal")
 			}

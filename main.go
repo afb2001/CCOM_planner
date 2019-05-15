@@ -29,6 +29,8 @@ func main() {
 	var line string
 	GetLine(reader) // start
 
+	PrintLog("Starting planner")
+
 	_, err := fmt.Sscanf(GetLine(reader), "max speed %f", &maxSpeed)
 	HandleError(err, ParseErr)
 	_, err = fmt.Sscanf(GetLine(reader), "max turning radius %f", &maxTurningRadius)
@@ -75,7 +77,7 @@ func main() {
 		}
 
 		var nObstacles int
-		PrintLog("Reading dynamic obstacles")
+		//PrintLog("Reading dynamic obstacles")
 		_, err := fmt.Sscanf(GetLine(reader), "dynamic obs %d", &nObstacles)
 		o := make(common.Obstacles, nObstacles)
 		HandleError(err, LogErr)
@@ -91,7 +93,8 @@ func main() {
 			fmt.Println(common.DefaultPlan(start))
 		} else {
 			fmt.Println(plan.String())
-			PrintLog(plan.String())
+			PrintLog("Found a plan of length", len(plan.States))
+			//PrintLog(plan.String())
 		}
 
 		PrintLog("ready to plan")

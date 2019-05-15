@@ -61,10 +61,14 @@ func BoundedBiasedRandomState(bounds *common.Grid, path common.Path, start *comm
 	distance = math.Min(distance, horizon)
 	var s, point *common.State
 	var l = int32(len(path))
-	if i := rand.Int31n(l * 2); i >= l {
+	if l == 0 { // rand.Int31n panics on 0
 		point = start
 	} else {
-		point = &path[i]
+		if i := rand.Int31n(l * 2); i >= l {
+			point = start
+		} else {
+			point = &path[i]
+		}
 	}
 	s = biasedRandomState(math.Max(0, point.X-distance),
 		math.Min(float64(bounds.Width), point.X+distance),
