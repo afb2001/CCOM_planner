@@ -6,10 +6,11 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 var DebugVis = false
-var DebugToFile = false
+var DebugToFile = true
 var VisWriter *bufio.Writer
 var visInputFile *os.File
 var Verbose = false
@@ -76,9 +77,12 @@ func PrintTrajectoryState(x, y, h, cost float64) {
 }
 
 func SetupDebugWriter() {
-	err := os.Remove("../vis_input")
-	HandleError(err, LogErr)
-	visInputFile, err = os.OpenFile("../vis_input", os.O_CREATE|os.O_WRONLY, 0755)
+	//err := os.Remove("../vis_input")
+	//HandleError(err, LogErr)
+	PrintLog("Opening visualization output file")
+	h := os.Getenv("HOME")
+	t := time.Now()
+	visInputFile, err := os.OpenFile(h+"/project11/catkin_ws/data/planner_thoughts_"+t.Format("20060102150405"), os.O_CREATE|os.O_WRONLY, 0755)
 	HandleError(err, LogErr)
 	VisWriter = bufio.NewWriter(visInputFile)
 }
