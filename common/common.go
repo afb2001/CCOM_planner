@@ -13,7 +13,7 @@ const (
 	planTimeDensity     float64 = 0.5
 	TimeHorizon         float64 = 30
 	coverageThreshold   float64 = 3
-	collisionDistance   float64 = 1.8
+	collisionDistance   float64 = 5
 )
 
 //region State
