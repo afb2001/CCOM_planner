@@ -10,7 +10,8 @@ import (
 //region GetKClosest
 
 /**
-samples doesn't have to be actual samples it can come from anywhere
+Get the K closest vertices to v.
+samples doesn't have to be actual samples it can come from anywhere.
 */
 func GetKClosestVertices(v *Vertex, samples []*Vertex, goalCost float64) (closest []*Edge) {
 	closest = make([]*Edge, K+1) // TODO! -- use heap!
@@ -67,6 +68,9 @@ func GetKClosestVertices(v *Vertex, samples []*Vertex, goalCost float64) (closes
 	}
 }
 
+/**
+Get K closest states to v. This is the same math as the vertices one but uses States instead.
+*/
 func GetKClosest(v *Vertex, samples []*common.State) (closest []*Edge) {
 	closest = make([]*Edge, K+1) // TODO! -- use heap!
 	var i int
@@ -115,6 +119,9 @@ func GetKClosest(v *Vertex, samples []*common.State) (closest []*Edge) {
 
 //region TracePlan
 
+/**
+Pull out the plan ending in vertex v by tracing back along the edges until the start.
+*/
 func TracePlan(v *Vertex, smoothing bool) *common.Plan {
 	branch := make([]*Edge, 0)
 	if v == nil {
@@ -174,6 +181,9 @@ func Now() float64 {
 	return float64(time.Now().UnixNano()) / 10e9
 }
 
+/**
+Get an ASCII representation the samples on the map.
+*/
 func ShowSamples(nodes []*Vertex, allSamples []*common.State, g *common.Grid, start *common.State, path common.Path) string {
 	var bytes = []byte(g.Dump())
 	var arrays [][]byte

@@ -38,6 +38,9 @@ func (s byDistance) Less(i, j int) bool {
 	return s[i].distance < s[j].distance
 }
 
+/**
+Create a new solver instance with pre-computed distances between all the points.
+*/
 func NewSolver(path common.Path) (solver Solver) {
 	solver.distances = map[point][]pointDistance{}
 	solver.points = make([]point, len(path))
@@ -60,6 +63,9 @@ func NewSolver(path common.Path) (solver Solver) {
 	return solver
 }
 
+/**
+Find the length of a short path crossing all the points in a greedy fashion.
+*/
 func (s Solver) Solve(x, y float64, toCover common.Path) float64 {
 	if len(toCover) == 0 {
 		return 0

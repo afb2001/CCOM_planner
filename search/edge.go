@@ -12,6 +12,10 @@ import (
 
 //region Edge
 
+/**
+Struct holding a start and end vertex, approximate and true cost, a Dubins path along itself, and a list of waypoints
+along that Dubins path (the plan).
+*/
 type Edge struct {
 	Start, End           *Vertex
 	approxCost, trueCost float64
@@ -19,6 +23,9 @@ type Edge struct {
 	Plan                 *common.Plan // Plan to traverse DPath
 }
 
+/**
+The approximate cost along an edge is just the cost ignoring collisions.
+*/
 func (e *Edge) ApproxCost() float64 {
 	// create a dubins path if one doesn't already exist
 	if e.DPath == nil {
@@ -33,14 +40,18 @@ func (e *Edge) ApproxCost() float64 {
 	return e.approxCost
 }
 
-// I think I actually wanted update End
+/**
+Update the edge with a new starting vertex.
+*/
 func (e *Edge) UpdateStart(newStart *Vertex) {
 	e.Start = newStart
 	// zero out the path and Plan so we don't use them out-of-date
 	e.DPath, e.Plan = nil, nil
 }
 
-// unused
+/**
+Update the edge with a new end vertex. I don't think this is used anywhere important.
+*/
 func (e *Edge) UpdateEnd(newEnd *Vertex) {
 	// should make sure this is right
 	// PrintLog("Doing a questionable thing")
@@ -50,13 +61,17 @@ func (e *Edge) UpdateEnd(newEnd *Vertex) {
 	e.DPath, e.Plan = nil, nil
 }
 
-// get the cached true cost
+/**
+Get the cached true cost.
+*/
 func (e Edge) TrueCost() float64 {
 	return e.trueCost
 }
 
-// Updates the cached true cost of this edge.
-// This is expensive.
+/**
+Updates the cached true cost of this edge.
+This is expensive.
+*/
 func (e *Edge) UpdateTrueCost() float64 {
 	var collisionPenalty float64
 	var newlyCovered common.Path
@@ -86,6 +101,9 @@ func (e *Edge) UpdateTrueCost() float64 {
 	return e.trueCost
 }
 
+/**
+Smooth the tree ending at this edge. This is recursive but on a parent edge each time.
+*/
 func (e *Edge) Smooth() {
 
 	// if e is the start (or somehow there's a cycle...)
@@ -108,6 +126,9 @@ func (e *Edge) Smooth() {
 	}
 }
 
+/**
+Get the time difference between the start and end of an edge.
+*/
 func (e Edge) netTime() float64 {
 	if e.End.State.Time < e.Start.State.Time {
 		PrintError(fmt.Sprintf("Found backwards edge: %s to %s", e.Start.State.String(), e.End.State.String()))

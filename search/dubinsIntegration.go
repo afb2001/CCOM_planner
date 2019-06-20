@@ -64,6 +64,9 @@ func getSamplesAndPlan(path *dubins.Path, startTime float64, toCover common.Path
 	return plan, penalty, newlyCoveredNoDup, t
 }
 
+/**
+Just get a plan to traverse this edge (not compute cost or get the newly covered points).
+*/
 func GetPlan(edge *Edge) (plan *common.Plan) {
 	plan = new(common.Plan)
 	plan.Start.Time = edge.Start.State.Time
@@ -89,6 +92,9 @@ func GetPlan(edge *Edge) (plan *common.Plan) {
 	return
 }
 
+/**
+Compute cost from collisions and newly covered points along the given Dubins path.
+*/
 func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (penalty float64, newlyCovered common.Path, finalTime float64) {
 	t := startTime // unused?
 	callback := func(q *[3]float64, inc float64) int {
