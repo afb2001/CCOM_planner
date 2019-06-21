@@ -94,15 +94,18 @@ func GetPlan(edge *Edge) (plan *common.Plan) {
 
 /**
 Compute cost from collisions and newly covered points along the given Dubins path.
+TODO! -- come up with a better name, line computeEdgeCost or something
+ALso get rid of t in this function
 */
 func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (penalty float64, newlyCovered common.Path, finalTime float64) {
 	t := startTime // unused?
+	// TODO! -- change inc name to something more like accumulated distance
 	callback := func(q *[3]float64, inc float64) int {
 		t = inc/MaxSpeed + startTime
-		collisionProbability := Obst.CollisionExistsWithArray(*q, t)
 		if Grid.IsBlocked(q[0], q[1]) {
 			penalty += CollisionPenalty
-		} else if collisionProbability > 0 {
+		} else {
+			collisionProbability := Obst.CollisionExistsWithArray(*q, t)
 			penalty += CollisionPenalty * collisionProbability
 		}
 		newlyCovered = append(newlyCovered, toCover.NewlyCoveredArray(*q)...) // splash operator I guess
@@ -113,6 +116,7 @@ func getSamples(path *dubins.Path, startTime float64, toCover common.Path) (pena
 
 		return 0
 	}
+	// Ask path to sample along itself at DubinsInc interval, using callback as a callback
 	err := path.SampleMany(DubinsInc, callback)
 
 	if err != dubins.EDUBOK {

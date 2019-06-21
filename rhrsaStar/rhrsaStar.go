@@ -98,6 +98,7 @@ func AStar(qV *VertexQueue, samples *[]*common.State, endTime float64) (vertex *
 			return nil
 		}
 
+		// TODO! -- what the heck?
 		vertex = heap.Pop(qV).(*Vertex)
 	}
 }
@@ -118,7 +119,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	// BestVertex = startV
 	PrintDebugVertex(startV.String(), "Start")
 	samples := make([]*common.State, 0)
-	allSamples := make([]*common.State, 0)
+	lastIterationSamples := make([]*common.State, 0)
 	currentSampleCount := BitStarSamples
 	var totalSampleCount int
 	qV := new(VertexQueue)
@@ -131,11 +132,11 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		if Verbose {
 			PrintVerbose("Starting sampling")
 		}
-		samples = make([]*common.State, len(allSamples)+currentSampleCount)
+		samples = make([]*common.State, len(lastIterationSamples)+currentSampleCount)
 		// samples = make([]*Vertex, BitStarSamples)
-		copy(samples, allSamples)
+		copy(samples, lastIterationSamples)
 		//PrintLog(fmt.Sprintf("Sampling State with distance less than %f", BestVertex.GetCurrentCost()))
-		for m := len(allSamples); m < len(allSamples)+currentSampleCount; m++ {
+		for m := len(lastIterationSamples); m < len(lastIterationSamples)+currentSampleCount; m++ {
 			// for m := 0; m < BitStarSamples; m++ {
 			samples[m] = BoundedBiasedRandomState(&Grid, *toCover, &Start, math.MaxFloat64)
 			PrintDebugVertex(samples[m].String()+" g = 0 h = 0", "sample")
@@ -144,8 +145,8 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		// also sample on the last best Plan
 		//samples = append(samples, LastPlan...) // TODO
 
-		// allSamples = append(allSamples, samples...)
-		allSamples = samples
+		// lastIterationSamples = append(lastIterationSamples, samples...)
+		lastIterationSamples = samples
 		if Verbose {
 			PrintVerbose("Finished sampling")
 		}
@@ -171,7 +172,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 		currentSampleCount += currentSampleCount
 	}
 	if Verbose {
-		PrintVerbose(ShowSamples(make([]*Vertex, 0), allSamples, &Grid, &Start, *toCover))
+		PrintVerbose(ShowSamples(make([]*Vertex, 0), lastIterationSamples, &Grid, &Start, *toCover))
 	}
 	if BestVertex == startV {
 		PrintLog("Couldn't find a plan any better than staying put.")

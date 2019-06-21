@@ -45,6 +45,7 @@ func (s State) DistanceToArray(other [3]float64) float64 {
 	return math.Sqrt((s.X-other[0])*(s.X-other[0]) + (s.Y-other[1])*(s.Y-other[1]))
 }
 
+// NOTE for the port: for getting bearing from change in x, y mod(atan2(dx, dy)*180/PI + 360, 360)
 func (s *State) HeadingTo(other *State) float64 {
 	dx := other.X - s.X
 	dy := other.Y - s.Y
