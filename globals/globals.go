@@ -26,9 +26,10 @@ var (
 	MaxTurningRadius float64
 	MaxSpeed         float64
 	// these should be immutable so no pointers necessary
-	Start common.State
-	Grid  common.Grid
-	Obst  common.Obstacles
+	Start         common.State
+	Grid          common.Grid
+	Obst          common.Obstacles
+	ExpandedCount int
 )
 
 var Solver tsp.Solver

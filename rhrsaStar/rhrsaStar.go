@@ -20,6 +20,7 @@ func ResetGlobals() {
 	Start = common.State{}
 	Obst = nil
 	BestVertex = nil
+	ExpandedCount = 0
 }
 
 //endregion
@@ -27,6 +28,7 @@ func ResetGlobals() {
 //region Expand
 
 func Expand(sourceVertex *Vertex, qV *VertexQueue, samples *[]*common.State) {
+	ExpandedCount += 1
 	for _, e := range GetKClosest(sourceVertex, *samples) {
 		if e == nil {
 			continue
@@ -180,7 +182,7 @@ func FindAStarPlan(startState common.State, toCover *common.Path, timeRemaining 
 	if BestVertex == nil {
 		PrintLog("Couldn't find a plan at all")
 	}
-	PrintLog(fmt.Sprintf("%d total samples", totalSampleCount))
+	PrintLog(fmt.Sprintf("%d total samples, %d expanded", totalSampleCount, ExpandedCount))
 	return
 }
 
